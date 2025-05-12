@@ -1,67 +1,61 @@
+// frontend-react/src/App.tsx
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import React from "react";
+import reactLogo from "./assets/react.svg";
+import viteLogo from "/vite.svg";
+import "./App.css";
+import { fetchTestData } from "./apiService"; // Importa a função da API
 
 function App() {
-  const [backendMessage, setBackendMessage] = useState("");
-  const [userInput, setUserInput] = useState("");
-  const [chatResponse, setChatResponse] = useState("");
+  const [count, setCount] = useState(0);
+  // Estado para armazenar a mensagem vinda do backend
+  const [backendMessage, setBackendMessage] = useState<string>(
+    "Carregando mensagem do backend..."
+  );
 
-  // Teste para a rota raiz do backend
+  // useEffect para chamar a API quando o componente montar
   useEffect(() => {
-    fetch("http://localhost:8000/") // URL do seu backend FastAPI
-      .then((response) => response.json())
-      .then((data) => setBackendMessage(data.message))
-      .catch((error) => console.error("Erro ao buscar no backend:", error));
-  }, []);
-
-  const handleSendMessage = async () => {
-    if (!userInput.trim()) return;
-    try {
-      const response = await fetch("http://localhost:8000/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          chat_id: "test-chat-001",
-          user_input: userInput,
-        }),
+    fetchTestData()
+      .then((data) => {
+        // Assume que a API retorna { message: "Alguma coisa" }
+        setBackendMessage(
+          data.message || "Mensagem recebida, mas formato inesperado."
+        );
+      })
+      .catch((error) => {
+        console.error("Falha ao buscar dados do backend:", error);
+        setBackendMessage(
+          "Falha ao conectar com o backend. Verifique o console."
+        );
       });
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`);
-      }
-      const data = await response.json();
-      setChatResponse(data.ia_response);
-      setUserInput(""); // Limpa o input
-    } catch (error) {
-      console.error("Erro ao enviar mensagem:", error);
-      setChatResponse(`Erro ao comunicar com a IA: ${error}`);
-    }
-  };
+  }, []); // Array vazio significa que roda apenas uma vez na montagem
 
   return (
-    <div className="App">
-      <h1>Meu App de Roleplay</h1>
-      <p>Mensagem do Backend: {backendMessage}</p>
+    <>
       <div>
-        <input
-          type="text"
-          value={userInput}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-            setUserInput(e.target.value)
-          } // Tipagem explícita do evento
-          placeholder="Digite sua mensagem..."
-        />
-        <button onClick={handleSendMessage}>Enviar</button>
+        <a href="https://vitejs.dev" target="_blank">
+          <img src={viteLogo} className="logo" alt="Vite logo" />
+        </a>
+        <a href="https://react.dev" target="_blank">
+          <img src={reactLogo} className="logo react" alt="React logo" />
+        </a>
       </div>
-      {chatResponse && (
-        <div>
-          <h3>Resposta da IA:</h3>
-          <p>{chatResponse}</p>
-        </div>
-      )}
-    </div>
+      <h1>Vite + React + ARE</h1>
+      {/* Exibe a mensagem do backend */}
+      <p>
+        <strong>Mensagem do Backend:</strong> {backendMessage}
+      </p>
+      <div className="card">
+        <button onClick={() => setCount((count) => count + 1)}>
+          count is {count}
+        </button>
+        <p>
+          Edit <code>src/App.tsx</code> and save to test HMR
+        </p>
+      </div>
+      <p className="read-the-docs">
+        Click on the Vite and React logos to learn more
+      </p>
+    </>
   );
 }
 

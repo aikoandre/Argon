@@ -1,2 +1,7 @@
 .aider*
 .env
+.msi
+app_data/
+node_modules/
+.electron/
+__pycache__/
