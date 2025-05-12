@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* React/JSX */
+    "jsx": "react-jsx", // Adicionado/Modificado para suportar JSX
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    // "erasableSyntaxOnly": true, // Esta opção não é padrão e pode causar problemas, removendo.
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+
+    /* Outras opções comuns para React */
+    "esModuleInterop": true, // Ajuda com imports padrão
+    "allowSyntheticDefaultImports": true, // Permite imports como `import React from 'react'`
+    "forceConsistentCasingInFileNames": true, // Garante consistência no nome dos arquivos
+    "isolatedModules": false // Necessário para algumas ferramentas de build como Vite
+  },
+  "include": ["src/**/*"]
+}
