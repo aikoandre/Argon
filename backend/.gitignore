@@ -1,0 +1,12 @@
+# backend/.gitignore
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+are_database.db
+are_database.db-journal
+alembic.log
+```8.  **Crie `backend/database.py`:**
+```python
