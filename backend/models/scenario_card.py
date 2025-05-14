@@ -1,6 +1,7 @@
 # backend/models/scenario_card.py
 import uuid
-from sqlalchemy import Column, String, Text, DateTime, JSON
+from sqlalchemy import Column, String, Text, DateTime, JSON, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from ..database import Base
 
@@ -13,9 +14,10 @@ class ScenarioCard(Base):
     beginning_message = Column(Text, nullable=True) # Mensagem de abertura padrão para este cenário
     # Referências a WorldCards relevantes para o cenário (ex: locais chave, facções envolvidas)
     # Poderia ser uma lista de UUIDs de WorldCards, ou uma busca por tags no futuro.
-    world_card_references = Column(JSON, nullable=True) # Ex: {"tags_to_include": ["vila_inicial", "floresta_misteriosa"]}
-    # Referências a EventCards (quando criarmos EventCard)
-    # event_card_references = Column(JSON, nullable=True)
+    world_card_references = Column(JSON, nullable=True)
+    
+    master_world_id = Column(String, ForeignKey("master_worlds.id"), nullable=False, index=True)
+    master_world = relationship("MasterWorld", back_populates="scenario_cards")
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

@@ -1,21 +1,22 @@
 # backend/routers/chat.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
 import uuid # Para gerar IDs de sessão se necessário (embora o modelo já faça isso)
 
 # Importe modelos SQLAlchemy
-from ..models.chat_session import ChatSession
-from ..models.chat_message import ChatMessage
-from ..models.scenario_card import ScenarioCard # Para buscar o nome/descrição do cenário
-from ..models.character_card import CharacterCard # Para buscar nome do GM
-from ..models.user_persona import UserPersona # Para buscar nome da persona
+from backend.models.chat_session import ChatSession
+from backend.models.chat_message import ChatMessage
+from backend.models.scenario_card import ScenarioCard # Para buscar o nome/descrição do cenário
+from backend.models.character_card import CharacterCard # Para buscar nome do GM
+from backend.models.user_persona import UserPersona # Para buscar nome da persona
 
 # Importe schemas Pydantic
-from ..schemas.chat_session import ChatSessionCreate, ChatSessionInDB, ChatSessionUpdate, ChatSessionListed
-from ..schemas.chat_message import ChatMessageCreate, ChatMessageInDB
+from backend.schemas.chat_session import ChatSessionCreate, ChatSessionInDB, ChatSessionUpdate, ChatSessionListed
+from backend.schemas.chat_message import ChatMessageCreate, ChatMessageInDB
 
-from ..database import get_db
+from backend.database import get_db
 
 router = APIRouter(
     prefix="/api/chats",

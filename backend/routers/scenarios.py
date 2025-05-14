@@ -4,11 +4,11 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 # Importe o modelo SQLAlchemy e os schemas Pydantic
-from ..models.scenario_card import ScenarioCard
-from ..schemas.scenario_card import ScenarioCardCreate, ScenarioCardUpdate, ScenarioCardInDB
+from models.scenario_card import ScenarioCard
+from schemas.scenario_card import ScenarioCardCreate, ScenarioCardUpdate, ScenarioCardInDB
 # Poderia importar WorldCard para validar referências, mas pode ficar complexo por enquanto
 
-from ..database import get_db
+from database import get_db
 
 router = APIRouter(
     prefix="/api/scenarios",
@@ -21,9 +21,31 @@ def create_scenario_card(
 ):
     """
     Cria um novo Scenario Card.
+    Valida se o master_world_id existe e se os world_card_references pertencem ao mesmo mundo.
     """
-    # Validações de world_card_references podem ser adicionadas aqui se necessário
-    # Por exemplo, verificar se os IDs ou tags referenciados existem
+    from models.master_world import MasterWorld
+    from models.lore_entry import LoreEntry
+    
+    # Verifica se o master_world existe
+    master_world = db.query(MasterWorld).filter(MasterWorld.id == scenario.master_world_id).first()
+    if not master_world:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Master world not found"
+        )
+
+    # Valida world_card_references se existirem
+    if scenario.world_card_references:
+        invalid_lore = db.query(LoreEntry).filter(
+            LoreEntry.id.in_(scenario.world_card_references),
+            LoreEntry.master_world_id != scenario.master_world_id
+        ).first()
+        if invalid_lore:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"World card {invalid_lore.id} does not belong to master world {scenario.master_world_id}"
+            )
+
     db_scenario = ScenarioCard(**scenario.model_dump())
     db.add(db_scenario)
     db.commit()

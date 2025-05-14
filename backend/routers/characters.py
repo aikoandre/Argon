@@ -20,10 +20,32 @@ def create_character_card(
 ):
     """
     Cria um novo Character Card (NPC/GM para a IA).
+    Valida se o master_world_id existe e se os linked_lore_ids pertencem ao mesmo mundo.
     """
-    # Nota: JSON fields (example_dialogues) são tratados automaticamente
-    db_character = CharacterCard(**character.model_dump()) # Pydantic V2
-    # Para Pydantic V1: db_character = CharacterCard(**character.dict())
+    from models.master_world import MasterWorld
+    from models.lore_entry import LoreEntry
+    
+    # Verifica se o master_world existe
+    master_world = db.query(MasterWorld).filter(MasterWorld.id == character.master_world_id).first()
+    if not master_world:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Master world not found"
+        )
+
+    # Valida linked_lore_ids se existirem
+    if character.linked_lore_ids:
+        invalid_lore = db.query(LoreEntry).filter(
+            LoreEntry.id.in_(character.linked_lore_ids),
+            LoreEntry.master_world_id != character.master_world_id
+        ).first()
+        if invalid_lore:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Lore entry {invalid_lore.id} does not belong to master world {character.master_world_id}"
+            )
+
+    db_character = CharacterCard(**character.model_dump())
     db.add(db_character)
     db.commit()
     db.refresh(db_character)

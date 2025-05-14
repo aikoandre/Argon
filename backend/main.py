@@ -8,7 +8,9 @@ from .routers import llm_providers as llm_providers_router
 from .routers import chat as chat_router
 from .routers import personas as personas_router
 from .routers import characters as characters_router
-from .routers import world_cards as world_cards_router
+from .routers import master_worlds as master_worlds_router
+from .routers.lore_entries import master_world_router as lore_entries_scoped_router
+from .routers.lore_entries import lore_entry_ops_router
 from .routers import scenarios as scenarios_router
 
 # Cria todas as tabelas definidas em Base (Alembic é preferível para produção)
@@ -40,8 +42,9 @@ app.include_router(llm_providers_router.router)
 app.include_router(chat_router.router)
 app.include_router(personas_router.router)
 app.include_router(characters_router.router)
-app.include_router(world_cards_router.router)
-app.include_router(scenarios_router.router)
+app.include_router(master_worlds_router.router)  # /api/master_worlds
+app.include_router(lore_entries_scoped_router)   # /api/master_worlds/{master_world_id}/lore_entries
+app.include_router(lore_entry_ops_router)        # /api/lore_entries/{entry_id}
 
 if __name__ == "__main__":
     import uvicorn

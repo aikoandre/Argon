@@ -6,19 +6,20 @@ import PersonasPage from "./pages/PersonasPage";
 import ChatsListPage from "./pages/ChatsListPage";
 import NewChatPage from "./pages/NewChatPage";
 import ChatPage from "./pages/ChatPage";
+import CharactersPage from "./pages/CharactersPage";
+import MasterWorldsPage from "./pages/MasterWorldsPage";
+import LoreEntriesPage from "./pages/LoreEntriesPage";
+import ScenariosPage from "./pages/ScenariosPage";
 import "./App.css";
 
 function App() {
   return (
     <Router>
-      <div className="bg-gray-900 text-gray-100 min-h-screen flex flex-col md:flex-row">
+      {" "}
+      <div className="min-h-screen flex flex-col md:flex-row bg-gray-900 text-gray-100">
         {/* Sidebar */}
-        <nav className="bg-gray-800 p-4 shadow-md w-full md:w-64 md:min-h-screen">
-          {" "}
-          {/* Ajustado para sidebar */}
-          <div className="container mx-auto md:mx-0 md:flex md:flex-col space-y-4">
-            {" "}
-            {/* Ajustes para layout de sidebar */}
+        <nav className="bg-gray-800 p-4 shadow-md flex-shrink-0 w-full md:w-64">
+          <div className="flex flex-col space-y-2">
             <div className="text-2xl font-bold mb-6 text-center md:text-left">
               Argon
             </div>
@@ -33,42 +34,60 @@ function App() {
               className="block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
             >
               Chats
-            </Link>{" "}
-            {/* <<--- Link */}
+            </Link>
             <Link
               to="/personas"
               className="block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
             >
               My Personas
             </Link>
-            {/* Adicione links para Characters, Scenarios, WorldLore aqui */}
+            <Link
+              to="/characters"
+              className="block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
+            >
+              AI Characters
+            </Link>
+            <Link
+              to="/scenarios"
+              className="block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
+            >
+              Scenarios
+            </Link>{" "}
+            <Link
+              to="/world-lore"
+              className="block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
+            >
+              World Lore
+            </Link>{" "}
+            {/* <<--- NOVO */}
+            {/* Colocando Settings no final da lista principal */}
             <Link
               to="/settings"
-              className="block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors mt-auto"
+              className="block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
             >
               Settings
-            </Link>{" "}
-            {/* mt-auto para empurrar para baixo */}
+            </Link>
           </div>
-        </nav>
-
-        {/* Área de Conteúdo Principal */}
-        <main className="flex-grow">
-          {" "}
-          {/* flex-grow para ocupar o resto do espaço */}
-          {/* O padding pode ser aplicado aqui ou nas páginas individuais */}
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/personas" element={<PersonasPage />} />
-            <Route path="/chats" element={<ChatsListPage />} />{" "}
-            {/* <<--- Rota */}
-            <Route path="/new-chat" element={<NewChatPage />} />{" "}
-            {/* <<--- Rota */}
-            <Route path="/chat/:chatId" element={<ChatPage />} />{" "}
-            {/* <<--- Rota */}
-            {/* Adicione mais rotas aqui */}
-          </Routes>
+        </nav>{" "}
+        {/* Main Content Area */}
+        <main className="flex-grow min-h-screen p-4 md:p-6 overflow-auto">
+          <div className="container mx-auto">
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/chats" element={<ChatsListPage />} />
+              <Route path="/new-chat" element={<NewChatPage />} />
+              <Route path="/chat/:chatId" element={<ChatPage />} />
+              <Route path="/personas" element={<PersonasPage />} />
+              <Route path="/characters" element={<CharactersPage />} />
+              <Route path="/scenarios" element={<ScenariosPage />} />
+              <Route path="/world-lore" element={<MasterWorldsPage />} />
+              <Route
+                path="/world-lore/:worldId/entries"
+                element={<LoreEntriesPage />}
+              />
+              <Route path="/settings" element={<SettingsPage />} />
+            </Routes>
+          </div>
         </main>
       </div>
     </Router>

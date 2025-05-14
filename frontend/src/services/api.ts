@@ -3,7 +3,7 @@ import axios from "axios";
 import type {
   UserSettingsData,
   UserSettingsUpdateData,
-} from "../types/settings"; // Supondo que types/settings.ts existe e define estes
+} from "../types/settings";
 
 const apiClient = axios.create({
   baseURL: "http://localhost:8000/api", // URL do seu backend FastAPI
@@ -157,8 +157,10 @@ export interface CharacterCardData {
   name: string;
   description?: string | null;
   instructions?: string | null;
-  example_dialogues?: Record<string, any>[] | string[] | null; // Ajuste conforme seu schema
-  beginning_message?: string | null;
+  example_dialogues?: Record<string, any>[] | string[] | null;
+  beginning_messages: string[] | null;
+  master_world_id: string;
+  linked_lore_ids: string[] | null;
   created_at: string;
   updated_at?: string | null;
 }
@@ -168,7 +170,9 @@ export interface CharacterCardCreateData {
   description?: string | null;
   instructions?: string | null;
   example_dialogues?: Record<string, any>[] | string[] | null;
-  beginning_message?: string | null;
+  beginning_messages: string[] | null;
+  master_world_id: string;
+  linked_lore_ids: string[] | null;
 }
 
 export interface CharacterCardUpdateData {
@@ -176,7 +180,8 @@ export interface CharacterCardUpdateData {
   description?: string | null;
   instructions?: string | null;
   example_dialogues?: Record<string, any>[] | string[] | null;
-  beginning_message?: string | null;
+  beginning_messages: string[] | null;
+  linked_lore_ids: string[] | null;
 }
 
 export const createCharacterCard = async (
@@ -189,8 +194,16 @@ export const createCharacterCard = async (
   return response.data;
 };
 
-export const getAllCharacterCards = async (): Promise<CharacterCardData[]> => {
-  const response = await apiClient.get<CharacterCardData[]>("/characters");
+export const getAllCharacterCards = async (
+  masterWorldId?: string
+): Promise<CharacterCardData[]> => {
+  const params: Record<string, string> = {};
+  if (masterWorldId) {
+    params.master_world_id = masterWorldId;
+  }
+  const response = await apiClient.get<CharacterCardData[]>("/characters", {
+    params,
+  });
   return response.data;
 };
 
@@ -226,7 +239,8 @@ export interface ScenarioCardData {
   name: string;
   description?: string | null;
   beginning_message?: string | null;
-  world_card_references?: Record<string, any> | null; // Ajuste conforme seu schema
+  master_world_id: string;
+  lore_entry_references?: string[] | null;
   created_at: string;
   updated_at?: string | null;
 }
@@ -234,13 +248,14 @@ export interface ScenarioCardCreateData {
   name: string;
   description?: string | null;
   beginning_message?: string | null;
-  world_card_references?: Record<string, any> | null;
+  master_world_id: string;
+  lore_entry_references?: string[] | null;
 }
 export interface ScenarioCardUpdateData {
   name?: string;
   description?: string | null;
   beginning_message?: string | null;
-  world_card_references?: Record<string, any> | null;
+  lore_entry_references?: string[] | null;
 }
 
 export const createScenarioCard = async (
@@ -282,81 +297,135 @@ export const deleteScenarioCard = async (scenarioId: string): Promise<void> => {
   await apiClient.delete(`/scenarios/${scenarioId}`);
 };
 
-// --- World Cards (Lore) ---
-export interface WorldCardData {
+// --- Master Worlds ---
+export interface MasterWorldData {
   id: string;
   name: string;
-  card_type: string;
+  description?: string | null;
+  tags?: string[] | null;
+  created_at: string;
+  updated_at?: string | null;
+}
+
+export const getMasterWorldById = async (
+  id: string
+): Promise<MasterWorldData> => {
+  const response = await apiClient.get<MasterWorldData>(`/master_worlds/${id}`);
+  return response.data;
+};
+
+export const getAllMasterWorlds = async (): Promise<MasterWorldData[]> => {
+  const response = await apiClient.get<MasterWorldData[]>("/master_worlds");
+  return response.data;
+};
+
+export const createMasterWorld = async (data: {
+  name: string;
+  description?: string | null;
+  tags?: string[] | null;
+}): Promise<MasterWorldData> => {
+  const response = await apiClient.post<MasterWorldData>(
+    "/master_worlds",
+    data
+  );
+  return response.data;
+};
+
+export const updateMasterWorld = async (
+  id: string,
+  data: { name?: string; description?: string | null; tags?: string[] | null }
+): Promise<MasterWorldData> => {
+  const response = await apiClient.put<MasterWorldData>(
+    `/master_worlds/${id}`,
+    data
+  );
+  return response.data;
+};
+
+export const deleteMasterWorld = async (id: string): Promise<void> => {
+  await apiClient.delete(`/master_worlds/${id}`);
+};
+
+// --- Lore Entries ---
+export interface LoreEntryData {
+  id: string;
+  master_world_id: string;
+  name: string;
+  entry_type: string;
   description?: string | null;
   tags?: string[] | null;
   aliases?: string[] | null;
-  attributes?: Record<string, any> | null;
   faction_id?: string | null;
   created_at: string;
   updated_at?: string | null;
 }
-export interface WorldCardCreateData {
+
+export interface LoreEntryCreateData {
   name: string;
-  card_type: string;
+  entry_type: string;
   description?: string | null;
   tags?: string[] | null;
   aliases?: string[] | null;
-  attributes?: Record<string, any> | null;
   faction_id?: string | null;
 }
-export interface WorldCardUpdateData {
+
+export interface LoreEntryUpdateData {
   name?: string;
-  card_type?: string;
+  entry_type?: string;
   description?: string | null;
   tags?: string[] | null;
   aliases?: string[] | null;
-  attributes?: Record<string, any> | null;
   faction_id?: string | null;
 }
 
-export const createWorldCard = async (
-  worldCardData: WorldCardCreateData
-): Promise<WorldCardData> => {
-  const response = await apiClient.post<WorldCardData>(
-    "/world_cards",
-    worldCardData
-  );
-  return response.data;
-};
-
-export const getAllWorldCards = async (
-  cardType?: string
-): Promise<WorldCardData[]> => {
+export const getAllLoreEntriesForMasterWorld = async (
+  masterWorldId: string,
+  entryType?: string
+): Promise<LoreEntryData[]> => {
   const params: Record<string, string> = {};
-  if (cardType) {
-    params.card_type = cardType;
+  if (entryType) {
+    params.entry_type = entryType;
   }
-  const response = await apiClient.get<WorldCardData[]>("/world_cards", {
-    params,
-  });
-  return response.data;
-};
-
-export const getWorldCardById = async (
-  cardId: string
-): Promise<WorldCardData> => {
-  const response = await apiClient.get<WorldCardData>(`/world_cards/${cardId}`);
-  return response.data;
-};
-
-export const updateWorldCard = async (
-  cardId: string,
-  worldCardData: WorldCardUpdateData
-): Promise<WorldCardData> => {
-  const response = await apiClient.put<WorldCardData>(
-    `/world_cards/${cardId}`,
-    worldCardData
+  const response = await apiClient.get<LoreEntryData[]>(
+    `/master_worlds/${masterWorldId}/lore_entries`,
+    { params }
   );
   return response.data;
 };
 
-export const deleteWorldCard = async (cardId: string): Promise<void> => {
-  await apiClient.delete(`/world_cards/${cardId}`);
+export const createLoreEntryForMasterWorld = async (
+  masterWorldId: string,
+  data: LoreEntryCreateData
+): Promise<LoreEntryData> => {
+  const response = await apiClient.post<LoreEntryData>(
+    `/master_worlds/${masterWorldId}/lore_entries`,
+    data
+  );
+  return response.data;
+};
+
+export const getLoreEntryById = async (
+  entryId: string
+): Promise<LoreEntryData> => {
+  const response = await apiClient.get<LoreEntryData>(
+    `/lore_entries/${entryId}`
+  );
+  return response.data;
+};
+
+export const updateLoreEntry = async (
+  entryId: string,
+  data: LoreEntryUpdateData
+): Promise<LoreEntryData> => {
+  const response = await apiClient.put<LoreEntryData>(
+    `/lore_entries/${entryId}`,
+    data
+  );
+  return response.data;
+};
+
+export const deleteLoreEntry = async (entryId: string): Promise<void> => {
+  await apiClient.delete(`/lore_entries/${entryId}`);
 };
 
 // --- Chat Sessions & Messages ---

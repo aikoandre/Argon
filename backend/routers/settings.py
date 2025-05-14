@@ -1,11 +1,11 @@
 # backend/routers/settings.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from typing import Optional
 
-from ..models.user_settings import UserSettings
-from ..schemas.user_settings import UserSettingsInDB, UserSettingsUpdate
-from ..database import get_db
+from backend.models.user_settings import UserSettings
+from backend.schemas.user_settings import UserSettingsInDB, UserSettingsUpdate
+from backend.database import get_db
 
 router = APIRouter(
     prefix="/api/settings",

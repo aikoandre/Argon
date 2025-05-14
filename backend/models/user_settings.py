@@ -1,6 +1,7 @@
 # backend/models/user_settings.py
 from sqlalchemy import Column, Integer, String, Boolean # Boolean é opcional, só se for usar
-from ..database import Base
+from sqlalchemy import Column, Integer, String
+from backend.database import Base
 
 class UserSettings(Base):
     __tablename__ = "user_settings"

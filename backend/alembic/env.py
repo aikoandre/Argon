@@ -15,6 +15,8 @@ if project_dir not in sys.path:
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -28,13 +30,17 @@ if config.config_file_name is not None:
 
 from backend.database import Base as AppBase
 
-from backend.models import user_settings
-from backend.models import user_persona
-from backend.models import character_card
-from backend.models import world_card
-from backend.models import scenario_card
-from backend.models import chat_session
-from backend.models import chat_message
+# Import all models to ensure they're registered with SQLAlchemy
+from backend.models import (
+    user_settings,
+    user_persona,
+    character_card,
+    master_world,
+    lore_entry,
+    scenario_card,
+    chat_session,
+    chat_message
+)
 
 target_metadata = AppBase.metadata
 
