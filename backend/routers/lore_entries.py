@@ -3,10 +3,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from models.lore_entry import LoreEntry
-from models.master_world import MasterWorld # Para validar master_world_id
-from schemas.lore_entry import LoreEntryCreate, LoreEntryUpdate, LoreEntryInDB, VALID_ENTRY_TYPES
-from database import get_db
+from ..models.lore_entry import LoreEntry
+from ..models.master_world import MasterWorld # Para validar master_world_id
+from ..schemas.lore_entry import LoreEntryCreate, LoreEntryUpdate, LoreEntryInDB, VALID_ENTRY_TYPES
+from ..database import get_db
 
 router = APIRouter(
     prefix="/api/lore_entries",
@@ -153,9 +153,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from models.lore_entry import LoreEntry
-from schemas.lore_entry import LoreEntryInDB
-from database import get_db
+from ..models.lore_entry import LoreEntry
+from ..schemas.lore_entry import LoreEntryInDB
+from ..database import get_db
 
 router = APIRouter(
     prefix="/api/lore_entries",

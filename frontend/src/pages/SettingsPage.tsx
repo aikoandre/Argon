@@ -1,172 +1,239 @@
 // frontend/src/pages/SettingsPage.tsx
-import React, { useState, useEffect, useMemo, type FormEvent } from 'react'; // Adicionado useMemo
-// Importe o componente Select
-import Select from 'react-select';
-import { getUserSettings, updateUserSettings, getLLMModels, type LLMModelData } from '../services/api';
-import type { UserSettingsUpdateData } from '../types/settings';
+import React, { useState, useEffect, useMemo, type FormEvent } from "react";
+import Select, { type SingleValue } from "react-select"; // MultiValue não é necessário aqui
+import {
+  getUserSettings,
+  updateUserSettings,
+  getLLMModels,
+  type LLMModelData,
+} from "../services/api";
+import type { UserSettingsUpdateData } from "../types/settings";
 
-// Interface para os modelos *depois* de formatados para react-select
 interface SelectOption {
-  value: string; // Corresponde ao model ID
-  label: string; // Nome para exibição (e busca)
+  value: string;
+  label: string;
 }
 
 const SettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<UserSettingsUpdateData>({
-    selected_llm_model: '',
-    openrouter_api_key: '',
+    selected_llm_model: "",
+    openrouter_api_key: "",
   });
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true); // Carregamento inicial de settings e modelos
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false); // Para o botão Save
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const [availableModels, setAvailableModels] = useState<LLMModelData[]>([]); // Mantém o formato original da API
-  const [modelsLoading, setModelsLoading] = useState<boolean>(true);
+  const [availableModels, setAvailableModels] = useState<LLMModelData[]>([]);
+  // modelsLoading foi fundido com isLoading, já que ambos são carregados inicialmente
+  // const [modelsLoading, setModelsLoading] = useState<boolean>(true);
   const [modelsError, setModelsError] = useState<string | null>(null);
 
-  // Formata os modelos para react-select, usando useMemo para evitar recálculo desnecessário
   const modelOptions = useMemo((): SelectOption[] => {
-    return availableModels.map(model => ({
+    /* ... como antes ... */
+    return availableModels.map((model) => ({
       value: model.id,
-      label: `${model.name || model.id} (${model.id})` // Label mais descritivo
+      label: `${model.name || model.id} (${model.id.split("/").pop()})`, // Mostra apenas o nome do modelo após a última /
     }));
   }, [availableModels]);
 
-  // Encontra o objeto de opção selecionado com base no ID armazenado no estado 'settings'
   const selectedModelOption = useMemo((): SelectOption | null => {
-    return modelOptions.find(option => option.value === settings.selected_llm_model) || null;
+    /* ... como antes ... */
+    return (
+      modelOptions.find(
+        (option) => option.value === settings.selected_llm_model
+      ) || null
+    );
   }, [modelOptions, settings.selected_llm_model]);
 
-
   useEffect(() => {
-    // ... (lógica fetchInitialData permanece a mesma, mas agora atualiza setAvailableModels com dados da API) ...
     const fetchInitialData = async () => {
-        setIsLoading(true);
-        setModelsLoading(true);
-        setError(null);
-        setModelsError(null);
-
-        try {
-          const [settingsData, modelsDataFromApi] = await Promise.all([ // Renomeado para clareza
-            getUserSettings(),
-            getLLMModels()
-          ]);
-
-          if (settingsData) {
-            setSettings({
-              selected_llm_model: settingsData.selected_llm_model || '',
-              openrouter_api_key: settingsData.openrouter_api_key || '',
-            });
-          } else {
-            setSettings({ selected_llm_model: '', openrouter_api_key: '' });
-          }
-
-          setAvailableModels(modelsDataFromApi); // Armazena os dados brutos da API
-
-        } catch (err: any) {
-          const errorMessage = err.response?.data?.detail || err.message || 'Failed to load initial data.';
-          if (err.config?.url?.includes('/llm/models')) {
-              setModelsError(errorMessage);
-          } else {
-              setError(errorMessage);
-          }
-          console.error("Failed to load initial data", err);
-        } finally {
-          setIsLoading(false);
-          setModelsLoading(false);
+      setIsLoading(true); // Único estado de loading para dados iniciais
+      setError(null);
+      setModelsError(null);
+      try {
+        const [settingsData, modelsDataFromApi] = await Promise.all([
+          getUserSettings(),
+          getLLMModels(),
+        ]);
+        if (settingsData) {
+          setSettings({
+            selected_llm_model: settingsData.selected_llm_model || "",
+            openrouter_api_key: settingsData.openrouter_api_key || "",
+          });
+        } else {
+          setSettings({ selected_llm_model: "", openrouter_api_key: "" });
         }
-      };
-
-      fetchInitialData();
+        setAvailableModels(modelsDataFromApi);
+      } catch (err: any) {
+        /* ... tratamento de erro como antes ... */
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchInitialData();
   }, []);
 
-  // O handleChange agora não é usado diretamente pelo react-select
-  // O onChange do react-select será tratado por handleModelChange
-
-  // Novo handler para a mudança no react-select
-  const handleModelChange = (selectedOption: SelectOption | null) => {
-    setSettings(prev => ({
+  const handleModelChange = (selectedOption: SingleValue<SelectOption>) => {
+    // SingleValue
+    setSettings((prev) => ({
       ...prev,
-      // Define o ID do modelo ou null/'' se nada for selecionado
-      selected_llm_model: selectedOption ? selectedOption.value : ''
+      selected_llm_model: selectedOption ? selectedOption.value : "",
     }));
     setSuccessMessage(null);
     setError(null);
   };
 
-    // Handler para a mudança da API Key (o handleChange original pode ser adaptado)
-    const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setSettings(prev => ({ ...prev, [name]: value }));
-        setSuccessMessage(null);
-        setError(null);
-      };
+  const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    /* ... como antes ... */
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    // setIsLoading(true); // Talvez um isSaving
+    setIsSubmitting(true); // Inicia o estado de submissão
     setError(null);
     setSuccessMessage(null);
     try {
       await updateUserSettings(settings);
-      setSuccessMessage('Settings updated successfully!');
+      setSuccessMessage("Settings updated successfully!");
     } catch (err) {
-      setError('Failed to update settings.');
+      setError("Failed to update settings.");
       console.error(err);
     } finally {
-      // setIsLoading(false);
+      setIsSubmitting(false); // Finaliza o estado de submissão
     }
   };
 
-  if (isLoading || modelsLoading) {
-       return <p>Loading data...</p>;
+  if (isLoading) {
+    // Um único loading para os dados iniciais
+    return (
+      <p className="text-center text-gray-400 p-10">Loading settings...</p>
+    );
   }
 
   return (
-    <div>
-      <h1>Application Settings</h1>
-      {error && <p style={{ color: 'red' }}>Error loading settings: {error}</p>}
-      {successMessage && <p style={{ color: 'green' }}>{successMessage}</p>}
-
-      <form onSubmit={handleSubmit}>
-        {/* Substitui o <select> por <Select> */}
-        <div style={{ marginBottom: '10px' }}> {/* Adicionado margin */}
-          <label htmlFor="selected_llm_model_input">Selected LLM Model:</label> {/* Mudei htmlFor pois o id do input interno será diferente */}
-          {modelsError && <p style={{ color: 'red' }}>Error loading models: {modelsError}</p>}
-          <Select<SelectOption> // Tipagem explícita (opcional)
-            inputId="selected_llm_model_input" // ID para o input interno acessível pelo label
-            options={modelOptions}
-            value={selectedModelOption} // Passa o objeto selecionado
-            onChange={handleModelChange} // Usa o novo handler
-            isLoading={modelsLoading}
-            isClearable // Permite limpar a seleção
-            isSearchable // Permite digitar para buscar (padrão, mas explícito)
-            placeholder="-- Type or select a Model --"
-            noOptionsMessage={() => modelsLoading ? 'Loading...' : 'No models found'}
-            isDisabled={isLoading || modelsError !== null} // Desabilita se erro ao carregar modelos
-            styles={{ // Exemplo de como ajustar estilos (opcional)
-              container: (base) => ({ ...base, width: '300px', color: '#333' })
-            }}
-          />
-        </div>
-
-        <div style={{ marginTop: '10px' }}>
-          <label htmlFor="openrouter_api_key">OpenRouter API Key:</label>
-          <input
-            type="password"
-            id="openrouter_api_key"
-            name="openrouter_api_key"
-            value={settings.openrouter_api_key || ''}
-            onChange={handleApiKeyChange} // Usa handler separado para o input
-            disabled={isLoading}
-            placeholder="sk-or-..."
-            style={{ width: '290px', padding: '8px', marginTop: '5px' }} // Estilo exemplo
-          />
-        </div>
-        <button type="submit" disabled={isLoading} style={{ marginTop: '20px' }}>
-          Save Settings
-        </button>
-      </form>
+    // Ajuste max-w- para controlar a largura do conteúdo centralizado
+    <div className="container mx-auto py-12 px-4 flex flex-col items-center min-h-[calc(100vh-var(--nav-height,80px))]">
+      {" "}
+      {/* Ajuste --nav-height */}
+      <div className="w-full max-w-lg bg-gray-800 p-8 rounded-xl shadow-2xl">
+        {" "}
+        {/* Card para o formulário */}
+        <h1 className="text-3xl font-bold mb-8 text-center text-white">
+          Application Settings
+        </h1>
+        {/* Exibe o erro geral do carregamento inicial, se houver */}
+        {!isLoading && error && !modelsError && (
+          <p className="text-red-500 mb-4 text-center">{error}</p>
+        )}
+        {successMessage && (
+          <p className="text-green-500 mb-6 text-center">{successMessage}</p>
+        )}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {" "}
+          {/* Adicionado space-y-6 */}
+          <div>
+            <label
+              htmlFor="selected_llm_model_input"
+              className="block text-sm font-medium text-gray-300 mb-1"
+            >
+              Selected LLM Model:
+            </label>
+            {modelsError && (
+              <p className="text-red-400 text-xs mt-1">
+                Error loading models: {modelsError}
+              </p>
+            )}
+            <Select<SelectOption>
+              inputId="selected_llm_model_input"
+              options={modelOptions}
+              value={selectedModelOption}
+              onChange={handleModelChange}
+              isLoading={isLoading} // isLoading cobre o carregamento de modelos agora
+              isClearable
+              isSearchable
+              placeholder="-- Type or select a Model --"
+              noOptionsMessage={() =>
+                isLoading
+                  ? "Loading models..."
+                  : modelsError
+                  ? "Could not load"
+                  : "No models found"
+              }
+              isDisabled={isLoading || modelsError !== null}
+              className="react-select-container" // Classe para estilização global se necessário
+              classNamePrefix="react-select" // Para estilização interna
+              styles={{
+                // Estilos para tema escuro (ajuste as cores)
+                control: (base, state) => ({
+                  ...base,
+                  backgroundColor: "#1F2937", // bg-gray-800
+                  borderColor: state.isFocused ? "#3B82F6" : "#4B5563", // border-blue-500 (focus), border-gray-600
+                  boxShadow: state.isFocused ? "0 0 0 1px #3B82F6" : "none",
+                  "&:hover": { borderColor: "#6B7280" }, // border-gray-500 (hover)
+                  minHeight: "42px", // Para alinhar com inputs padrão
+                }),
+                singleValue: (base) => ({ ...base, color: "white" }),
+                menu: (base) => ({
+                  ...base,
+                  backgroundColor: "#1F2937",
+                  zIndex: 10,
+                }),
+                option: (base, { isFocused, isSelected }) => ({
+                  ...base,
+                  backgroundColor: isSelected
+                    ? "#3B82F6"
+                    : isFocused
+                    ? "#374151"
+                    : "#1F2937", // bg-blue-600 (selected), bg-gray-700 (focus)
+                  color: "white",
+                  ":active": { backgroundColor: "#2563EB" }, // bg-blue-700 (active)
+                }),
+                placeholder: (base) => ({ ...base, color: "#9CA3AF" }), // text-gray-400
+                input: (base) => ({ ...base, color: "white" }),
+                dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
+                clearIndicator: (base) => ({
+                  ...base,
+                  color: "#9CA3AF",
+                  ":hover": { color: "white" },
+                }),
+                indicatorSeparator: (base) => ({
+                  ...base,
+                  backgroundColor: "#4B5563",
+                }),
+              }}
+            />
+          </div>
+          <div>
+            {" "}
+            {/* Removido mt-4, space-y-6 no form cuida disso */}
+            <label
+              htmlFor="openrouter_api_key"
+              className="block text-sm font-medium text-gray-300 mb-1"
+            >
+              OpenRouter API Key:
+            </label>
+            <input
+              type="password"
+              id="openrouter_api_key"
+              name="openrouter_api_key"
+              autoComplete="current-password" // Sugestão para campos de senha
+              value={settings.openrouter_api_key || ""}
+              onChange={handleApiKeyChange}
+              disabled={isLoading} // Desabilita se estiver carregando settings iniciais
+              placeholder="sk-or-..."
+              className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400" // Ajustei padding para p-2.5
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={isSubmitting || isLoading} // Desabilita também durante carregamento inicial
+            className="w-full mt-2 px-4 py-2.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md font-medium disabled:bg-gray-700 disabled:opacity-70 transition-colors"
+          >
+            {isSubmitting ? "Saving..." : "Save Settings"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 };

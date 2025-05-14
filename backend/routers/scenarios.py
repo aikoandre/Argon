@@ -4,11 +4,11 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 # Importe o modelo SQLAlchemy e os schemas Pydantic
-from models.scenario_card import ScenarioCard
-from schemas.scenario_card import ScenarioCardCreate, ScenarioCardUpdate, ScenarioCardInDB
+from ..models.scenario_card import ScenarioCard
+from ..schemas.scenario_card import ScenarioCardCreate, ScenarioCardUpdate, ScenarioCardInDB
 # Poderia importar WorldCard para validar referências, mas pode ficar complexo por enquanto
 
-from database import get_db
+from ..database import get_db
 
 router = APIRouter(
     prefix="/api/scenarios",
@@ -21,44 +21,49 @@ def create_scenario_card(
 ):
     """
     Cria um novo Scenario Card.
-    Valida se o master_world_id existe e se os world_card_references pertencem ao mesmo mundo.
+    Se master_world_id for fornecido, valida se ele existe.
+    Valida se os world_card_references pertencem ao mesmo mundo, se especificado.
     """
-    from models.master_world import MasterWorld
-    from models.lore_entry import LoreEntry
+    from ..models.master_world import MasterWorld
+    from ..models.lore_entry import LoreEntry
     
-    # Verifica se o master_world existe
-    master_world = db.query(MasterWorld).filter(MasterWorld.id == scenario.master_world_id).first()
-    if not master_world:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Master world not found"
-        )
-
-    # Valida world_card_references se existirem
-    if scenario.world_card_references:
-        invalid_lore = db.query(LoreEntry).filter(
-            LoreEntry.id.in_(scenario.world_card_references),
-            LoreEntry.master_world_id != scenario.master_world_id
-        ).first()
-        if invalid_lore:
+    print(f"Attempting to create scenario with data: {scenario.model_dump()}")  # Debug log
+    
+    # Verifica se o master_world existe, se fornecido
+    if scenario.master_world_id:
+        print(f"Validating master_world_id: {scenario.master_world_id}")  # Debug log
+        master_world = db.query(MasterWorld).filter(MasterWorld.id == scenario.master_world_id).first()
+        if not master_world:
+            print(f"Master world not found: {scenario.master_world_id}")  # Debug log
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"World card {invalid_lore.id} does not belong to master world {scenario.master_world_id}"
+                detail="Master world not found"
             )
 
-    db_scenario = ScenarioCard(**scenario.model_dump())
-    db.add(db_scenario)
-    db.commit()
-    db.refresh(db_scenario)
-    return db_scenario
+    try:
+        db_scenario = ScenarioCard(**scenario.model_dump())
+        print(f"Scenario object created: {db_scenario}")  # Debug log
+        db.add(db_scenario)
+        db.commit()
+        db.refresh(db_scenario)
+        return db_scenario
+    except Exception as e:
+        print(f"Error creating scenario: {e}")  # Debug log
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create scenario"
+        )
 
 @router.get("", response_model=List[ScenarioCardInDB])
-def get_all_scenario_cards(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def get_all_scenario_cards(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
     """
-    Lista todos os Scenario Cards.
+    List all Scenario Cards (no filtering)
     """
-    scenarios = db.query(ScenarioCard).order_by(ScenarioCard.name).offset(skip).limit(limit).all()
-    return scenarios
+    return db.query(ScenarioCard).order_by(ScenarioCard.name).offset(skip).limit(limit).all()
 
 @router.get("/{scenario_id}", response_model=ScenarioCardInDB)
 def get_scenario_card(scenario_id: str, db: Session = Depends(get_db)):
@@ -77,15 +82,27 @@ def update_scenario_card(
     """
     Atualiza um Scenario Card existente. Permite atualização parcial.
     """
+    from ..models.master_world import MasterWorld
+    from ..models.lore_entry import LoreEntry
+
     db_scenario = db.query(ScenarioCard).filter(ScenarioCard.id == scenario_id).first()
     if db_scenario is None:
         raise HTTPException(status_code=404, detail="Scenario Card not found")
 
     update_data = scenario_update.model_dump(exclude_unset=True)
 
+    # Validar master_world_id se for atualizado
+    if 'master_world_id' in update_data and update_data['master_world_id']:
+        master_world = db.query(MasterWorld).filter(MasterWorld.id == update_data['master_world_id']).first()
+        if not master_world:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Master world not found"
+            )
+
+
     for key, value in update_data.items():
         setattr(db_scenario, key, value)
-
     db.add(db_scenario)
     db.commit()
     db.refresh(db_scenario)

@@ -28,11 +28,14 @@ const HomePage: React.FC = () => {
   }, []);
 
   return (
-    <div>
-      <h1>Welcome to the Advanced Roleplay Engine</h1>
+    <div className="container mx-auto py-8 px-4 text-center max-w-prose text-white">
+      <h1 className="text-7xl mb-4 quintessential-regular">Argon</h1>
       <p>{healthStatus}</p>
-      {error && <p style={{ color: "red" }}>{error}</p>}
-      <p>Navigate to "Settings" to configure your application.</p>
+      {error && (
+        <p style={{ color: "red" }}>
+          {error}
+        </p>
+      )}
     </div>
   );
 };

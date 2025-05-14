@@ -1,12 +1,12 @@
-import React, { useState, useEffect, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   getAllMasterWorlds,
   createMasterWorld,
   updateMasterWorld,
   deleteMasterWorld,
-  type MasterWorldData
-} from '../services/api';
+  type MasterWorldData,
+} from "../services/api";
 
 interface ModalProps {
   isOpen: boolean;
@@ -22,7 +22,12 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
       <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-lg text-white">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-semibold">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">×</button>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white text-2xl"
+          >
+            ×
+          </button>
         </div>
         {children}
       </div>
@@ -38,9 +43,9 @@ interface MasterWorldFormData {
 }
 
 const initialFormData: MasterWorldFormData = {
-  name: '',
-  description: '',
-  tags_string: '',
+  name: "",
+  description: "",
+  tags_string: "",
 };
 
 const MasterWorldsPage: React.FC = () => {
@@ -49,8 +54,11 @@ const MasterWorldsPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [editingWorld, setEditingWorld] = useState<MasterWorldData | null>(null);
-  const [formData, setFormData] = useState<MasterWorldFormData>(initialFormData);
+  const [editingWorld, setEditingWorld] = useState<MasterWorldData | null>(
+    null
+  );
+  const [formData, setFormData] =
+    useState<MasterWorldFormData>(initialFormData);
   const navigate = useNavigate();
 
   const fetchMasterWorlds = async () => {
@@ -60,7 +68,7 @@ const MasterWorldsPage: React.FC = () => {
       const data = await getAllMasterWorlds();
       setMasterWorlds(data);
     } catch (err) {
-      setError('Failed to load master worlds.');
+      setError("Failed to load master worlds.");
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -71,9 +79,11 @@ const MasterWorldsPage: React.FC = () => {
     fetchMasterWorlds();
   }, []);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleOpenModal = (world?: MasterWorldData) => {
@@ -81,8 +91,8 @@ const MasterWorldsPage: React.FC = () => {
       setEditingWorld(world);
       setFormData({
         name: world.name,
-        description: world.description || '',
-        tags_string: world.tags ? world.tags.join(', ') : '',
+        description: world.description || "",
+        tags_string: world.tags ? world.tags.join(", ") : "",
       });
     } else {
       setEditingWorld(null);
@@ -106,7 +116,10 @@ const MasterWorldsPage: React.FC = () => {
       return;
     }
 
-    const tagsForApi = formData.tags_string.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+    const tagsForApi = formData.tags_string
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter((tag) => tag.length > 0);
 
     const payload = {
       name: formData.name,
@@ -125,7 +138,9 @@ const MasterWorldsPage: React.FC = () => {
       handleCloseModal();
       fetchMasterWorlds();
     } catch (err: any) {
-      const apiError = err.response?.data?.detail || (editingWorld ? 'Failed to update world.' : 'Failed to create world.');
+      const apiError =
+        err.response?.data?.detail ||
+        (editingWorld ? "Failed to update world." : "Failed to create world.");
       setError(apiError);
       console.error(err);
     } finally {
@@ -134,13 +149,17 @@ const MasterWorldsPage: React.FC = () => {
   };
 
   const handleDelete = async (worldId: string) => {
-    if (window.confirm('Are you sure you want to delete this world and ALL its lore entries? This action is irreversible.')) {
+    if (
+      window.confirm(
+        "Are you sure you want to delete this world and ALL its lore entries? This action is irreversible."
+      )
+    ) {
       setIsLoading(true);
       try {
         await deleteMasterWorld(worldId);
         fetchMasterWorlds();
       } catch (err: any) {
-        setError(err.response?.data?.detail || 'Failed to delete world.');
+        setError(err.response?.data?.detail || "Failed to delete world.");
         console.error(err);
       } finally {
         setIsLoading(false);
@@ -149,43 +168,70 @@ const MasterWorldsPage: React.FC = () => {
   };
 
   if (isLoading && masterWorlds.length === 0) {
-    return <p className="text-center text-gray-400 p-10">Loading Your Worlds...</p>;
+    return (
+      <p className="text-center text-gray-400 p-10">Loading Your Worlds...</p>
+    );
   }
 
   return (
     <div className="container mx-auto p-4 md:p-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-bold text-white">My Worlds (Universes)</h1>
-        <button onClick={() => handleOpenModal()} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md">
+        <h1 className="text-4xl font-bold text-white">Worlds</h1>
+        <button
+          onClick={() => handleOpenModal()}
+          className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md"
+        >
           + Create New World
         </button>
       </div>
 
       {error && !isModalOpen && (
-        <p className="bg-red-700 text-white p-3 rounded-md mb-4 text-center">{error}</p>
+        <p className="bg-red-700 text-white p-3 rounded-md mb-4 text-center">
+          {error}
+        </p>
       )}
 
       {masterWorlds.length === 0 && !isLoading && (
-         <p className="text-center text-gray-500 py-10">No worlds created yet. Start by creating your first universe!</p>
+        <p className="text-center text-gray-500 py-10">
+          No worlds created yet. Start by creating your first universe!
+        </p>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {masterWorlds.map(world => (
-          <div key={world.id} className="bg-gray-800 p-6 rounded-lg shadow-lg flex flex-col justify-between cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all"
-               onClick={() => navigate(`/world-lore/${world.id}/entries`)}>
+        {masterWorlds.map((world) => (
+          <div
+            key={world.id}
+            className="bg-gray-800 p-6 rounded-lg shadow-lg flex flex-col justify-between cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all"
+            onClick={() => navigate(`/world-lore/${world.id}/entries`)}
+          >
             <div>
-              <h2 className="text-2xl font-semibold text-blue-400 mb-2 truncate" title={world.name}>{world.name}</h2>
-              <p className="text-gray-400 mb-3 text-sm line-clamp-3" title={world.description || undefined}>
-                {world.description || <span className="italic">No description provided.</span>}
+              <h2
+                className="text-2xl font-semibold text-blue-400 mb-2 truncate"
+                title={world.name}
+              >
+                {world.name}
+              </h2>
+              <p
+                className="text-gray-400 mb-3 text-sm line-clamp-3"
+                title={world.description || undefined}
+              >
+                {world.description || (
+                  <span className="italic">No description provided.</span>
+                )}
               </p>
               {world.tags && world.tags.length > 0 && (
                 <div className="mb-3">
-                  {world.tags.slice(0, 4).map(tag => (
-                    <span key={tag} className="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded-full mr-1 mb-1 inline-block">
+                  {world.tags.slice(0, 4).map((tag) => (
+                    <span
+                      key={tag}
+                      className="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded-full mr-1 mb-1 inline-block"
+                    >
                       {tag}
                     </span>
                   ))}
-                  {world.tags.length > 4 && <span className="text-xs text-gray-400">...</span>}
+                  {world.tags.length > 4 && (
+                    <span className="text-xs text-gray-400">...</span>
+                  )}
                 </div>
               )}
             </div>
@@ -216,14 +262,22 @@ const MasterWorldsPage: React.FC = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        title={editingWorld ? 'Edit World' : 'Create New World'}
+        title={editingWorld ? "Edit World" : "Create New World"}
       >
-        <form onSubmit={handleSubmit} className="space-y-4 max-h-[80vh] overflow-y-auto p-1 pr-2">
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-4 max-h-[80vh] overflow-y-auto p-1 pr-2"
+        >
           {error && isModalOpen && (
-            <p className="bg-red-700 text-white p-3 rounded-md text-sm text-center mb-3">{error}</p>
+            <p className="bg-red-700 text-white p-3 rounded-md text-sm text-center mb-3">
+              {error}
+            </p>
           )}
           <div>
-            <label htmlFor="mw-name" className="block text-sm font-medium text-gray-300 mb-1">
+            <label
+              htmlFor="mw-name"
+              className="block text-sm font-medium text-gray-300 mb-1"
+            >
               World Name <span className="text-red-500">*</span>
             </label>
             <input
@@ -238,7 +292,10 @@ const MasterWorldsPage: React.FC = () => {
             />
           </div>
           <div>
-            <label htmlFor="mw-description" className="block text-sm font-medium text-gray-300 mb-1">
+            <label
+              htmlFor="mw-description"
+              className="block text-sm font-medium text-gray-300 mb-1"
+            >
               Overall Description
             </label>
             <textarea
@@ -252,7 +309,10 @@ const MasterWorldsPage: React.FC = () => {
             />
           </div>
           <div>
-            <label htmlFor="mw-tags" className="block text-sm font-medium text-gray-300 mb-1">
+            <label
+              htmlFor="mw-tags"
+              className="block text-sm font-medium text-gray-300 mb-1"
+            >
               Tags (comma-separated)
             </label>
             <input
@@ -279,7 +339,13 @@ const MasterWorldsPage: React.FC = () => {
               disabled={isSubmitting}
               className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md disabled:opacity-50"
             >
-              {isSubmitting ? (editingWorld ? 'Saving...' : 'Creating...') : (editingWorld ? 'Save Changes' : 'Create World')}
+              {isSubmitting
+                ? editingWorld
+                  ? "Saving..."
+                  : "Creating..."
+                : editingWorld
+                ? "Save Changes"
+                : "Create World"}
             </button>
           </div>
         </form>

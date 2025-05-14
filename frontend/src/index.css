@@ -6,11 +6,22 @@ html,
 body {
   height: 100%;
   margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: "Montserrat", sans-serif;
+  font-weight: 400;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #111827;
   color: #f3f4f6;
+}
+
+/* Hide scrollbar for specific elements */
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;  /* Safari and Chrome */
 }
 
 @keyframes modalShow {
@@ -27,3 +38,11 @@ body {
 .animate-modalShow {
   animation: modalShow 0.3s ease-out forwards;
 }
+
+/* Font for HomePage title */
+.quintessential-regular {
+  font-family: "Quintessential", serif;
+  font-weight: 400;
+  font-style: normal;
+}
+

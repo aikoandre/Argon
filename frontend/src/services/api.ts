@@ -170,9 +170,9 @@ export interface CharacterCardCreateData {
   description?: string | null;
   instructions?: string | null;
   example_dialogues?: Record<string, any>[] | string[] | null;
-  beginning_messages: string[] | null;
-  master_world_id: string;
-  linked_lore_ids: string[] | null;
+  beginning_messages?: string[] | null;
+  master_world_id?: string | null;
+  linked_lore_ids?: string[] | null;
 }
 
 export interface CharacterCardUpdateData {
@@ -187,11 +187,18 @@ export interface CharacterCardUpdateData {
 export const createCharacterCard = async (
   characterData: CharacterCardCreateData
 ): Promise<CharacterCardData> => {
-  const response = await apiClient.post<CharacterCardData>(
-    "/characters",
-    characterData
-  );
-  return response.data;
+  try {
+    const response = await apiClient.post<CharacterCardData>(
+      "/characters",
+      characterData
+    );
+    return response.data;
+  } catch (error: any) {
+    if (error.response && error.response.data && error.response.data.detail) {
+      throw new Error(error.response.data.detail);
+    }
+    throw error;
+  }
 };
 
 export const getAllCharacterCards = async (
@@ -201,10 +208,15 @@ export const getAllCharacterCards = async (
   if (masterWorldId) {
     params.master_world_id = masterWorldId;
   }
-  const response = await apiClient.get<CharacterCardData[]>("/characters", {
-    params,
-  });
-  return response.data;
+  try {
+    const response = await apiClient.get<CharacterCardData[]>("/characters", {
+      params,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching character cards:", error);
+    throw error;
+  }
 };
 
 export const getCharacterCardById = async (
@@ -238,9 +250,10 @@ export interface ScenarioCardData {
   id: string;
   name: string;
   description?: string | null;
-  beginning_message?: string | null;
-  master_world_id: string;
-  lore_entry_references?: string[] | null;
+  beginning_message?: string[] | null;
+  master_world_id?: string | null;
+  world_card_references?: string[] | null;
+  user_persona_id: string | null;
   created_at: string;
   updated_at?: string | null;
 }
@@ -249,28 +262,50 @@ export interface ScenarioCardCreateData {
   description?: string | null;
   beginning_message?: string | null;
   master_world_id: string;
-  lore_entry_references?: string[] | null;
+  world_card_references?: string[] | null;
+  user_persona_id?: string | null;
 }
 export interface ScenarioCardUpdateData {
   name?: string;
   description?: string | null;
   beginning_message?: string | null;
-  lore_entry_references?: string[] | null;
+  world_card_references?: string[] | null;
+  user_persona_id?: string | null;
 }
 
 export const createScenarioCard = async (
   scenarioData: ScenarioCardCreateData
 ): Promise<ScenarioCardData> => {
-  const response = await apiClient.post<ScenarioCardData>(
-    "/scenarios",
-    scenarioData
-  );
-  return response.data;
+  try {
+    const response = await apiClient.post<ScenarioCardData>(
+      "/scenarios",
+      scenarioData
+    );
+    return response.data;
+  } catch (error: any) {
+    if (error.response && error.response.data && error.response.data.detail) {
+      throw new Error(error.response.data.detail);
+    }
+    throw error;
+  }
 };
 
-export const getAllScenarioCards = async (): Promise<ScenarioCardData[]> => {
-  const response = await apiClient.get<ScenarioCardData[]>("/scenarios");
-  return response.data;
+export const getAllScenarioCards = async (
+  masterWorldId?: string
+): Promise<ScenarioCardData[]> => {
+  const params: Record<string, string> = {};
+  if (masterWorldId) {
+    params.master_world_id = masterWorldId;
+  }
+  try {
+    const response = await apiClient.get<ScenarioCardData[]>("/scenarios", {
+      params,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching scenario cards:", error);
+    throw error;
+  }
 };
 
 export const getScenarioCardById = async (

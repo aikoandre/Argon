@@ -14,10 +14,11 @@ class CharacterCard(Base):
     instructions = Column(Text, nullable=True) # Como a IA deve se comportar/formatar
     example_dialogues = Column(JSON, nullable=True, default=lambda: []) # Lista de strings ou objetos de diálogo
     beginning_messages = Column(JSON, nullable=True, default=lambda: []) # Mensagem inicial específica se este GM iniciar o chat
-    master_world_id = Column(String, ForeignKey("master_worlds.id"), nullable=False, index=True)
+    master_world_id = Column(String, ForeignKey("master_worlds.id", ondelete="SET NULL"), nullable=True, index=True)
     master_world = relationship("MasterWorld", back_populates="character_cards")
     
     linked_lore_ids = Column(JSON, nullable=True, default=lambda: [])
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+

@@ -20,50 +20,48 @@ function App() {
         {/* Sidebar */}
         <nav className="bg-gray-800 p-4 shadow-md flex-shrink-0 w-full md:w-64">
           <div className="flex flex-col space-y-2">
-            <div className="text-2xl font-bold mb-6 text-center md:text-left">
+            <div className="text-3xl px-3 font-bold mb-6 text-center quintessential-regular">
               Argon
             </div>
             <Link
               to="/"
-              className="block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
+              className="text-xl montserrat block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
             >
               Home
             </Link>
             <Link
               to="/chats"
-              className="block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
+              className="text-xl montserrat block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
             >
               Chats
             </Link>
             <Link
               to="/personas"
-              className="block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
+              className="text-xl montserrat block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
             >
-              My Personas
+              Personas
             </Link>
             <Link
               to="/characters"
-              className="block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
+              className="text-xl montserrat block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
             >
-              AI Characters
+              Characters
             </Link>
             <Link
               to="/scenarios"
-              className="block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
+              className="text-xl montserrat block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
             >
               Scenarios
             </Link>{" "}
             <Link
               to="/world-lore"
-              className="block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
+              className="text-xl montserrat block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
             >
-              World Lore
+              Worlds
             </Link>{" "}
-            {/* <<--- NOVO */}
-            {/* Colocando Settings no final da lista principal */}
             <Link
               to="/settings"
-              className="block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
+              className="text-xl montserrat block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
             >
               Settings
             </Link>

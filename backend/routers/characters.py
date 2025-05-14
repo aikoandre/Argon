@@ -20,29 +20,19 @@ def create_character_card(
 ):
     """
     Cria um novo Character Card (NPC/GM para a IA).
-    Valida se o master_world_id existe e se os linked_lore_ids pertencem ao mesmo mundo.
+    Se master_world_id for fornecido, valida se ele existe.
+    Valida se os linked_lore_ids pertencem ao mesmo mundo, se especificado.
     """
-    from models.master_world import MasterWorld
-    from models.lore_entry import LoreEntry
+    from ..models.master_world import MasterWorld
+    from ..models.lore_entry import LoreEntry
     
-    # Verifica se o master_world existe
-    master_world = db.query(MasterWorld).filter(MasterWorld.id == character.master_world_id).first()
-    if not master_world:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Master world not found"
-        )
-
-    # Valida linked_lore_ids se existirem
-    if character.linked_lore_ids:
-        invalid_lore = db.query(LoreEntry).filter(
-            LoreEntry.id.in_(character.linked_lore_ids),
-            LoreEntry.master_world_id != character.master_world_id
-        ).first()
-        if invalid_lore:
+    # Verifica se o master_world existe, se fornecido
+    if character.master_world_id:
+        master_world = db.query(MasterWorld).filter(MasterWorld.id == character.master_world_id).first()
+        if not master_world:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Lore entry {invalid_lore.id} does not belong to master world {character.master_world_id}"
+                detail="Master world not found"
             )
 
     db_character = CharacterCard(**character.model_dump())
@@ -52,12 +42,21 @@ def create_character_card(
     return db_character
 
 @router.get("", response_model=List[CharacterCardInDB])
-def get_all_character_cards(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def get_all_character_cards(
+    skip: int = 0,
+    limit: int = 100,
+    master_world_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
     """
-    Lista todos os Character Cards.
+    List all Character Cards with optional filtering by Master World ID.
     """
-    characters = db.query(CharacterCard).offset(skip).limit(limit).all()
-    return characters
+    query = db.query(CharacterCard)
+
+    if master_world_id is not None:
+        query = query.filter(CharacterCard.master_world_id == master_world_id)
+
+    return query.order_by(CharacterCard.name).offset(skip).limit(limit).all()
 
 @router.get("/{character_id}", response_model=CharacterCardInDB)
 def get_character_card(character_id: str, db: Session = Depends(get_db)):
@@ -76,17 +75,28 @@ def update_character_card(
     """
     Atualiza um Character Card existente. Permite atualização parcial.
     """
+    from ..models.master_world import MasterWorld
+    from ..models.lore_entry import LoreEntry
+
     db_character = db.query(CharacterCard).filter(CharacterCard.id == character_id).first()
     if db_character is None:
         raise HTTPException(status_code=404, detail="Character Card not found")
 
     # Usar CharacterCardUpdate (que tem todos os campos como Optional)
     update_data = character_update.model_dump(exclude_unset=True) # Pydantic V2
-    # Para Pydantic V1: update_data = character_update.dict(exclude_unset=True)
+
+    # Validar master_world_id se for atualizado
+    if 'master_world_id' in update_data and update_data['master_world_id']:
+        master_world = db.query(MasterWorld).filter(MasterWorld.id == update_data['master_world_id']).first()
+        if not master_world:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Master world not found"
+            )
+
 
     for key, value in update_data.items():
         setattr(db_character, key, value)
-
     db.add(db_character)
     db.commit()
     db.refresh(db_character)

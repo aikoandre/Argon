@@ -2,6 +2,7 @@
 import uuid
 from sqlalchemy import Column, String, Text, DateTime
 from sqlalchemy.dialects.postgresql import UUID # Se usar PostgreSQL no futuro
+from sqlalchemy.orm import relationship
 # Para SQLite, UUID pode ser armazenado como String
 from sqlalchemy.sql import func
 from ..database import Base
@@ -16,3 +17,5 @@ class UserPersona(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    scenario_cards = relationship("ScenarioCard", back_populates="user_persona")

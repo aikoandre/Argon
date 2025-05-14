@@ -59,6 +59,8 @@ const initialFormFields: CharacterFormData = {
 };
 
 const CharactersPage: React.FC = () => {
+  console.log("CharactersPage component rendering...");
+
   const [characters, setCharacters] = useState<CharacterCardData[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true); // Loading geral da página/lista
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -84,66 +86,74 @@ const CharactersPage: React.FC = () => {
 
   // Estados para MasterWorld e Lore Links
   const [masterWorlds, setMasterWorlds] = useState<MasterWorldData[]>([]); // Lista de todos os mundos
+  const [isLoadingWorlds, setIsLoadingWorlds] = useState<boolean>(true); // Loading para a lista de mundos
   const [selectedMasterWorldForList, setSelectedMasterWorldForList] = useState<
     string | null
-  >(null); // Mundo selecionado para listar Characters
+  >(null); // Para filtrar a lista principal
   const [selectedMasterWorldForForm, setSelectedMasterWorldForForm] =
-    useState<SingleValue<SelectOption>>(null); // Mundo selecionado NO FORMULÁRIO
+    useState<SingleValue<SelectOption>>(null);
 
   const [worldLoreOptions, setWorldLoreOptions] = useState<SelectOption[]>([]);
   const [selectedLoreLinks, setSelectedLoreLinks] = useState<
     MultiValue<SelectOption>
   >([]);
-  const [isLoadingWorlds, setIsLoadingWorlds] = useState<boolean>(false); // Para dropdown de mundos
   const [isLoadingLore, setIsLoadingLore] = useState<boolean>(false); // Para dropdown de lore
 
-  // Busca Master Worlds para o dropdown de filtro da página
+  // Busca todos os Master Worlds para os dropdowns/filtros
   useEffect(() => {
+    console.log("useEffect: Fetching Master Worlds...");
     const fetchWorlds = async () => {
       setIsLoadingWorlds(true);
       try {
-        const worldsData = await getAllMasterWorlds();
-        setMasterWorlds(worldsData);
-        if (worldsData.length > 0 && !selectedMasterWorldForList) {
-          setSelectedMasterWorldForList(worldsData[0].id); // Seleciona o primeiro por padrão para listar
-        }
+        const data = await getAllMasterWorlds();
+        console.log("Fetched Master Worlds:", data);
+        setMasterWorlds(data);
       } catch (err) {
-        console.error("Failed to load master worlds", err);
-        setError("Could not load master worlds.");
+        console.error("Failed to load master worlds:", err);
       } finally {
         setIsLoadingWorlds(false);
       }
     };
     fetchWorlds();
-  }, []); // Roda uma vez
+  }, []);
 
-  // Busca Characters quando selectedMasterWorldForList muda
+  // Busca todos os Characters (ou filtrados por Master World)
   useEffect(() => {
-    if (selectedMasterWorldForList) {
-      const fetchChars = async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-          // Assumindo que getAllCharacterCards agora aceita masterWorldId
-          const data = await getAllCharacterCards(selectedMasterWorldForList);
-          setCharacters(data);
-        } catch (err) {
-          setError("Failed to load characters for the selected world.");
-          console.error(err);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      fetchChars();
-    } else {
-      setCharacters([]); // Limpa characters se nenhum mundo estiver selecionado
-      setIsLoading(false);
-    }
+    console.log("useEffect: Fetching Characters...");
+    const fetchChars = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        console.log(
+          "Fetching characters with masterWorldId:",
+          selectedMasterWorldForList
+        );
+        const data = await getAllCharacterCards(
+          selectedMasterWorldForList || undefined
+        );
+        console.log("Fetched Characters:", data);
+        setCharacters(data);
+      } catch (err) {
+        setError("Failed to load characters.");
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchChars();
   }, [selectedMasterWorldForList]);
 
   // Busca Lore Entries (para o dropdown no modal) quando selectedMasterWorldForForm (no modal) muda
   useEffect(() => {
+    console.log(
+      "useEffect: selectedMasterWorldForForm changed:",
+      selectedMasterWorldForForm
+    );
     if (selectedMasterWorldForForm?.value) {
+      console.log(
+        "Fetching Lore Entries for world:",
+        selectedMasterWorldForForm.value
+      );
       const fetchLoreOpts = async () => {
         setIsLoadingLore(true);
         try {
@@ -158,6 +168,7 @@ const CharactersPage: React.FC = () => {
           );
         } catch (err) {
           console.error("Failed to load lore options for modal:", err);
+          console.log("Failed to load lore options for modal:", err);
           setWorldLoreOptions([]); // Limpa em caso de erro
         } finally {
           setIsLoadingLore(false);
@@ -165,6 +176,7 @@ const CharactersPage: React.FC = () => {
       };
       fetchLoreOpts();
     } else {
+      console.log("No Master World selected for form, clearing lore options.");
       setWorldLoreOptions([]); // Limpa opções se nenhum mundo selecionado no formulário
     }
   }, [selectedMasterWorldForForm]);
@@ -259,6 +271,7 @@ const CharactersPage: React.FC = () => {
   };
 
   const handleOpenModal = (character?: CharacterCardData) => {
+    console.log("handleOpenModal called with character:", character);
     setError(null);
     if (character) {
       setEditingCharacter(character);
@@ -321,6 +334,7 @@ const CharactersPage: React.FC = () => {
   };
 
   const handleCloseModal = () => {
+    console.log("handleCloseModal called.");
     setIsModalOpen(false);
     setEditingCharacter(null);
     setFormFields(initialFormFields);
@@ -334,13 +348,10 @@ const CharactersPage: React.FC = () => {
   };
 
   const handleSubmit = async (e: FormEvent) => {
+    console.log("handleSubmit called.");
     e.preventDefault();
     if (!formFields.name.trim()) {
       setError("Name is required.");
-      return;
-    }
-    if (!selectedMasterWorldForForm?.value) {
-      setError("Master World is required for the character.");
       return;
     }
 
@@ -355,7 +366,8 @@ const CharactersPage: React.FC = () => {
     const payload: CharacterCardCreateData = {
       // CharacterCardUpdateData é similar
       ...formFields,
-      master_world_id: selectedMasterWorldForForm.value, // ID do mundo selecionado no formulário
+      // Use the selected Master World if available, otherwise it will be null
+      master_world_id: selectedMasterWorldForForm?.value || null,
       example_dialogues: finalDialogues.length > 0 ? finalDialogues : null,
       beginning_messages:
         finalBeginningMessages.length > 0 ? finalBeginningMessages : null,
@@ -374,16 +386,10 @@ const CharactersPage: React.FC = () => {
       } else {
         await createCharacterCard(payload);
       }
-      const data = await getAllCharacterCards();
-      setCharacters(data);
       handleCloseModal();
-      // Refresh the character list with current world filter
+      // Refresh all characters
       const refreshedData = await getAllCharacterCards();
-      setCharacters(
-        refreshedData.filter(
-          (char) => char.master_world_id === selectedMasterWorldForList
-        )
-      );
+      setCharacters(refreshedData);
     } catch (err: any) {
       /* ... tratamento de erro ... */
     } finally {
@@ -392,15 +398,12 @@ const CharactersPage: React.FC = () => {
   };
 
   const handleDelete = async (characterId: string) => {
+    console.log("handleDelete called for ID:", characterId);
     try {
       await deleteCharacterCard(characterId);
       // Refresh the character list
       const data = await getAllCharacterCards();
-      setCharacters(
-        data.filter(
-          (char) => char.master_world_id === selectedMasterWorldForList
-        )
-      );
+      setCharacters(data);
     } catch (err) {
       console.error("Failed to delete character:", err);
       setError("Failed to delete character");
@@ -411,43 +414,20 @@ const CharactersPage: React.FC = () => {
     label: w.name,
   }));
 
+  const masterWorldOptionsForList = masterWorlds.map((w) => ({
+    value: w.id,
+    label: w.name,
+  }));
+
+  console.log("CharactersPage component returning JSX...");
   return (
     <div className="container mx-auto p-4 md:p-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <h1 className="text-4xl font-bold text-white">AI Characters</h1>
+        <h1 className="text-4xl font-bold text-white">Characters</h1>
         <div className="flex items-center gap-2 w-full md:w-auto">
-          <label
-            htmlFor="master-world-filter"
-            className="text-sm text-gray-400 shrink-0"
-          >
-            World:
-          </label>
-          <Select<SelectOption>
-            inputId="master-world-filter"
-            options={masterWorldOptionsForForm}
-            value={
-              masterWorldOptionsForForm.find(
-                (opt) => opt.value === selectedMasterWorldForList
-              ) || null
-            }
-            onChange={(opt: SingleValue<SelectOption>) =>
-              setSelectedMasterWorldForList(opt ? opt.value : null)
-            }
-            isLoading={isLoadingWorlds}
-            isClearable
-            placeholder="Filter by World..."
-            className="text-black min-w-[200px] md:min-w-[250px] flex-grow"
-            classNamePrefix="react-select"
-            styles={
-              {
-                /* ... seus estilos para react-select ... */
-              }
-            }
-          />
           <button
             onClick={() => handleOpenModal()}
             className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md whitespace-nowrap"
-            disabled={!selectedMasterWorldForList || isLoadingWorlds} // Desabilita se nenhum mundo selecionado para filtro
           >
             + Create Character
           </button>
@@ -477,71 +457,75 @@ const CharactersPage: React.FC = () => {
         )}
       {!isLoading && !error && !selectedMasterWorldForList && (
         <p className="text-center text-gray-500 py-10">
-          Please select a Master World to view or create characters.
+          No characters found. Create one!
         </p>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {characters.map((char) => (
-          <div
-            key={char.id}
-            className="bg-gray-800 rounded-lg shadow-lg p-6 hover:bg-gray-700 transition-colors"
-          >
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="text-xl font-semibold text-white">{char.name}</h3>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => handleOpenModal(char)}
-                  className="text-gray-400 hover:text-blue-500 transition-colors"
-                  title="Edit Character"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
+      {!isLoading && !error && characters.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {characters.map((char) => (
+            <div
+              key={char.id}
+              className="bg-gray-800 rounded-lg shadow-lg p-6 hover:bg-gray-700 transition-colors"
+            >
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-xl font-semibold text-white">
+                  {char.name}
+                </h3>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleOpenModal(char)}
+                    className="text-gray-400 hover:text-blue-500 transition-colors"
+                    title="Edit Character"
                   >
-                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => handleDelete(char.id)}
-                  className="text-gray-400 hover:text-red-500 transition-colors"
-                  title="Delete Character"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => handleDelete(char.id)}
+                    className="text-gray-400 hover:text-red-500 transition-colors"
+                    title="Delete Character"
                   >
-                    <path
-                      fillRule="evenodd"
-                      d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </button>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              {char.description && (
+                <p className="text-gray-300 text-sm mb-4 line-clamp-3">
+                  {char.description}
+                </p>
+              )}
+              <div className="text-xs text-gray-400">
+                {Array.isArray(char.linked_lore_ids) &&
+                  char.linked_lore_ids.length > 0 && (
+                    <p>Linked Lore: {char.linked_lore_ids.length} entries</p>
+                  )}
+                {Array.isArray(char.example_dialogues) &&
+                  char.example_dialogues.length > 0 && (
+                    <p>Example Dialogues: {char.example_dialogues.length}</p>
+                  )}
               </div>
             </div>
-            {char.description && (
-              <p className="text-gray-300 text-sm mb-4 line-clamp-3">
-                {char.description}
-              </p>
-            )}
-            <div className="text-xs text-gray-400">
-              {Array.isArray(char.linked_lore_ids) &&
-                char.linked_lore_ids.length > 0 && (
-                  <p>Linked Lore: {char.linked_lore_ids.length} entries</p>
-                )}
-              {Array.isArray(char.example_dialogues) &&
-                char.example_dialogues.length > 0 && (
-                  <p>Example Dialogues: {char.example_dialogues.length}</p>
-                )}
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       <Modal
         isOpen={isModalOpen}
@@ -552,7 +536,7 @@ const CharactersPage: React.FC = () => {
       >
         <form
           onSubmit={handleSubmit}
-          className="space-y-4 max-h-[70vh] overflow-y-auto p-1 pr-2"
+          className="space-y-4 max-h-[70vh] overflow-y-auto p-1 pr-2 hide-scrollbar"
         >
           {error && isModalOpen && (
             <p className="bg-red-700 text-white p-3 rounded-md text-sm text-center">
@@ -566,7 +550,7 @@ const CharactersPage: React.FC = () => {
               htmlFor="char-master_world"
               className="block text-sm font-medium text-gray-300 mb-1"
             >
-              Master World <span className="text-red-500">*</span>
+              Master World
             </label>
             <Select<SelectOption>
               inputId="char-master_world"
@@ -815,9 +799,9 @@ const CharactersPage: React.FC = () => {
             <button
               type="submit"
               disabled={
-                isSubmitting ||
-                !formFields.name.trim() ||
-                !selectedMasterWorldForForm?.value
+                isSubmitting || !formFields.name.trim()
+                // Remove the Master World requirement
+                // || !selectedMasterWorldForForm?.value
               }
               className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md font-medium disabled:bg-blue-800 disabled:opacity-50"
             >
