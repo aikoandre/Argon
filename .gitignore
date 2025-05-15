@@ -5,3 +5,4 @@ app_data/
 node_modules/
 .electron/
 __pycache__/
+.gitignore
