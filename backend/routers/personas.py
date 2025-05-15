@@ -6,6 +6,7 @@ from typing import List, Optional
 # Importe o modelo SQLAlchemy e os schemas Pydantic
 from ..models.user_persona import UserPersona
 from ..schemas.user_persona import UserPersonaCreate, UserPersonaUpdate, UserPersonaInDB
+from ..models.master_world import MasterWorld
 
 from ..database import get_db
 
@@ -21,6 +22,11 @@ def create_user_persona(
     """
     Cria uma nova User Persona.
     """
+    # Validate master_world_id if provided
+    if persona.master_world_id:
+        world = db.query(MasterWorld).filter(MasterWorld.id == persona.master_world_id).first()
+        if not world:
+            raise HTTPException(status_code=400, detail="Master World not found")
     db_persona = UserPersona(**persona.model_dump()) # Pydantic V2
     # Para Pydantic V1: db_persona = UserPersona(**persona.dict())
     db.add(db_persona)
@@ -59,6 +65,12 @@ def update_user_persona(
 
     update_data = persona_update.model_dump(exclude_unset=True) # Pydantic V2
     # Para Pydantic V1: update_data = persona_update.dict(exclude_unset=True)
+
+    # Validate master_world_id if provided
+    if "master_world_id" in update_data and update_data["master_world_id"]:
+        world = db.query(MasterWorld).filter(MasterWorld.id == update_data["master_world_id"]).first()
+        if not world:
+            raise HTTPException(status_code=400, detail="Master World not found")
 
     for key, value in update_data.items():
         setattr(db_persona, key, value)

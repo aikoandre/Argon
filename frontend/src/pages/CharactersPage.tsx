@@ -1,6 +1,6 @@
 // frontend/src/pages/CharactersPage.tsx
 import React, { useState, useEffect, type FormEvent } from "react";
-import Select, { type MultiValue, type SingleValue } from "react-select"; // Adicionado SingleValue
+import Select, { type SingleValue } from "react-select"; // Removido MultiValue
 import { useNavigate } from 'react-router-dom';
 import {
   checkExistingChatSession,
@@ -11,7 +11,6 @@ import {
   createCharacterCard,
   updateCharacterCard,
   deleteCharacterCard,
-  getAllLoreEntriesForMasterWorld,
   getAllMasterWorlds,
   type CharacterCardData,
   type CharacterCardCreateData,
@@ -91,17 +90,11 @@ const CharactersPage: React.FC = () => {
   >([""]);
   const [currentBmgIndex, setCurrentBmgIndex] = useState<number>(0);
 
-  // Estados para MasterWorld e Lore Links
+  // Estados para MasterWorld
   const [masterWorlds, setMasterWorlds] = useState<MasterWorldData[]>([]); // Lista de todos os mundos
   const [isLoadingWorlds, setIsLoadingWorlds] = useState<boolean>(true); // Loading para a lista de mundos
   const [selectedMasterWorldForForm, setSelectedMasterWorldForForm] =
     useState<SingleValue<SelectOption>>(null);
-
-  const [worldLoreOptions, setWorldLoreOptions] = useState<SelectOption[]>([]);
-  const [selectedLoreLinks, setSelectedLoreLinks] = useState<
-    MultiValue<SelectOption>
-  >([]);
-  const [isLoadingLore, setIsLoadingLore] = useState<boolean>(false); // Para dropdown de lore
 
   // Busca todos os Master Worlds para os dropdowns/filtros
   useEffect(() => {
@@ -140,44 +133,6 @@ const CharactersPage: React.FC = () => {
     };
     fetchChars();
   }, []); // Only on mount
-
-  // Busca Lore Entries (para o dropdown no modal) quando selectedMasterWorldForForm (no modal) muda
-  useEffect(() => {
-    console.log(
-      "useEffect: selectedMasterWorldForForm changed:",
-      selectedMasterWorldForForm
-    );
-    if (selectedMasterWorldForForm?.value) {
-      console.log(
-        "Fetching Lore Entries for world:",
-        selectedMasterWorldForForm.value
-      );
-      const fetchLoreOpts = async () => {
-        setIsLoadingLore(true);
-        try {
-          const loreData = await getAllLoreEntriesForMasterWorld(
-            selectedMasterWorldForForm.value
-          );
-          setWorldLoreOptions(
-            loreData.map((lore) => ({
-              value: lore.id,
-              label: `${lore.name} (${lore.entry_type.replace("_LORE", "")})`,
-            }))
-          );
-        } catch (err) {
-          console.error("Failed to load lore options for modal:", err);
-          console.log("Failed to load lore options for modal:", err);
-          setWorldLoreOptions([]); // Limpa em caso de erro
-        } finally {
-          setIsLoadingLore(false);
-        }
-      };
-      fetchLoreOpts();
-    } else {
-      console.log("No Master World selected for form, clearing lore options.");
-      setWorldLoreOptions([]); // Limpa opções se nenhum mundo selecionado no formulário
-    }
-  }, [selectedMasterWorldForForm]);
 
   const handleStaticInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -257,15 +212,10 @@ const CharactersPage: React.FC = () => {
     setCurrentBmgIndex(newIndex);
   };
 
-  const handleLoreLinkChange = (selectedOptions: MultiValue<SelectOption>) => {
-    setSelectedLoreLinks(selectedOptions);
-  };
-
   const handleMasterWorldChangeForForm = (
     selectedOption: SingleValue<SelectOption>
   ) => {
     setSelectedMasterWorldForForm(selectedOption);
-    setSelectedLoreLinks([]); // Reseta lore links quando o mundo do formulário muda
   };
 
   const handleOpenModal = (character?: CharacterCardData) => {
@@ -299,18 +249,6 @@ const CharactersPage: React.FC = () => {
       setSelectedMasterWorldForForm(
         worldOption ? { value: worldOption.id, label: worldOption.name } : null
       );
-
-      // Carrega lore links (o useEffect [selectedMasterWorldForForm] cuidará de buscar as opções)
-      if (character.linked_lore_ids && character.master_world_id) {
-        // A busca real de worldLoreOptions agora é feita pelo useEffect [selectedMasterWorldForForm]
-        // Aqui, apenas tentamos pré-selecionar se as opções já estiverem carregadas para o mundo correto
-        const preselected = worldLoreOptions.filter((opt) =>
-          character.linked_lore_ids!.includes(opt.value)
-        );
-        setSelectedLoreLinks(preselected);
-      } else {
-        setSelectedLoreLinks([]);
-      }
     } else {
       // Novo personagem
       setEditingCharacter(null);
@@ -319,7 +257,6 @@ const CharactersPage: React.FC = () => {
       setCurrentDialogueIndex(0);
       setCurrentBeginningMessages([""]);
       setCurrentBmgIndex(0);
-      setSelectedLoreLinks([]);
       setSelectedMasterWorldForForm(null); // No pre-selection
     }
     setIsModalOpen(true);
@@ -334,7 +271,6 @@ const CharactersPage: React.FC = () => {
     setCurrentDialogueIndex(0);
     setCurrentBeginningMessages([""]);
     setCurrentBmgIndex(0);
-    setSelectedLoreLinks([]);
     setSelectedMasterWorldForForm(null);
     setError(null);
   };
@@ -353,7 +289,6 @@ const CharactersPage: React.FC = () => {
     const finalBeginningMessages = currentBeginningMessages
       .map((m) => m.trim())
       .filter((m) => m);
-    const finalLinkedLoreIds = selectedLoreLinks.map((option) => option.value);
 
     const payload: CharacterCardCreateData = {
       // CharacterCardUpdateData é similar
@@ -363,8 +298,6 @@ const CharactersPage: React.FC = () => {
       example_dialogues: finalDialogues.length > 0 ? finalDialogues : null,
       beginning_messages:
         finalBeginningMessages.length > 0 ? finalBeginningMessages : null,
-      linked_lore_ids:
-        finalLinkedLoreIds.length > 0 ? finalLinkedLoreIds : null,
     };
 
     setIsSubmitting(true);
@@ -393,15 +326,16 @@ const CharactersPage: React.FC = () => {
     try {
       const existingSession = await checkExistingChatSession({
         gm_character_id: characterId,
-        user_persona_id: null,
+        scenario_id: "",
+        user_persona_id: ""
       });
-
       if (existingSession) {
         navigate(`/chat/${existingSession.id}`);
       } else {
         const newSession = await createChatSession({
           gm_character_id: characterId,
-          user_persona_id: null,
+          scenario_id: "",
+          user_persona_id: "",
           title: `Chat with ${characters.find(c => c.id === characterId)?.name}`
         });
         navigate(`/chat/${newSession.id}`);
@@ -463,65 +397,35 @@ const CharactersPage: React.FC = () => {
           {characters.map((char) => (
             <div
               key={char.id}
-              className="bg-gray-800 rounded-lg shadow-lg p-6 hover:bg-gray-700 transition-colors cursor-pointer"
+              className="bg-gray-800 rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105"
               onClick={() => handleCardClick(char.id)}
             >
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-xl font-semibold text-white">
-                  {char.name}
-                </h3>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={(e) => { 
-                      e.stopPropagation();
-                      handleOpenModal(char);
-                    }}
-                    className="text-gray-400 hover:text-blue-500 transition-colors"
-                    title="Edit Character"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDelete(char.id); }}
-                    className="text-gray-400 hover:text-red-500 transition-colors"
-                    title="Delete Character"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </button>
-                </div>
+              {/* Ícones de editar/excluir no topo direito */}
+              <div className="absolute top-2 right-2 flex space-x-2 z-10">
+                <button
+                onClick={(e) => { e.stopPropagation(); handleOpenModal(char); }}
+                className="text-gray-400 hover:text-blue-500 transition-colors"
+                title="Edit Character"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                </svg>
+              </button>
+                <button
+                onClick={(e) => { e.stopPropagation(); handleDelete(char.id); }}
+                className="text-gray-400 hover:text-red-500 transition-colors"
+                title="Delete Character"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </button>
               </div>
-              {char.description && (
-                <p className="text-gray-300 text-sm mb-4 line-clamp-3">
-                  {char.description}
-                </p>
-              )}
-              <div className="text-xs text-gray-400">
-                {Array.isArray(char.linked_lore_ids) &&
-                  char.linked_lore_ids.length > 0 && (
-                    <p>Linked Lore: {char.linked_lore_ids.length} entries</p>
-                  )}
-                {Array.isArray(char.example_dialogues) &&
-                  char.example_dialogues.length > 0 && (
-                    <p>Example Dialogues: {char.example_dialogues.length}</p>
-                  )}
+              {/* Rodapé translúcido com nome e descrição */}
+              <div className="absolute bottom-0 left-0 w-full bg-black/40 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
+              <div className="flex w-full items-center justify-between">
+                <h2 className="text-lg font-semibold text-white break-words whitespace-normal mr-2 flex-1 leading-snug">{char.name}</h2>
+                </div>
               </div>
             </div>
           ))}
@@ -558,7 +462,7 @@ const CharactersPage: React.FC = () => {
               options={masterWorldOptionsForForm}
               value={selectedMasterWorldForForm}
               onChange={handleMasterWorldChangeForForm}
-              isDisabled={isLoadingWorlds || !!editingCharacter} // Desabilita se estiver editando (não muda o mundo de um char existente)
+              isDisabled={isLoadingWorlds} // Desabilita se estiver editando (não muda o mundo de um char existente)
               placeholder="Select Master World..."
               className="text-black"
               classNamePrefix="react-select"
@@ -789,41 +693,6 @@ const CharactersPage: React.FC = () => {
               </button>
             </div>
           </div>
-
-          {/* Linked World Lore (só mostra se um mundo estiver selecionado no formulário) */}
-          {selectedMasterWorldForForm?.value && (
-            <div className="mt-4">
-              <label
-                htmlFor="char-linked_lore"
-                className="block text-sm font-medium text-gray-300 mb-1"
-              >
-                Link to World Lore from "{selectedMasterWorldForForm.label}"{" "}
-                {isLoadingLore && "(Loading...)"}
-              </label>
-              <Select<SelectOption, true>
-                inputId="char-linked_lore"
-                isMulti
-                options={worldLoreOptions}
-                value={selectedLoreLinks}
-                onChange={handleLoreLinkChange}
-                isLoading={isLoadingLore}
-                placeholder="Search and select lore entries..."
-                noOptionsMessage={() =>
-                  isLoadingLore
-                    ? "Loading lore..."
-                    : "No lore found in this world"
-                }
-                className="text-black"
-                classNamePrefix="react-select"
-                styles={
-                  {
-                    /* ... estilos ... */
-                  }
-                }
-                isDisabled={!selectedMasterWorldForForm?.value || isLoadingLore}
-              />
-            </div>
-          )}
 
           <div className="flex justify-end space-x-3 pt-2">
             <button

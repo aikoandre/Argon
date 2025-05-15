@@ -295,7 +295,7 @@ const LoreEntriesPage: React.FC = () => {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {entriesOfType.map(entry => (
-                      <div key={entry.id} className="bg-gray-800 rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden">
+                      <div key={entry.id} className="bg-gray-800 rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105">
                         {/* Top right icons */}
                         <div className="absolute top-2 right-2 flex space-x-2 z-10">
                           <button
@@ -319,8 +319,8 @@ const LoreEntriesPage: React.FC = () => {
                         </div>
                         {/* Bottom left info */}
                         <div className="absolute bottom-0 left-0 w-full bg-black/40 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
-                          <div className="flex w-full items-center justify-between">
-                            <h2 className="text-lg font-semibold text-sky-400 truncate mr-2" title={entry.name}>{entry.name}</h2>
+                          <div className="flex w-full items-start">
+                            <h2 className="text-lg font-semibold text-white break-words whitespace-normal mr-2 flex-1 leading-snug" title={entry.name}>{entry.name}</h2>
                             <p className={`text-xs px-2 py-0.5 rounded-full font-semibold w-fit
                               ${entry.entry_type === 'CHARACTER_LORE' ? 'bg-purple-700 text-purple-200' :
                                 entry.entry_type === 'LOCATION' ? 'bg-green-700 text-green-200' :
@@ -352,7 +352,26 @@ const LoreEntriesPage: React.FC = () => {
 
         <Modal isOpen={isModalOpen} onClose={handleCloseModal} title={editingEntry ? 'Edit Lore Entry' : 'Create New Lore Entry'}>
           <form onSubmit={handleSubmit} className="space-y-4 max-h-[80vh] overflow-y-auto p-1 pr-2 custom-scrollbar">
-            {error && isModalOpen && <p className="bg-red-700 text-white p-3 rounded-md text-sm text-center mb-3">{error}</p>}
+            {/* Campo de imagem opcional - agora antes do campo Name, label em cima */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Image</label>
+              <div className="flex items-center">
+                <button type="button" className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11">
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
+                  </svg>
+                  <span>Select Image</span>
+                  <input type="file" accept="image/*" className="hidden" />
+                </button>
+                <span className="h-11 w-px bg-gray-600" />
+                <button type="button" className="bg-gray-700 hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
             <div>
               <label htmlFor="le-name" className="block text-sm font-medium text-gray-300 mb-1">Name <span className="text-red-500">*</span></label>
               <input type="text" name="name" id="le-name" value={formData.name} onChange={handleInputChange} required 
@@ -457,7 +476,7 @@ const LoreEntriesPage: React.FC = () => {
                 placeholder="Add aliases (press enter, comma, or space)"
               />
             </div>
-            
+
             <div className="flex justify-end space-x-3 pt-2">
               <button type="button" onClick={handleCloseModal} className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-md">Cancel</button>
               <button type="submit" disabled={isSubmitting} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md disabled:opacity-50">

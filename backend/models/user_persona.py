@@ -1,6 +1,6 @@
 # backend/models/user_persona.py
 import uuid
-from sqlalchemy import Column, String, Text, DateTime
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID # Se usar PostgreSQL no futuro
 from sqlalchemy.orm import relationship
 # Para SQLite, UUID pode ser armazenado como String
@@ -14,6 +14,9 @@ class UserPersona(Base):
     name = Column(String, nullable=False, index=True)
     description = Column(Text, nullable=True)
     # Adicione mais campos se necessário, ex: persona_goals, style_notes
+    master_world_id = Column(String, ForeignKey("master_worlds.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Optionally, add relationship if you want to access the world from persona
+    master_world = relationship("MasterWorld")
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

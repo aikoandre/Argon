@@ -325,7 +325,7 @@ const ScenariosPage: React.FC = () => {
     try {
       const existingSession = await checkExistingChatSession({
         scenario_id: scenarioId,
-        user_persona_id: '',
+        user_persona_id: undefined, // undefined para não enviar campo
       });
 
       if (existingSession) {
@@ -333,9 +333,9 @@ const ScenariosPage: React.FC = () => {
       } else {
         const newSession = await createChatSession({
           scenario_id: scenarioId,
-          user_persona_id: '',
-          gm_character_id: '',
-          title: `Scenario: ${scenarios.find(s => s.id === scenarioId)?.name}`
+          gm_character_id: "", // string vazia para não enviar valor
+          user_persona_id: "", // string vazia para não enviar valor
+          title: `Scenario: ${scenarios.find(s => s.id === scenarioId)?.name}`,
         });
         navigate(`/chat/${newSession.id}`);
       }
@@ -382,60 +382,37 @@ const ScenariosPage: React.FC = () => {
         {scenarios.map((scen) => (
           <div
             key={scen.id}
-            className="bg-gray-800 rounded-lg shadow-lg p-6 hover:bg-gray-700 transition-colors cursor-pointer"
+            className="bg-gray-800 rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105"
             onClick={() => handleScenarioClick(scen.id)}
           >
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="text-xl font-semibold text-white">{scen.name}</h3>
-              <div className="flex space-x-2">
-                <button
-                  onClick={(e) => { 
-                    e.stopPropagation();
-                    handleOpenModal(scen);
-                  }}
-                  className="text-gray-400 hover:text-blue-500 transition-colors"
-                  title="Edit Scenario"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                  </svg>
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDelete(scen.id); }}
-                  className="text-gray-400 hover:text-red-500 transition-colors"
-                  title="Delete Scenario"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </button>
-              </div>
+            {/* Top right icons */}
+            <div className="absolute top-2 right-2 flex space-x-2 z-10">
+              <button
+                onClick={(e) => { e.stopPropagation(); handleOpenModal(scen); }}
+                className="text-gray-400 hover:text-blue-500 transition-colors"
+                title="Edit Scenario"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                </svg>
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleDelete(scen.id); }}
+                className="text-gray-400 hover:text-red-500 transition-colors"
+                title="Delete Scenario"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </button>
             </div>
-            {scen.description && (
-              <p className="text-gray-300 text-sm mb-4 line-clamp-3">
-                {scen.description}
-              </p>
-            )}
-            {scen.beginning_message && (
-              <p className="text-gray-400 text-xs">Has Beginning Message</p>
-            )}
-            {Array.isArray(scen.example_dialogues) && scen.example_dialogues.length > 0 && (
-              <p className="text-gray-400 text-xs">Example Dialogues: {scen.example_dialogues.length}</p>
-            )}
+            {/* Bottom info (footer) */}
+            <div className="absolute bottom-0 left-0 w-full bg-black/40 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
+              <div className="flex w-full items-center justify-between">
+                <h2 className="text-lg font-semibold text-white break-words whitespace-normal mr-2 flex-1 leading-snug" title={scen.name}>{scen.name}</h2>
+              </div>
+              {/* Não exibe tags */}
+            </div>
           </div>
         ))}
       </div>
@@ -454,6 +431,26 @@ const ScenariosPage: React.FC = () => {
               {error}
             </p>
           )}
+          {/* Campo de imagem opcional - antes do campo Name, label em cima */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Image</label>
+            <div className="flex items-center">
+              <button type="button" className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
+                </svg>
+                <span>Select Image</span>
+                <input type="file" accept="image/*" className="hidden" />
+              </button>
+              <span className="h-11 w-px bg-gray-600" />
+              <button type="button" className="bg-gray-700 hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </div>
 
           <div>
             <label
@@ -467,7 +464,7 @@ const ScenariosPage: React.FC = () => {
               options={masterWorldOptions}
               value={selectedMasterWorldForForm}
               onChange={handleMasterWorldChangeForForm}
-              isDisabled={isLoadingWorlds || !!editingScenario}
+              isDisabled={isLoadingWorlds}
               placeholder="Select Master World..."
               className="text-black"
               classNamePrefix="react-select"
