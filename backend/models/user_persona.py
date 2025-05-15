@@ -18,4 +18,5 @@ class UserPersona(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    scenario_cards = relationship("ScenarioCard", back_populates="user_persona")
+    # Remove the relationship that's causing the error
+    # scenario_cards = relationship("ScenarioCard", back_populates="user_persona")
