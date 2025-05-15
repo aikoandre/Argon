@@ -325,7 +325,7 @@ const ScenariosPage: React.FC = () => {
     try {
       const existingSession = await checkExistingChatSession({
         scenario_id: scenarioId,
-        user_persona_id: null,
+        user_persona_id: '',
       });
 
       if (existingSession) {
@@ -333,7 +333,8 @@ const ScenariosPage: React.FC = () => {
       } else {
         const newSession = await createChatSession({
           scenario_id: scenarioId,
-          user_persona_id: null,
+          user_persona_id: '',
+          gm_character_id: '',
           title: `Scenario: ${scenarios.find(s => s.id === scenarioId)?.name}`
         });
         navigate(`/chat/${newSession.id}`);

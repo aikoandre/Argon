@@ -316,7 +316,6 @@ const MasterWorldsPage: React.FC = () => {
               tags={formData.tags}
               onChange={(newTags) => setFormData(prev => ({ ...prev, tags: newTags }))}
               placeholder="Add tags (press enter, comma, or space)"
-              delimiter=", "
             />
           </div>
           <div className="flex justify-end space-x-3 pt-2">

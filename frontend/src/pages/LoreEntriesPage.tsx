@@ -1,5 +1,5 @@
 import React, { useState, useEffect, type FormEvent } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import Select, { type SingleValue } from 'react-select';
 import ReactTagInput from "@pathofdev/react-tag-input";
 import "@pathofdev/react-tag-input/build/index.css";
@@ -295,32 +295,9 @@ const LoreEntriesPage: React.FC = () => {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {entriesOfType.map(entry => (
-                      <div key={entry.id} className="bg-gray-800 p-6 rounded-lg shadow-lg flex flex-col justify-between">
-                        <div className="flex-grow">
-                          <h2 className="text-xl font-semibold text-sky-400 mb-1 truncate" title={entry.name}>{entry.name}</h2>
-                          <p className={`text-sm px-2 py-0.5 rounded-full font-semibold w-fit mb-2
-                            ${entry.entry_type === 'CHARACTER_LORE' ? 'bg-purple-700 text-purple-200' :
-                              entry.entry_type === 'LOCATION' ? 'bg-green-700 text-green-200' :
-                              entry.entry_type === 'FACTION' ? 'bg-yellow-700 text-yellow-200' :
-                              entry.entry_type === 'ITEM' ? 'bg-pink-700 text-pink-200' :
-                              entry.entry_type === 'CONCEPT' ? 'bg-indigo-700 text-indigo-200' :
-                              'bg-gray-700 text-gray-300'}`}>
-                            {getFriendlyEntryTypeName(entry.entry_type)}
-                          </p>
-                          <p className="text-gray-400 mb-2 text-sm line-clamp-2" title={entry.description || undefined}>
-                            {entry.description || <span className="italic">No description</span>}
-                          </p>
-                          {entry.tags && entry.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mb-2">
-                              {entry.tags.map(tag => (
-                                <span key={tag} className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded">
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex justify-end space-x-3 mt-3">
+                      <div key={entry.id} className="bg-gray-800 rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden">
+                        {/* Top right icons */}
+                        <div className="absolute top-2 right-2 flex space-x-2 z-10">
                           <button
                             onClick={() => handleOpenModal(entry)}
                             className="text-gray-400 hover:text-blue-500 transition-colors"
@@ -339,6 +316,30 @@ const LoreEntriesPage: React.FC = () => {
                               <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                             </svg>
                           </button>
+                        </div>
+                        {/* Bottom left info */}
+                        <div className="absolute bottom-0 left-0 w-full bg-black/40 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
+                          <div className="flex w-full items-center justify-between">
+                            <h2 className="text-lg font-semibold text-sky-400 truncate mr-2" title={entry.name}>{entry.name}</h2>
+                            <p className={`text-xs px-2 py-0.5 rounded-full font-semibold w-fit
+                              ${entry.entry_type === 'CHARACTER_LORE' ? 'bg-purple-700 text-purple-200' :
+                                entry.entry_type === 'LOCATION' ? 'bg-green-700 text-green-200' :
+                                entry.entry_type === 'FACTION' ? 'bg-yellow-700 text-yellow-200' :
+                                entry.entry_type === 'ITEM' ? 'bg-pink-700 text-pink-200' :
+                                entry.entry_type === 'CONCEPT' ? 'bg-indigo-700 text-indigo-200' :
+                                'bg-gray-700 text-gray-300'}`}>
+                              {getFriendlyEntryTypeName(entry.entry_type)}
+                            </p>
+                          </div>
+                          {entry.tags && entry.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1 mb-1">
+                              {entry.tags.map((tagValue) => (
+                                <span key={tagValue} className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded">
+                                  {tagValue}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -443,21 +444,17 @@ const LoreEntriesPage: React.FC = () => {
             <div>
               <label htmlFor="le-tags" className="block text-sm font-medium text-gray-300 mb-1">Tags</label>
               <ReactTagInput
-                id="le-tags"
                 tags={formData.tags}
                 onChange={(newTags) => setFormData(prev => ({ ...prev, tags: newTags }))}
                 placeholder="Add tags (press enter, comma, or space)"
-                delimiter=", "
               />
             </div>
             <div>
               <label htmlFor="le-aliases" className="block text-sm font-medium text-gray-300 mb-1">Aliases/Keywords</label>
               <ReactTagInput
-                id="le-aliases"
                 tags={formData.aliases}
                 onChange={(newAliases) => setFormData(prev => ({ ...prev, aliases: newAliases }))}
                 placeholder="Add aliases (press enter, comma, or space)"
-                delimiter=", "
               />
             </div>
             
