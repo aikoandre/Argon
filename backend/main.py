@@ -141,7 +141,7 @@ async def health_check():
 # Inclui os routers de lore entries
 app.include_router(lore_entries_router)
 app.include_router(master_world_lore_router)
-app.include_router(chat_router)
+app.include_router(chat_router, prefix="/api/chats")
 app.include_router(scenarios_router)
 app.include_router(personas_router)
 app.include_router(characters_router)

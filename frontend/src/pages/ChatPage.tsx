@@ -8,6 +8,10 @@ import {
 } from "../services/api";
 import type { ChatMessageData, ChatSessionData } from "../services/api";
 
+// Default avatar images - replace these with your actual avatar URLs
+const DEFAULT_USER_AVATAR = "/user-avatar.png";
+const DEFAULT_BOT_AVATAR = "/bot-avatar.png";
+
 const ChatPage: React.FC = () => {
   const { chatId } = useParams<{ chatId: string }>();
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
@@ -19,13 +23,14 @@ const ChatPage: React.FC = () => {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const messagesEndRef = useRef<null | HTMLDivElement>(null); // Para scroll automático
+  const messagesEndRef = useRef<null | HTMLDivElement>(null);
+  const chatContainerRef = useRef<null | HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  useEffect(scrollToBottom, [messages]); // Scrolla sempre que novas mensagens chegam
+  useEffect(scrollToBottom, [messages]);
 
   useEffect(() => {
     if (!chatId) {
@@ -38,7 +43,6 @@ const ChatPage: React.FC = () => {
       setIsLoadingMessages(true);
       setError(null);
       try {
-        // Buscar mensagens e detalhes da sessão em paralelo
         const [msgs, details] = await Promise.all([
           getChatSessionMessages(chatId),
           getChatSessionDetails(chatId),
@@ -67,14 +71,13 @@ const ChatPage: React.FC = () => {
       chat_session_id: chatId,
       sender_type: "USER",
       content: newMessage.trim(),
-      timestamp: new Date().toISOString(), // Timestamp local temporário
-      // message_metadata: {}, // Se tiver
+      timestamp: new Date().toISOString(),
     };
 
     // Adição otimista da mensagem do usuário
     setMessages((prevMessages) => [...prevMessages, userMessage]);
     const currentMessageContent = newMessage.trim();
-    setNewMessage(""); // Limpa o input
+    setNewMessage("");
 
     try {
       const sentMessage = await addMessageToSession(chatId, {
@@ -101,88 +104,164 @@ const ChatPage: React.FC = () => {
     }
   };
 
+  // Function to format timestamp
+  const formatTime = (timestamp: string) => {
+    try {
+      return new Date(timestamp).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch (error) {
+      return "";
+    }
+  };
+
   if (isLoadingMessages) {
-    return <p className="text-center text-gray-400 p-10">Loading chat...</p>;
-  }
-  if (error) {
-    return <p className="text-center text-red-500 p-10">{error}</p>;
-  }
-  if (!sessionDetails) {
     return (
-      <p className="text-center text-gray-400 p-10">Chat session not found.</p>
+      <div className="flex items-center justify-center h-screen bg-gray-900">
+        <div className="text-center text-gray-400 p-10 animate-pulse">
+          <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p>Loading chat...</p>
+        </div>
+      </div>
     );
   }
 
-  return (
-    <div className="flex flex-col h-[calc(100vh-theme.navHeight)] max-h-[calc(100vh-80px)]">
-      {" "}
-      {/* Ajuste a altura conforme sua navbar */}
-      <header className="p-4 bg-gray-800 border-b border-gray-700">
-        <h1 className="text-xl font-semibold text-white">
-          {sessionDetails.title || `Chat ${chatId?.substring(0, 8)}`}
-        </h1>
-        {/* Poderia mostrar o nome do GM/Cenário aqui */}
-      </header>
-      <div className="flex-grow overflow-y-auto p-4 space-y-4 bg-gray-750">
-        {" "}
-        {/* bg-gray-750 como exemplo, use sua cor */}
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex ${
-              msg.sender_type === "USER" ? "justify-end" : "justify-start"
-            }`}
-          >
-            <div
-              className={`max-w-xs lg:max-w-md px-4 py-2 rounded-xl shadow ${
-                msg.sender_type === "USER"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-600 text-gray-100"
-              }`}
-            >
-              <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-              <p
-                className={`text-xs mt-1 ${
-                  msg.sender_type === "USER"
-                    ? "text-blue-200 text-right"
-                    : "text-gray-400 text-left"
-                }`}
-              >
-                {/* {new Date(msg.timestamp).toLocaleTimeString()} - {msg.sender_type} */}
-              </p>
-            </div>
-          </div>
-        ))}
-        <div ref={messagesEndRef} /> {/* Elemento para scroll */}
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900">
+        <p className="text-center text-red-500 p-10 rounded-lg bg-gray-800 shadow-lg">
+          {error}
+        </p>
       </div>
-      <form
-        onSubmit={handleSendMessage}
-        className="p-4 bg-gray-800 border-t border-gray-700"
-      >
-        <div className="flex items-center">
-          <textarea
-            rows={1} // Começa com 1 linha, pode aumentar com o texto
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type anything..."
-            disabled={isSending}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage(e as any); // FormEvent esperado
-              }
-            }}
-            className="flex-grow p-3 bg-gray-700 border border-gray-600 rounded-l-lg focus:ring-blue-500 focus:border-blue-500 resize-none text-white placeholder-gray-400"
-          />
-          <button
-            type="submit"
-            disabled={isSending || !newMessage.trim()}
-            className="bg-purple-600 hover:bg-purple-700 text-white font-bold p-3 rounded-r-lg transition duration-150 ease-in-out disabled:opacity-50"
-          >
-            {isSending ? "..." : "Send"}
-          </button>
+    );
+  }
+
+  if (!sessionDetails) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900">
+        <p className="text-center text-gray-400 p-10 rounded-lg bg-gray-800 shadow-lg">
+          Chat session not found.
+        </p>
+      </div>
+    );
+  }
+
+  // Default persona name for the user if not available
+  const defaultUserPersona = "User";
+
+  return (
+    <div className="relative h-screen bg-gray-900">
+      {/* No chat header - removed as requested */}
+      
+      {/* Container das mensagens sem padding-top (header removido) */}
+      <div className="h-full overflow-hidden pb-20">
+        <div 
+          ref={chatContainerRef}
+          className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent"
+        >
+          <div className="max-w-4xl mx-auto px-4 pb-4">
+            {messages.length === 0 && (
+              <div className="flex justify-center my-10">
+                <p className="text-gray-500 text-center italic">
+                  No messages yet. Start a conversation!
+                </p>
+              </div>
+            )}
+            
+            {messages.map((msg) => (
+              <div key={msg.id} className="mb-4">
+                <div
+                  className={`rounded-lg ${
+                    msg.sender_type === "USER"
+                      ? "bg-gray-800 text-white"
+                      : "bg-gray-800 text-gray-100"
+                  }`}
+                >
+                  <div className="p-3 flex">
+                    {/* Imagem */}
+                    <div className="flex-shrink-0 w-16 h-24 mr-3">
+                      <img
+                        src={msg.sender_type === "USER" ? DEFAULT_USER_AVATAR : DEFAULT_BOT_AVATAR}
+                        alt={msg.sender_type === "USER" ? "User" : "Bot"}
+                        className="w-full h-full object-cover rounded-lg bg-gray-700"
+                        onError={(e) => {
+                          const fallback = msg.sender_type === "USER"
+                            ? "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'%3E%3C/path%3E%3Ccircle cx='12' cy='7' r='4'%3E%3C/circle%3E%3C/svg%3E"
+                            : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'%3E%3C/circle%3E%3Cpath d='M8 9.05v-.1'%3E%3C/path%3E%3Cpath d='M16 9.05v-.1'%3E%3C/path%3E%3Cpath d='M12 13a4 4 0 0 1-4 4'%3E%3C/path%3E%3Cpath d='M12 13a4 4 0 0 0 4 4'%3E%3C/path%3E%3C/svg%3E";
+                          (e.target as HTMLImageElement).src = fallback;
+                        }}
+                      />
+                    </div>
+                    {/* Nome, data/hora e mensagem */}
+                    <div className="flex-1 flex flex-col">
+                      <div className="flex items-center mb-1 flex-wrap">
+                        <span className="font-medium text-purple-400 mr-2">
+                          {msg.sender_type === "USER" ? defaultUserPersona : "Assistant"}
+                        </span>
+                        <span className="text-xs text-gray-400 mr-2">
+                          {new Date(msg.timestamp).toLocaleDateString()}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {formatTime(msg.timestamp)}
+                        </span>
+                      </div>
+                      <p className="whitespace-pre-wrap break-words mt-0.5">{msg.content}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
         </div>
-      </form>
+      </div>
+
+      {/* Container do input fixo no bottom */}
+      <div className="absolute bottom-0 left-0 right-0 py-3">
+        <div className="max-w-4xl mx-auto px-4">
+          <form onSubmit={handleSendMessage} className="relative">
+            <textarea
+              rows={1}
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Type a message..."
+              disabled={isSending}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage(e as any);
+                }
+              }}
+              className="w-full p-4 pr-14 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none text-white placeholder-gray-400 outline-none"
+              style={{ minHeight: "50px", maxHeight: "120px" }}
+            />
+            <button
+              type="submit"
+              disabled={isSending || !newMessage.trim()}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-purple-600 hover:bg-purple-700 text-white font-bold p-2 rounded-lg w-10 h-10 flex items-center justify-center transition duration-150 ease-in-out disabled:opacity-50"
+            >
+              {isSending ? (
+                <span className="animate-spin">⟳</span>
+              ) : (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-5 h-5"
+                >
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              )}
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 };

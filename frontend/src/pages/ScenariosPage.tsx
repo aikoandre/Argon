@@ -1,6 +1,11 @@
 // frontend/src/pages/ScenariosPage.tsx
 import React, { useState, useEffect, type FormEvent } from "react";
 import Select, { type SingleValue } from "react-select";
+import { useNavigate } from "react-router-dom";
+import { 
+  checkExistingChatSession,
+  createChatSession 
+} from "../services/api";
 import {
   getAllScenarioCards,
   createScenarioCard,
@@ -57,6 +62,8 @@ const initialFormFields: ScenarioFormData = {
 const initialBeginningMessages = [""];
 
 const ScenariosPage: React.FC = () => {
+  const navigate = useNavigate(); // Add this line
+
   const [scenarios, setScenarios] = useState<ScenarioCardData[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -314,6 +321,29 @@ const ScenariosPage: React.FC = () => {
     }
   };
 
+  const handleScenarioClick = async (scenarioId: string) => {
+    try {
+      const existingSession = await checkExistingChatSession({
+        scenario_id: scenarioId,
+        user_persona_id: null,
+      });
+
+      if (existingSession) {
+        navigate(`/chat/${existingSession.id}`);
+      } else {
+        const newSession = await createChatSession({
+          scenario_id: scenarioId,
+          user_persona_id: null,
+          title: `Scenario: ${scenarios.find(s => s.id === scenarioId)?.name}`
+        });
+        navigate(`/chat/${newSession.id}`);
+      }
+    } catch (error) {
+      console.error('Error handling scenario session:', error);
+      setError('Could not start scenario session');
+    }
+  };
+
   const masterWorldOptions = masterWorlds.map((w) => ({
     value: w.id,
     label: w.name,
@@ -351,7 +381,8 @@ const ScenariosPage: React.FC = () => {
         {scenarios.map((scen) => (
           <div
             key={scen.id}
-            className="bg-gray-800 rounded-lg shadow-lg p-6 hover:bg-gray-700 transition-colors"
+            className="bg-gray-800 rounded-lg shadow-lg p-6 hover:bg-gray-700 transition-colors cursor-pointer"
+            onClick={() => handleScenarioClick(scen.id)}
           >
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-xl font-semibold text-white">{scen.name}</h3>

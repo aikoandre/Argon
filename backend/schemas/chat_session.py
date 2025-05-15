@@ -11,9 +11,9 @@ import uuid
 
 class ChatSessionBase(BaseModel):
     title: Optional[str] = Field(None, max_length=150)
-    scenario_id: str # Ou uuid.UUID
-    gm_character_id: str # Ou uuid.UUID
-    user_persona_id: str # Ou uuid.UUID
+    scenario_id: Optional[str] = None
+    gm_character_id: Optional[str] = None
+    user_persona_id: Optional[str] = None
 
 class ChatSessionCreate(ChatSessionBase):
     pass

@@ -1,6 +1,11 @@
 // frontend/src/pages/CharactersPage.tsx
 import React, { useState, useEffect, type FormEvent } from "react";
 import Select, { type MultiValue, type SingleValue } from "react-select"; // Adicionado SingleValue
+import { useNavigate } from 'react-router-dom';
+import {
+  checkExistingChatSession,
+  createChatSession
+} from "../services/api";
 import {
   getAllCharacterCards, // Esta função precisará aceitar masterWorldId como filtro
   createCharacterCard,
@@ -60,6 +65,8 @@ const initialFormFields: CharacterFormData = {
 
 const CharactersPage: React.FC = () => {
   console.log("CharactersPage component rendering...");
+
+  const navigate = useNavigate(); // <-- Add this line
 
   const [characters, setCharacters] = useState<CharacterCardData[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true); // Loading geral da página/lista
@@ -382,6 +389,29 @@ const CharactersPage: React.FC = () => {
     }
   };
 
+  const handleCardClick = async (characterId: string) => {
+    try {
+      const existingSession = await checkExistingChatSession({
+        gm_character_id: characterId,
+        user_persona_id: null,
+      });
+
+      if (existingSession) {
+        navigate(`/chat/${existingSession.id}`);
+      } else {
+        const newSession = await createChatSession({
+          gm_character_id: characterId,
+          user_persona_id: null,
+          title: `Chat with ${characters.find(c => c.id === characterId)?.name}`
+        });
+        navigate(`/chat/${newSession.id}`);
+      }
+    } catch (error) {
+      console.error('Error handling chat session:', error);
+      setError('Could not start chat session');
+    }
+  };
+
   const handleDelete = async (characterId: string) => {
     console.log("handleDelete called for ID:", characterId);
     try {
@@ -433,7 +463,8 @@ const CharactersPage: React.FC = () => {
           {characters.map((char) => (
             <div
               key={char.id}
-              className="bg-gray-800 rounded-lg shadow-lg p-6 hover:bg-gray-700 transition-colors"
+              className="bg-gray-800 rounded-lg shadow-lg p-6 hover:bg-gray-700 transition-colors cursor-pointer"
+              onClick={() => handleCardClick(char.id)}
             >
               <div className="flex justify-between items-start mb-4">
                 <h3 className="text-xl font-semibold text-white">

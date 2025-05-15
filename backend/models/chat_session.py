@@ -12,9 +12,9 @@ class ChatSession(Base):
     title = Column(String, nullable=True) # Pode ser gerado ou definido pelo usuário
 
     # Chaves estrangeiras - Assumindo que os IDs nas tabelas referenciadas são String(UUID)
-    scenario_id = Column(String, ForeignKey("scenario_cards.id"), nullable=False)
-    gm_character_id = Column(String, ForeignKey("character_cards.id"), nullable=False)
-    user_persona_id = Column(String, ForeignKey("user_personas.id"), nullable=False)
+    scenario_id = Column(String, ForeignKey("scenario_cards.id"), nullable=True)
+    gm_character_id = Column(String, ForeignKey("character_cards.id"), nullable=True)
+    user_persona_id = Column(String, ForeignKey("user_personas.id"), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_active_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

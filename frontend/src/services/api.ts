@@ -505,10 +505,10 @@ export const createChatSession = async (
   data: ChatSessionCreateData
 ): Promise<ChatSessionData> => {
   try {
-    const response = await apiClient.post<ChatSessionData>("/chats", data);
+    const response = await apiClient.post<ChatSessionData>('/chats/', data); // Adicionar barra no final
     return response.data;
   } catch (error) {
-    console.error("Error creating chat session:", error);
+    console.error('Error creating chat session:', error);
     throw error;
   }
 };
@@ -591,6 +591,22 @@ export const deleteChatSession = async (chatId: string): Promise<void> => {
     await apiClient.delete(`/chats/${chatId}`);
   } catch (error) {
     console.error(`Error deleting chat session ${chatId}:`, error);
+    throw error;
+  }
+};
+
+export const checkExistingChatSession = async (params: {
+  gm_character_id?: string;
+  scenario_id?: string;
+  user_persona_id?: string | null;
+}): Promise<ChatSessionData | null> => {
+  try {
+    const response = await apiClient.get<ChatSessionData>('/chats/check', { params });
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      return null;
+    }
     throw error;
   }
 };
