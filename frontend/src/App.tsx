@@ -80,7 +80,7 @@ function App() {
               <Route path="/scenarios" element={<ScenariosPage />} />
               <Route path="/world-lore" element={<MasterWorldsPage />} />
               <Route
-                path="/world-lore/:worldId/entries"
+                path="/world-lore/:masterWorldId/entries"
                 element={<LoreEntriesPage />}
               />
               <Route path="/settings" element={<SettingsPage />} />

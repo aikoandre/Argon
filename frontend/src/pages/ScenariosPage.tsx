@@ -54,7 +54,6 @@ const initialFormFields: ScenarioFormData = {
   description: "",
 };
 
-const initialExampleDialogues = [""];
 const initialBeginningMessages = [""];
 
 const ScenariosPage: React.FC = () => {
@@ -201,7 +200,6 @@ const ScenariosPage: React.FC = () => {
         ? {
             name: scenario.name,
             description: scenario.description || "",
-            beginning_message: scenario.beginning_message || "",
           }
         : initialFormFields
     );
@@ -212,6 +210,11 @@ const ScenariosPage: React.FC = () => {
       : [""];
     setCurrentExampleDialogues(dialogues);
     setCurrentDialogueIndex(0);
+
+    // Initialize beginning messages
+    const bmg = scenario?.beginning_message ? [...scenario.beginning_message] : [""];
+    setCurrentBeginningMessages(bmg);
+    setCurrentBmgIndex(0);
 
     // Set MasterWorld selection based on scenario or null for new scenario
     const worldOption = scenario
@@ -250,12 +253,18 @@ const ScenariosPage: React.FC = () => {
       .map(m => m.trim())
       .filter(m => m);
 
-    const payload: ScenarioCardCreateData = {
-      ...formFields,
+    // Cria um payload limpo, sem user_persona_id e world_card_references
+    const { user_persona_id, world_card_references, ...safeFields } = formFields as any;
+    let payload: ScenarioCardCreateData = {
+      ...safeFields,
       master_world_id: selectedMasterWorldForForm?.value || null,
       example_dialogues: finalDialogues.length > 0 ? finalDialogues : null,
       beginning_message: finalBeginningMessages.length > 0 ? finalBeginningMessages : null,
     };
+
+    // Garantia extra: remove se vier de outro lugar
+    delete (payload as any).user_persona_id;
+    delete (payload as any).world_card_references;
 
     console.log("Submitting scenario with payload:", payload); // Debug log
 
@@ -427,6 +436,47 @@ const ScenariosPage: React.FC = () => {
               placeholder="Select Master World..."
               className="text-black"
               classNamePrefix="react-select"
+              styles={
+                {
+                 // Estilos para tema escuro
+                control: (base, state) => ({
+                  ...base,
+                  backgroundColor: "#1F2937", // bg-gray-800
+                  borderColor: state.isFocused ? "#3B82F6" : "#4B5563", // border-blue-500 (focus), border-gray-600
+                  boxShadow: state.isFocused ? "0 0 0 1px #3B82F6" : "none",
+                  "&:hover": { borderColor: "#6B7280" }, // border-gray-500 (hover)
+                  minHeight: "42px", // Para alinhar com inputs padrão
+                }),
+                singleValue: (base) => ({ ...base, color: "white" }),
+                menu: (base) => ({
+                  ...base,
+                  backgroundColor: "#1F2937",
+                  zIndex: 10,
+                }),
+                option: (base, { isFocused, isSelected }) => ({
+                  ...base,
+                  backgroundColor: isSelected
+                  ? "#3B82F6"
+                  : isFocused
+                  ? "#374151"
+                  : "#1F2937", // bg-blue-600 (selected), bg-gray-700 (focus)
+                  color: "white",
+                  ":active": { backgroundColor: "#2563EB" }, // bg-blue-700 (active)
+                }),
+    placeholder: (base) => ({ ...base, color: "#9CA3AF" }), // text-gray-400
+    input: (base) => ({ ...base, color: "white" }),
+    dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
+    clearIndicator: (base) => ({
+      ...base,
+      color: "#9CA3AF",
+      ":hover": { color: "white" },
+    }),
+    indicatorSeparator: (base) => ({
+      ...base,
+      backgroundColor: "#4B5563",
+    }),
+                }
+              }
             />
           </div>
 

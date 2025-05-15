@@ -87,9 +87,6 @@ const CharactersPage: React.FC = () => {
   // Estados para MasterWorld e Lore Links
   const [masterWorlds, setMasterWorlds] = useState<MasterWorldData[]>([]); // Lista de todos os mundos
   const [isLoadingWorlds, setIsLoadingWorlds] = useState<boolean>(true); // Loading para a lista de mundos
-  const [selectedMasterWorldForList, setSelectedMasterWorldForList] = useState<
-    string | null
-  >(null); // Para filtrar a lista principal
   const [selectedMasterWorldForForm, setSelectedMasterWorldForForm] =
     useState<SingleValue<SelectOption>>(null);
 
@@ -124,13 +121,7 @@ const CharactersPage: React.FC = () => {
       setIsLoading(true);
       setError(null);
       try {
-        console.log(
-          "Fetching characters with masterWorldId:",
-          selectedMasterWorldForList
-        );
-        const data = await getAllCharacterCards(
-          selectedMasterWorldForList || undefined
-        );
+        const data = await getAllCharacterCards(); // No filter
         console.log("Fetched Characters:", data);
         setCharacters(data);
       } catch (err) {
@@ -141,7 +132,7 @@ const CharactersPage: React.FC = () => {
       }
     };
     fetchChars();
-  }, [selectedMasterWorldForList]);
+  }, []); // Only on mount
 
   // Busca Lore Entries (para o dropdown no modal) quando selectedMasterWorldForForm (no modal) muda
   useEffect(() => {
@@ -322,13 +313,7 @@ const CharactersPage: React.FC = () => {
       setCurrentBeginningMessages([""]);
       setCurrentBmgIndex(0);
       setSelectedLoreLinks([]);
-      // Pré-seleciona o mundo do filtro da página, se houver
-      const worldOption = masterWorlds.find(
-        (w) => w.id === selectedMasterWorldForList
-      );
-      setSelectedMasterWorldForForm(
-        worldOption ? { value: worldOption.id, label: worldOption.name } : null
-      );
+      setSelectedMasterWorldForForm(null); // No pre-selection
     }
     setIsModalOpen(true);
   };
@@ -414,11 +399,6 @@ const CharactersPage: React.FC = () => {
     label: w.name,
   }));
 
-  const masterWorldOptionsForList = masterWorlds.map((w) => ({
-    value: w.id,
-    label: w.name,
-  }));
-
   console.log("CharactersPage component returning JSX...");
   return (
     <div className="container mx-auto p-4 md:p-8">
@@ -442,20 +422,7 @@ const CharactersPage: React.FC = () => {
           {error}
         </p>
       )}
-      {!isLoading &&
-        !error &&
-        characters.length === 0 &&
-        selectedMasterWorldForList && (
-          <p className="text-center text-gray-500 py-10">
-            No AI characters found for world "
-            {
-              masterWorlds.find((w) => w.id === selectedMasterWorldForList)
-                ?.name
-            }
-            ". Create one!
-          </p>
-        )}
-      {!isLoading && !error && !selectedMasterWorldForList && (
+      {!isLoading && !error && characters.length === 0 && (
         <p className="text-center text-gray-500 py-10">
           No characters found. Create one!
         </p>
@@ -563,7 +530,43 @@ const CharactersPage: React.FC = () => {
               classNamePrefix="react-select"
               styles={
                 {
-                  /* ... estilos ... */
+                 // Estilos para tema escuro
+                control: (base, state) => ({
+                  ...base,
+                  backgroundColor: "#1F2937", // bg-gray-800
+                  borderColor: state.isFocused ? "#3B82F6" : "#4B5563", // border-blue-500 (focus), border-gray-600
+                  boxShadow: state.isFocused ? "0 0 0 1px #3B82F6" : "none",
+                  "&:hover": { borderColor: "#6B7280" }, // border-gray-500 (hover)
+                  minHeight: "42px", // Para alinhar com inputs padrão
+                }),
+                singleValue: (base) => ({ ...base, color: "white" }),
+                menu: (base) => ({
+                  ...base,
+                  backgroundColor: "#1F2937",
+                  zIndex: 10,
+                }),
+                option: (base, { isFocused, isSelected }) => ({
+                  ...base,
+                  backgroundColor: isSelected
+                  ? "#3B82F6"
+                  : isFocused
+                  ? "#374151"
+                  : "#1F2937", // bg-blue-600 (selected), bg-gray-700 (focus)
+                  color: "white",
+                  ":active": { backgroundColor: "#2563EB" }, // bg-blue-700 (active)
+                }),
+    placeholder: (base) => ({ ...base, color: "#9CA3AF" }), // text-gray-400
+    input: (base) => ({ ...base, color: "white" }),
+    dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
+    clearIndicator: (base) => ({
+      ...base,
+      color: "#9CA3AF",
+      ":hover": { color: "white" },
+    }),
+    indicatorSeparator: (base) => ({
+      ...base,
+      backgroundColor: "#4B5563",
+    }),
                 }
               }
             />

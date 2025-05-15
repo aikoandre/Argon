@@ -27,6 +27,25 @@ interface LoreEntryFormData {
   aliases_string: string;
 }
 
+export const getFriendlyEntryTypeName = (entryType: string): string => {
+  switch (entryType) {
+    case "CHARACTER_LORE":
+      return "Character";
+    case "LOCATION":
+      return "Location";
+    case "FACTION":
+      return "Faction";
+    case "ITEM":
+      return "Item";
+    case "CONCEPT":
+      return "Concept";
+    // Adicione outros tipos que você possa ter
+    default:
+      // Capitaliza e remove underscores para tipos não mapeados explicitamente
+      return entryType.replace(/_/g, ' ').replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+  }
+};
+
 const initialFormData: LoreEntryFormData = {
   name: '',
   entry_type: VALID_ENTRY_TYPES[0],
@@ -71,7 +90,10 @@ const LoreEntriesPage: React.FC = () => {
   const [editingEntry, setEditingEntry] = useState<LoreEntryData | null>(null);
   const [formData, setFormData] = useState<LoreEntryFormData>(initialFormData);
 
-  const entryTypeOptions: SelectOption[] = VALID_ENTRY_TYPES.map(type => ({ value: type, label: type.replace(/_/g, ' ') }));
+  const entryTypeOptions: SelectOption[] = VALID_ENTRY_TYPES.map(type => ({
+  value: type,
+  label: getFriendlyEntryTypeName(type)
+}));
 
   useEffect(() => {
     if (!masterWorldId) {
@@ -160,12 +182,14 @@ const LoreEntriesPage: React.FC = () => {
       faction_id: formData.entry_type === "CHARACTER_LORE" ? formData.faction_id : null,
       tags: tagsForApi.length > 0 ? tagsForApi : null,
       aliases: aliasesForApi.length > 0 ? aliasesForApi : null,
+      master_world_id: masterWorldId, // Corrigido: agora sempre envia master_world_id
     };
     const payloadForUpdate: LoreEntryUpdateData = { ...payloadForCreate };
 
     setIsSubmitting(true);
     setError(null);
     try {
+      console.log('Payload enviado para API:', editingEntry ? payloadForUpdate : payloadForCreate);
       if (editingEntry) {
         await updateLoreEntry(editingEntry.id, payloadForUpdate);
       } else {
@@ -177,7 +201,19 @@ const LoreEntriesPage: React.FC = () => {
       const factionsData = await getAllLoreEntriesForMasterWorld(masterWorldId, "FACTION");
       setFactionsOptions(factionsData.map(f => ({ value: f.id, label: f.name })));
     } catch (err: any) {
-      const apiError = err.response?.data?.detail || (editingEntry ? 'Failed to update lore entry.' : 'Failed to create lore entry.');
+      if (err.response?.data) {
+        console.error('Resposta de erro detalhada da API:', err.response.data);
+      }
+      let apiError = editingEntry ? 'Failed to update lore entry.' : 'Failed to create lore entry.';
+      if (err.response?.data?.detail) {
+        if (Array.isArray(err.response.data.detail)) {
+          apiError = err.response.data.detail.map((e: any) => e.msg).join(' | ');
+        } else if (typeof err.response.data.detail === 'string') {
+          apiError = err.response.data.detail;
+        } else if (typeof err.response.data.detail === 'object' && err.response.data.detail.msg) {
+          apiError = err.response.data.detail.msg;
+        }
+      }
       setError(apiError);
       console.error(err);
     } finally {
@@ -244,7 +280,7 @@ const LoreEntriesPage: React.FC = () => {
                     entry.entry_type === 'ITEM' ? 'bg-pink-700 text-pink-200' :
                     entry.entry_type === 'CONCEPT' ? 'bg-indigo-700 text-indigo-200' :
                     'bg-gray-700 text-gray-300'}`}>
-                  {entry.entry_type.replace(/_/g, ' ')}
+                  {getFriendlyEntryTypeName(entry.entry_type)}
                 </span>
               </div>
               <p className="text-gray-400 mb-2 text-sm line-clamp-2" title={entry.description || undefined}>
@@ -293,6 +329,48 @@ const LoreEntriesPage: React.FC = () => {
                 value={entryTypeOptions.find(opt => opt.value === formData.entry_type) || null}
                 onChange={(opt) => handleSelectChange(opt as SingleValue<SelectOption>, { name: 'entry_type' })}
                 className="text-black" classNamePrefix="react-select"
+                styles={
+                {
+                 // Estilos para tema escuro
+                control: (base, state) => ({
+                  ...base,
+                  backgroundColor: "#1F2937", // bg-gray-800
+                  borderColor: state.isFocused ? "#3B82F6" : "#4B5563", // border-blue-500 (focus), border-gray-600
+                  boxShadow: state.isFocused ? "0 0 0 1px #3B82F6" : "none",
+                  "&:hover": { borderColor: "#6B7280" }, // border-gray-500 (hover)
+                  minHeight: "42px", // Para alinhar com inputs padrão
+                }),
+                singleValue: (base) => ({ ...base, color: "white" }),
+                menu: (base) => ({
+                  ...base,
+                  backgroundColor: "#1F2937",
+                  zIndex: 10,
+                }),
+                option: (base, { isFocused, isSelected }) => ({
+                  ...base,
+                  backgroundColor: isSelected
+                  ? "#3B82F6"
+                  : isFocused
+                  ? "#374151"
+                  : "#1F2937", // bg-blue-600 (selected), bg-gray-700 (focus)
+                  color: "white",
+                  ":active": { backgroundColor: "#2563EB" }, // bg-blue-700 (active)
+                }),
+                placeholder: (base) => ({ ...base, color: "#9CA3AF" }), // text-gray-400
+    input: (base) => ({ ...base, color: "white" }),
+    dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
+    clearIndicator: (base) => ({
+      ...base,
+      color: "#9CA3AF",
+      ":hover": { color: "white" },
+    }),
+    indicatorSeparator: (base) => ({
+      ...base,
+      backgroundColor: "#4B5563",
+    }),
+                
+              }}
+                
             />
           </div>
           <div>
@@ -311,6 +389,47 @@ const LoreEntriesPage: React.FC = () => {
                 isClearable placeholder="Select a faction..."
                 className="text-black" classNamePrefix="react-select"
                 noOptionsMessage={() => factionsOptions.length === 0 ? "No factions in this world. Create one first!" : "No options"}
+              styles={
+                {
+                 // Estilos para tema escuro
+                control: (base, state) => ({
+                  ...base,
+                  backgroundColor: "#1F2937", // bg-gray-800
+                  borderColor: state.isFocused ? "#3B82F6" : "#4B5563", // border-blue-500 (focus), border-gray-600
+                  boxShadow: state.isFocused ? "0 0 0 1px #3B82F6" : "none",
+                  "&:hover": { borderColor: "#6B7280" }, // border-gray-500 (hover)
+                  minHeight: "42px", // Para alinhar com inputs padrão
+                }),
+                singleValue: (base) => ({ ...base, color: "white" }),
+                menu: (base) => ({
+                  ...base,
+                  backgroundColor: "#1F2937",
+                  zIndex: 10,
+                }),
+                option: (base, { isFocused, isSelected }) => ({
+                  ...base,
+                  backgroundColor: isSelected
+                  ? "#3B82F6"
+                  : isFocused
+                  ? "#374151"
+                  : "#1F2937", // bg-blue-600 (selected), bg-gray-700 (focus)
+                  color: "white",
+                  ":active": { backgroundColor: "#2563EB" }, // bg-blue-700 (active)
+                }),
+                placeholder: (base) => ({ ...base, color: "#9CA3AF" }), // text-gray-400
+    input: (base) => ({ ...base, color: "white" }),
+    dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
+    clearIndicator: (base) => ({
+      ...base,
+      color: "#9CA3AF",
+      ":hover": { color: "white" },
+    }),
+    indicatorSeparator: (base) => ({
+      ...base,
+      backgroundColor: "#4B5563",
+    }),
+                
+              }}
               />
             </div>
           )}

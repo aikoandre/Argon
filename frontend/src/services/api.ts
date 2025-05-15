@@ -251,6 +251,7 @@ export interface ScenarioCardData {
   name: string;
   description?: string | null;
   beginning_message?: string[] | null;
+  example_dialogues?: string[] | null;
   master_world_id?: string | null;
   world_card_references?: string[] | null;
   user_persona_id: string | null;
@@ -260,16 +261,19 @@ export interface ScenarioCardData {
 export interface ScenarioCardCreateData {
   name: string;
   description?: string | null;
-  beginning_message?: string | null;
-  master_world_id: string;
+  beginning_message?: string[] | null;
+  example_dialogues?: string[] | null;
+  master_world_id?: string | null;
   world_card_references?: string[] | null;
   user_persona_id?: string | null;
 }
 export interface ScenarioCardUpdateData {
   name?: string;
   description?: string | null;
-  beginning_message?: string | null;
+  beginning_message?: string[] | null;
+  example_dialogues?: string[] | null;
   world_card_references?: string[] | null;
+  master_world_id?: string | null;
   user_persona_id?: string | null;
 }
 
@@ -402,6 +406,7 @@ export interface LoreEntryCreateData {
   tags?: string[] | null;
   aliases?: string[] | null;
   faction_id?: string | null;
+  master_world_id: string; // <-- Adicionado para corresponder ao backend
 }
 
 export interface LoreEntryUpdateData {

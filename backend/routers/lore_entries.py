@@ -44,6 +44,7 @@ def create_lore_entry_for_world(
 
     # Removido attributes do payload, como discutido
     db_entry_data = entry.model_dump()
+    db_entry_data.pop('master_world_id', None)  # Corrige erro de argumento duplicado
     # db_entry_data.pop('attributes', None) # Se 'attributes' ainda estiver no schema Create mas não no modelo
 
     db_entry = LoreEntry(**db_entry_data, master_world_id=master_world_id)
