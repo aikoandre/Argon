@@ -7,6 +7,8 @@ import {
   deleteMasterWorld,
   type MasterWorldData,
 } from "../services/api";
+import ReactTagInput from "@pathofdev/react-tag-input";
+import "@pathofdev/react-tag-input/build/index.css";
 
 interface ModalProps {
   isOpen: boolean;
@@ -39,13 +41,13 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
 interface MasterWorldFormData {
   name: string;
   description: string;
-  tags_string: string; // Tags como string separada por vírgula
+  tags: string[];
 }
 
 const initialFormData: MasterWorldFormData = {
   name: "",
   description: "",
-  tags_string: "",
+  tags: [],
 };
 
 const MasterWorldsPage: React.FC = () => {
@@ -92,7 +94,7 @@ const MasterWorldsPage: React.FC = () => {
       setFormData({
         name: world.name,
         description: world.description || "",
-        tags_string: world.tags ? world.tags.join(", ") : "",
+        tags: world.tags ? [...world.tags] : [],
       });
     } else {
       setEditingWorld(null);
@@ -116,15 +118,10 @@ const MasterWorldsPage: React.FC = () => {
       return;
     }
 
-    const tagsForApi = formData.tags_string
-      .split(",")
-      .map((tag) => tag.trim())
-      .filter((tag) => tag.length > 0);
-
     const payload = {
       name: formData.name,
       description: formData.description,
-      tags: tagsForApi.length > 0 ? tagsForApi : null,
+      tags: formData.tags.length > 0 ? formData.tags : null,
     };
 
     setIsSubmitting(true);
@@ -313,17 +310,13 @@ const MasterWorldsPage: React.FC = () => {
               htmlFor="mw-tags"
               className="block text-sm font-medium text-gray-300 mb-1"
             >
-              Tags (comma-separated)
+              Tags
             </label>
-            <input
-              type="text"
-              name="tags_string"
-              id="mw-tags"
-              value={formData.tags_string}
-              onChange={handleInputChange}
-              placeholder="e.g., high fantasy, sci-fi, post-apocalyptic"
-              className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
-              autoComplete="off"
+            <ReactTagInput
+              tags={formData.tags}
+              onChange={(newTags) => setFormData(prev => ({ ...prev, tags: newTags }))}
+              placeholder="Add tags (press enter, comma, or space)"
+              delimiter=", "
             />
           </div>
           <div className="flex justify-end space-x-3 pt-2">

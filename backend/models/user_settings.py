@@ -9,4 +9,5 @@ class UserSettings(Base):
     id = Column(Integer, primary_key=True, default=1)
     selected_llm_model = Column(String, default="GPT-4o")
     openrouter_api_key = Column(String, nullable=True)
+    active_persona_id = Column(String, nullable=True)  # ID da persona ativa
     # format_thoughts_italic = Column(Boolean, default=True) # Exemplo de outro campo

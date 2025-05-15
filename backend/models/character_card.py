@@ -19,6 +19,13 @@ class CharacterCard(Base):
     
     linked_lore_ids = Column(JSON, nullable=True, default=lambda: [])
 
+    # Add relationship to ChatSession with cascade delete
+    chat_sessions = relationship(
+        "ChatSession",
+        back_populates="gm_character",
+        cascade="all, delete-orphan"
+    )
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

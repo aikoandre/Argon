@@ -1,6 +1,8 @@
 import React, { useState, useEffect, type FormEvent } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import Select, { type SingleValue } from 'react-select';
+import ReactTagInput from "@pathofdev/react-tag-input";
+import "@pathofdev/react-tag-input/build/index.css";
 import {
   getAllLoreEntriesForMasterWorld,
   createLoreEntryForMasterWorld,
@@ -15,46 +17,13 @@ import {
 
 const VALID_ENTRY_TYPES = ["CHARACTER_LORE", "LOCATION", "FACTION", "ITEM", "CONCEPT"];
 
+// Define the desired order for displaying sections
+const DISPLAY_ENTRY_TYPES_ORDER = ["CHARACTER_LORE", "LOCATION", "FACTION", "ITEM", "CONCEPT"];
+
 interface SelectOption { value: string; label: string; }
 interface ModalProps { isOpen: boolean; onClose: () => void; children: React.ReactNode; title: string; }
 
-interface LoreEntryFormData {
-  name: string;
-  entry_type: string;
-  description: string;
-  faction_id: string | null;
-  tags_string: string;
-  aliases_string: string;
-}
-
-export const getFriendlyEntryTypeName = (entryType: string): string => {
-  switch (entryType) {
-    case "CHARACTER_LORE":
-      return "Character";
-    case "LOCATION":
-      return "Location";
-    case "FACTION":
-      return "Faction";
-    case "ITEM":
-      return "Item";
-    case "CONCEPT":
-      return "Concept";
-    // Adicione outros tipos que você possa ter
-    default:
-      // Capitaliza e remove underscores para tipos não mapeados explicitamente
-      return entryType.replace(/_/g, ' ').replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
-  }
-};
-
-const initialFormData: LoreEntryFormData = {
-  name: '',
-  entry_type: VALID_ENTRY_TYPES[0],
-  description: '',
-  faction_id: null,
-  tags_string: '',
-  aliases_string: '',
-};
-
+// --- DEFINE THE MODAL COMPONENT *OUTSIDE* THE MAIN PAGE COMPONENT ---
 const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
   if (!isOpen) return null;
   return (
@@ -74,6 +43,45 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
     </div>
   );
 };
+// --- END MODAL COMPONENT DEFINITION ---
+
+interface LoreEntryFormData {
+  name: string;
+  entry_type: string;
+  description: string;
+  faction_id: string | null;
+  tags: string[];
+  aliases: string[];
+}
+
+export const getFriendlyEntryTypeName = (entryType: string): string => {
+  switch (entryType) {
+    case "CHARACTER_LORE":
+      return "Character";
+    case "LOCATION":
+      return "Location";
+    case "FACTION":
+      return "Group";
+    case "ITEM":
+      return "Item";
+    case "CONCEPT":
+      return "Concept";
+    // Adicione outros tipos que você possa ter
+    default:
+      // Capitaliza e remove underscores para tipos não mapeados explicitamente
+      return entryType.replace(/_/g, ' ').replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+  }
+};
+
+const initialFormData: LoreEntryFormData = {
+  name: '',
+  entry_type: VALID_ENTRY_TYPES[0],
+  description: '',
+  faction_id: null,
+  tags: [],
+  aliases: [],
+};
+
 
 const LoreEntriesPage: React.FC = () => {
   const { masterWorldId } = useParams<{ masterWorldId: string }>();
@@ -136,7 +144,8 @@ const LoreEntriesPage: React.FC = () => {
     setFormData(prev => ({
         ...prev,
         [actionMeta.name]: selectedOption ? selectedOption.value : null,
-        ...(actionMeta.name === 'entry_type' && (selectedOption?.value !== 'CHARACTER_LORE' || !selectedOption) && { faction_id: null })
+        // If changing entry type to non-CHARACTER_LORE, clear faction_id
+        ...(actionMeta.name === 'entry_type' && selectedOption?.value !== 'CHARACTER_LORE' && { faction_id: null })
     }));
   };
 
@@ -148,8 +157,8 @@ const LoreEntriesPage: React.FC = () => {
         entry_type: entry.entry_type,
         description: entry.description || '',
         faction_id: entry.faction_id || null,
-        tags_string: entry.tags ? entry.tags.join(', ') : '',
-        aliases_string: entry.aliases ? entry.aliases.join(', ') : '',
+        tags: entry.tags ? [...entry.tags] : [],
+        aliases: entry.aliases ? [...entry.aliases] : [],
       });
     } else {
       setEditingEntry(null);
@@ -172,19 +181,26 @@ const LoreEntriesPage: React.FC = () => {
     if (!formData.name.trim()) { setError("Name is required."); return; }
     if (!formData.entry_type) { setError("Entry Type is required."); return; }
 
-    const tagsForApi = formData.tags_string.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
-    const aliasesForApi = formData.aliases_string.split(',').map(alias => alias.trim()).filter(alias => alias.length > 0);
+    const tagsForApi = formData.tags;
+    const aliasesForApi = formData.aliases;
 
     const payloadForCreate: LoreEntryCreateData = {
       name: formData.name,
       entry_type: formData.entry_type,
       description: formData.description,
-      faction_id: formData.entry_type === "CHARACTER_LORE" ? formData.faction_id : null,
+      faction_id: formData.entry_type === "CHARACTER_LORE" ? (formData.faction_id || null) : null,
       tags: tagsForApi.length > 0 ? tagsForApi : null,
       aliases: aliasesForApi.length > 0 ? aliasesForApi : null,
-      master_world_id: masterWorldId, // Corrigido: agora sempre envia master_world_id
+      master_world_id: masterWorldId,
     };
-    const payloadForUpdate: LoreEntryUpdateData = { ...payloadForCreate };
+    const payloadForUpdate: LoreEntryUpdateData = {
+        name: formData.name,
+        entry_type: formData.entry_type,
+        description: formData.description,
+        faction_id: formData.entry_type === "CHARACTER_LORE" ? (formData.faction_id || null) : null,
+        tags: tagsForApi.length > 0 ? tagsForApi : [],
+        aliases: aliasesForApi.length > 0 ? aliasesForApi : [],
+    };
 
     setIsSubmitting(true);
     setError(null);
@@ -244,218 +260,217 @@ const LoreEntriesPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
-      <div className="mb-8">
-        <Link to="/world-lore" className="text-blue-400 hover:text-blue-300">← Back to My Worlds</Link>
-        <div className="flex justify-between items-center mt-2">
-          <h1 className="text-4xl font-bold text-white">
-            {currentMasterWorld?.name || 'Lore Entries'}
-          </h1>
-          <button 
-            onClick={() => handleOpenModal()} 
-            className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md"
-          >
-            + Create New Lore Entry
-          </button>
-        </div>
-        <p className="text-gray-400">{currentMasterWorld?.description}</p>
-      </div>
-
-      {error && <p className="bg-red-700 text-white p-3 rounded-md mb-4 text-center">{error}</p>}
-
-      {loreEntries.length === 0 && !isLoading && (
-        <p className="text-center text-gray-500 py-10">No lore entries created for this world yet.</p>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {loreEntries.map(entry => (
-          <div key={entry.id} className="bg-gray-800 p-6 rounded-lg shadow-lg flex flex-col justify-between">
-            <div>
-              <div className="flex justify-between items-start">
-                <h2 className="text-xl font-semibold text-sky-400 mb-1 truncate" title={entry.name}>{entry.name}</h2>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold
-                  ${entry.entry_type === 'CHARACTER_LORE' ? 'bg-purple-700 text-purple-200' :
-                    entry.entry_type === 'LOCATION' ? 'bg-green-700 text-green-200' :
-                    entry.entry_type === 'FACTION' ? 'bg-yellow-700 text-yellow-200' :
-                    entry.entry_type === 'ITEM' ? 'bg-pink-700 text-pink-200' :
-                    entry.entry_type === 'CONCEPT' ? 'bg-indigo-700 text-indigo-200' :
-                    'bg-gray-700 text-gray-300'}`}>
-                  {getFriendlyEntryTypeName(entry.entry_type)}
-                </span>
-              </div>
-              <p className="text-gray-400 mb-2 text-sm line-clamp-2" title={entry.description || undefined}>
-                {entry.description || <span className="italic">No description</span>}
-              </p>
-              {entry.tags && entry.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {entry.tags.map(tag => (
-                    <span key={tag} className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="flex justify-end space-x-3 mt-3">
-              <button 
-                onClick={() => handleOpenModal(entry)} 
-                className="text-sm bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-1 px-3 rounded-md"
-              >
-                Edit
-              </button>
-              <button 
-                onClick={() => handleDelete(entry.id)} 
-                className="text-sm bg-red-600 hover:bg-red-700 text-white font-semibold py-1 px-3 rounded-md"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <Modal isOpen={isModalOpen} onClose={handleCloseModal} title={editingEntry ? 'Edit Lore Entry' : 'Create New Lore Entry'}>
-        <form onSubmit={handleSubmit} className="space-y-4 max-h-[80vh] overflow-y-auto p-1 pr-2">
-          {error && isModalOpen && <p className="bg-red-700 text-white p-3 rounded-md text-sm text-center mb-3">{error}</p>}
-          <div>
-            <label htmlFor="le-name" className="block text-sm font-medium text-gray-300 mb-1">Name <span className="text-red-500">*</span></label>
-            <input type="text" name="name" id="le-name" value={formData.name} onChange={handleInputChange} required 
-                   className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500" autoComplete="off"/>
-          </div>
-          <div>
-            <label htmlFor="le-entry_type" className="block text-sm font-medium text-gray-300 mb-1">Entry Type <span className="text-red-500">*</span></label>
-            <Select<SelectOption>
-                inputId="le-entry_type" name="entry_type" options={entryTypeOptions}
-                value={entryTypeOptions.find(opt => opt.value === formData.entry_type) || null}
-                onChange={(opt) => handleSelectChange(opt as SingleValue<SelectOption>, { name: 'entry_type' })}
-                className="text-black" classNamePrefix="react-select"
-                styles={
-                {
-                 // Estilos para tema escuro
-                control: (base, state) => ({
-                  ...base,
-                  backgroundColor: "#1F2937", // bg-gray-800
-                  borderColor: state.isFocused ? "#3B82F6" : "#4B5563", // border-blue-500 (focus), border-gray-600
-                  boxShadow: state.isFocused ? "0 0 0 1px #3B82F6" : "none",
-                  "&:hover": { borderColor: "#6B7280" }, // border-gray-500 (hover)
-                  minHeight: "42px", // Para alinhar com inputs padrão
-                }),
-                singleValue: (base) => ({ ...base, color: "white" }),
-                menu: (base) => ({
-                  ...base,
-                  backgroundColor: "#1F2937",
-                  zIndex: 10,
-                }),
-                option: (base, { isFocused, isSelected }) => ({
-                  ...base,
-                  backgroundColor: isSelected
-                  ? "#3B82F6"
-                  : isFocused
-                  ? "#374151"
-                  : "#1F2937", // bg-blue-600 (selected), bg-gray-700 (focus)
-                  color: "white",
-                  ":active": { backgroundColor: "#2563EB" }, // bg-blue-700 (active)
-                }),
-                placeholder: (base) => ({ ...base, color: "#9CA3AF" }), // text-gray-400
-    input: (base) => ({ ...base, color: "white" }),
-    dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
-    clearIndicator: (base) => ({
-      ...base,
-      color: "#9CA3AF",
-      ":hover": { color: "white" },
-    }),
-    indicatorSeparator: (base) => ({
-      ...base,
-      backgroundColor: "#4B5563",
-    }),
-                
-              }}
-                
-            />
-          </div>
-          <div>
-            <label htmlFor="le-description" className="block text-sm font-medium text-gray-300 mb-1">Description</label>
-            <textarea name="description" id="le-description" rows={3} value={formData.description} onChange={handleInputChange} 
-                      className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500" autoComplete="off"/>
-          </div>
-
-          {formData.entry_type === "CHARACTER_LORE" && (
-            <div>
-              <label htmlFor="le-faction_id" className="block text-sm font-medium text-gray-300 mb-1">Faction/Group</label>
-              <Select<SelectOption>
-                inputId="le-faction_id" name="faction_id" options={factionsOptions}
-                value={factionsOptions.find(opt => opt.value === formData.faction_id) || null}
-                onChange={(opt) => handleSelectChange(opt as SingleValue<SelectOption>, { name: 'faction_id' })}
-                isClearable placeholder="Select a faction..."
-                className="text-black" classNamePrefix="react-select"
-                noOptionsMessage={() => factionsOptions.length === 0 ? "No factions in this world. Create one first!" : "No options"}
-              styles={
-                {
-                 // Estilos para tema escuro
-                control: (base, state) => ({
-                  ...base,
-                  backgroundColor: "#1F2937", // bg-gray-800
-                  borderColor: state.isFocused ? "#3B82F6" : "#4B5563", // border-blue-500 (focus), border-gray-600
-                  boxShadow: state.isFocused ? "0 0 0 1px #3B82F6" : "none",
-                  "&:hover": { borderColor: "#6B7280" }, // border-gray-500 (hover)
-                  minHeight: "42px", // Para alinhar com inputs padrão
-                }),
-                singleValue: (base) => ({ ...base, color: "white" }),
-                menu: (base) => ({
-                  ...base,
-                  backgroundColor: "#1F2937",
-                  zIndex: 10,
-                }),
-                option: (base, { isFocused, isSelected }) => ({
-                  ...base,
-                  backgroundColor: isSelected
-                  ? "#3B82F6"
-                  : isFocused
-                  ? "#374151"
-                  : "#1F2937", // bg-blue-600 (selected), bg-gray-700 (focus)
-                  color: "white",
-                  ":active": { backgroundColor: "#2563EB" }, // bg-blue-700 (active)
-                }),
-                placeholder: (base) => ({ ...base, color: "#9CA3AF" }), // text-gray-400
-    input: (base) => ({ ...base, color: "white" }),
-    dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
-    clearIndicator: (base) => ({
-      ...base,
-      color: "#9CA3AF",
-      ":hover": { color: "white" },
-    }),
-    indicatorSeparator: (base) => ({
-      ...base,
-      backgroundColor: "#4B5563",
-    }),
-                
-              }}
-              />
-            </div>
-          )}
-
-          <div>
-            <label htmlFor="le-tags" className="block text-sm font-medium text-gray-300 mb-1">Tags (comma-separated)</label>
-            <input type="text" name="tags_string" id="le-tags" value={formData.tags_string} onChange={handleInputChange} 
-                   placeholder="e.g., important, secret, ancient" 
-                   className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500" autoComplete="off"/>
-          </div>
-          <div>
-            <label htmlFor="le-aliases" className="block text-sm font-medium text-gray-300 mb-1">Aliases/Keywords (comma-separated)</label>
-            <input type="text" name="aliases_string" id="le-aliases" value={formData.aliases_string} onChange={handleInputChange} 
-                   placeholder="e.g., The Wanderer, Prophecy Fragment" 
-                   className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500" autoComplete="off"/>
-          </div>
-          
-          <div className="flex justify-end space-x-3 pt-2">
-            <button type="button" onClick={handleCloseModal} className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-md">Cancel</button>
-            <button type="submit" disabled={isSubmitting} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md disabled:opacity-50">
-              {isSubmitting ? (editingEntry ? 'Saving...' : 'Creating...') : (editingEntry ? 'Save Changes' : 'Create Entry')}
+    <>
+      <div className="container mx-auto p-4 md:p-8">
+        <div className="mb-8">
+          <div className="flex justify-between items-center">
+            <h1 className="text-4xl font-bold text-white">
+              {currentMasterWorld?.name || 'Lore Entries'}
+            </h1>
+            <button 
+              onClick={() => handleOpenModal()} 
+              className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md"
+            >
+              + New
             </button>
           </div>
-        </form>
-      </Modal>
-    </div>
+          <p className="text-gray-400">{currentMasterWorld?.description}</p>
+        </div>
+
+        {error && <p className="bg-red-700 text-white p-3 rounded-md mb-4 text-center">{error}</p>}
+
+        {/* Render sections by type */}
+        <div className="space-y-8">
+          {DISPLAY_ENTRY_TYPES_ORDER.map(entryType => {
+            const friendlyTypeName = getFriendlyEntryTypeName(entryType);
+            const entriesOfType = loreEntries.filter(entry => entry.entry_type === entryType);
+
+            return (
+              <div key={entryType}>
+                <h3 className="text-2xl font-semibold text-gray-300 mb-4 border-b border-gray-700 pb-2">
+                  {friendlyTypeName}
+                </h3>
+                {entriesOfType.length === 0 ? (
+                  <p className="text-center text-gray-500 py-4">Empty section</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {entriesOfType.map(entry => (
+                      <div key={entry.id} className="bg-gray-800 p-6 rounded-lg shadow-lg flex flex-col justify-between">
+                        <div className="flex-grow">
+                          <h2 className="text-xl font-semibold text-sky-400 mb-1 truncate" title={entry.name}>{entry.name}</h2>
+                          <p className={`text-sm px-2 py-0.5 rounded-full font-semibold w-fit mb-2
+                            ${entry.entry_type === 'CHARACTER_LORE' ? 'bg-purple-700 text-purple-200' :
+                              entry.entry_type === 'LOCATION' ? 'bg-green-700 text-green-200' :
+                              entry.entry_type === 'FACTION' ? 'bg-yellow-700 text-yellow-200' :
+                              entry.entry_type === 'ITEM' ? 'bg-pink-700 text-pink-200' :
+                              entry.entry_type === 'CONCEPT' ? 'bg-indigo-700 text-indigo-200' :
+                              'bg-gray-700 text-gray-300'}`}>
+                            {getFriendlyEntryTypeName(entry.entry_type)}
+                          </p>
+                          <p className="text-gray-400 mb-2 text-sm line-clamp-2" title={entry.description || undefined}>
+                            {entry.description || <span className="italic">No description</span>}
+                          </p>
+                          {entry.tags && entry.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {entry.tags.map(tag => (
+                                <span key={tag} className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded">
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex justify-end space-x-3 mt-3">
+                          <button
+                            onClick={() => handleOpenModal(entry)}
+                            className="text-gray-400 hover:text-blue-500 transition-colors"
+                            title="Edit Lore Entry"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleDelete(entry.id)}
+                            className="text-gray-400 hover:text-red-500 transition-colors"
+                            title="Delete Lore Entry"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <Modal isOpen={isModalOpen} onClose={handleCloseModal} title={editingEntry ? 'Edit Lore Entry' : 'Create New Lore Entry'}>
+          <form onSubmit={handleSubmit} className="space-y-4 max-h-[80vh] overflow-y-auto p-1 pr-2 custom-scrollbar">
+            {error && isModalOpen && <p className="bg-red-700 text-white p-3 rounded-md text-sm text-center mb-3">{error}</p>}
+            <div>
+              <label htmlFor="le-name" className="block text-sm font-medium text-gray-300 mb-1">Name <span className="text-red-500">*</span></label>
+              <input type="text" name="name" id="le-name" value={formData.name} onChange={handleInputChange} required 
+                     className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500" autoComplete="off"/>
+            </div>
+            <div>
+              <label htmlFor="le-entry_type" className="block text-sm font-medium text-gray-300 mb-1">Entry Type <span className="text-red-500">*</span></label>
+              <Select<SelectOption>
+                  inputId="le-entry_type" name="entry_type" options={entryTypeOptions}
+                  value={entryTypeOptions.find(opt => opt.value === formData.entry_type) || null}
+                  onChange={(opt) => handleSelectChange(opt as SingleValue<SelectOption>, { name: 'entry_type' })}
+                  className="text-black" classNamePrefix="react-select"
+                  styles={{
+                    control: (base, state) => ({
+                      ...base,
+                      backgroundColor: "#1F2937",
+                      borderColor: state.isFocused ? "#3B82F6" : "#4B5563",
+                      boxShadow: state.isFocused ? "0 0 0 1px #3B82F6" : "none",
+                      "&:hover": { borderColor: "#6B7280" },
+                      minHeight: "42px",
+                    }),
+                    singleValue: (base) => ({ ...base, color: "white" }),
+                    menu: (base) => ({ ...base, backgroundColor: "#1F2937", zIndex: 10 }),
+                    option: (base, { isFocused, isSelected }) => ({
+                      ...base,
+                      backgroundColor: isSelected
+                        ? "#3B82F6"
+                        : isFocused
+                        ? "#374151"
+                        : "#1F2937",
+                      color: "white",
+                      ":active": { backgroundColor: "#2563EB" },
+                    }),
+                    placeholder: (base) => ({ ...base, color: "#9CA3AF" }),
+                    input: (base) => ({ ...base, color: "white" }),
+                    dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
+                    clearIndicator: (base) => ({ ...base, color: "#9CA3AF", ":hover": { color: "white" } }),
+                    indicatorSeparator: (base) => ({ ...base, backgroundColor: "#4B5563" }),
+                  }}
+              />
+            </div>
+            <div>
+              <label htmlFor="le-description" className="block text-sm font-medium text-gray-300 mb-1">Description</label>
+              <textarea name="description" id="le-description" rows={3} value={formData.description} onChange={handleInputChange} 
+                        className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500" autoComplete="off"/>
+            </div>
+
+            {formData.entry_type === "CHARACTER_LORE" && (
+              <div>
+                <label htmlFor="le-faction_id" className="block text-sm font-medium text-gray-300 mb-1">Group</label>
+                <Select<SelectOption>
+                  inputId="le-faction_id" name="faction_id" options={factionsOptions}
+                  value={factionsOptions.find(opt => opt.value === formData.faction_id) || null}
+                  onChange={(opt) => handleSelectChange(opt as SingleValue<SelectOption>, { name: 'faction_id' })}
+                  isClearable placeholder="Select a faction..."
+                  className="text-black" classNamePrefix="react-select"
+                  noOptionsMessage={() => factionsOptions.length === 0 ? "No groups in this world. Create one first!" : "No options"}
+                  styles={{
+                    control: (base, state) => ({
+                      ...base,
+                      backgroundColor: "#1F2937",
+                      borderColor: state.isFocused ? "#3B82F6" : "#4B5563",
+                      boxShadow: state.isFocused ? "0 0 0 1px #3B82F6" : "none",
+                      "&:hover": { borderColor: "#6B7280" },
+                      minHeight: "42px",
+                    }),
+                    singleValue: (base) => ({ ...base, color: "white" }),
+                    menu: (base) => ({ ...base, backgroundColor: "#1F2937", zIndex: 10 }),
+                    option: (base, { isFocused, isSelected }) => ({
+                      ...base,
+                      backgroundColor: isSelected
+                        ? "#3B82F6"
+                        : isFocused
+                        ? "#374151"
+                        : "#1F2937",
+                      color: "white",
+                      ":active": { backgroundColor: "#2563EB" },
+                    }),
+                    placeholder: (base) => ({ ...base, color: "#9CA3AF" }),
+                    input: (base) => ({ ...base, color: "white" }),
+                    dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
+                    clearIndicator: (base) => ({ ...base, color: "#9CA3AF", ":hover": { color: "white" } }),
+                    indicatorSeparator: (base) => ({ ...base, backgroundColor: "#4B5563" }),
+                  }}
+                />
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="le-tags" className="block text-sm font-medium text-gray-300 mb-1">Tags</label>
+              <ReactTagInput
+                id="le-tags"
+                tags={formData.tags}
+                onChange={(newTags) => setFormData(prev => ({ ...prev, tags: newTags }))}
+                placeholder="Add tags (press enter, comma, or space)"
+                delimiter=", "
+              />
+            </div>
+            <div>
+              <label htmlFor="le-aliases" className="block text-sm font-medium text-gray-300 mb-1">Aliases/Keywords</label>
+              <ReactTagInput
+                id="le-aliases"
+                tags={formData.aliases}
+                onChange={(newAliases) => setFormData(prev => ({ ...prev, aliases: newAliases }))}
+                placeholder="Add aliases (press enter, comma, or space)"
+                delimiter=", "
+              />
+            </div>
+            
+            <div className="flex justify-end space-x-3 pt-2">
+              <button type="button" onClick={handleCloseModal} className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-md">Cancel</button>
+              <button type="submit" disabled={isSubmitting} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md disabled:opacity-50">
+                {isSubmitting ? (editingEntry ? 'Saving...' : 'Creating...') : (editingEntry ? 'Save Changes' : 'Create Entry')}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      </div>
+    </>
   );
 };
 

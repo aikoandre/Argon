@@ -12,7 +12,7 @@ import asyncio
 from backend.services import mistral_client
 from backend.background_tasks import embedding_worker
 from backend.services.mistral_client import embedding_queue, initialize_mistral_client
-from backend.routers.lore_entries import router as lore_entries_router, master_world_router as master_world_lore_router
+from backend.routers.lore_entries import lore_entry_ops_router, master_world_router as master_world_lore_router
 from backend.routers.chat import router as chat_router
 from backend.routers.scenarios import router as scenarios_router
 from backend.routers.personas import router as personas_router
@@ -47,15 +47,6 @@ async def startup_event():
     """Função executada quando o FastAPI inicia."""
     global background_worker_task
     print("API Iniciando...")
-
-    # --- TEMPORÁRIO: Cria as tabelas do banco de dados se não existirem ---
-    # REMOVA esta parte e use Alembic para migrações em produção!
-    print("Criando tabelas do banco de dados (se não existirem)...")
-    from backend.database import Base
-    from backend import database as db_database
-    Base.metadata.create_all(bind=db_database.engine)
-    print("Verificação/Criação de tabelas concluída.")
-    # --- FIM TEMPORÁRIO ---
 
 
     # 1. Inicializa o cliente Mistral (carrega API Key, etc.)
@@ -139,7 +130,7 @@ async def health_check():
 # Ex: app.include_router(settings_router, prefix="/api")
 
 # Inclui os routers de lore entries
-app.include_router(lore_entries_router)
+app.include_router(lore_entry_ops_router)
 app.include_router(master_world_lore_router)
 app.include_router(chat_router, prefix="/api/chats")
 app.include_router(scenarios_router)

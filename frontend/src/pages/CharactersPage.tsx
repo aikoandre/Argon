@@ -472,7 +472,10 @@ const CharactersPage: React.FC = () => {
                 </h3>
                 <div className="flex space-x-2">
                   <button
-                    onClick={() => handleOpenModal(char)}
+                    onClick={(e) => { 
+                      e.stopPropagation();
+                      handleOpenModal(char);
+                    }}
                     className="text-gray-400 hover:text-blue-500 transition-colors"
                     title="Edit Character"
                   >
@@ -486,7 +489,7 @@ const CharactersPage: React.FC = () => {
                     </svg>
                   </button>
                   <button
-                    onClick={() => handleDelete(char.id)}
+                    onClick={(e) => { e.stopPropagation(); handleDelete(char.id); }}
                     className="text-gray-400 hover:text-red-500 transition-colors"
                     title="Delete Character"
                   >

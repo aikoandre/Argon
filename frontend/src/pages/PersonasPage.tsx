@@ -5,6 +5,8 @@ import {
   createUserPersona,
   updateUserPersona,
   deleteUserPersona,
+  getUserSettings,
+  updateUserSettings,
   type UserPersonaData,
   type UserPersonaCreateData,
   type UserPersonaUpdateData,
@@ -68,6 +70,7 @@ const PersonasPage: React.FC = () => {
   const [personas, setPersonas] = useState<UserPersonaData[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [activePersonaId, setActivePersonaId] = useState<string | null>(null);
 
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingPersona, setEditingPersona] = useState<UserPersonaData | null>(
@@ -93,6 +96,12 @@ const PersonasPage: React.FC = () => {
 
   useEffect(() => {
     fetchPersonas();
+  }, []);
+
+  useEffect(() => {
+    getUserSettings().then((settings) => {
+      setActivePersonaId(settings?.active_persona_id || null);
+    });
   }, []);
 
   const handleInputChange = (
@@ -167,6 +176,28 @@ const PersonasPage: React.FC = () => {
     }
   };
 
+  const handleActivatePersona = async (personaId: string) => {
+    // Se já está ativa, desativa
+    if (activePersonaId === personaId) {
+      try {
+        await updateUserSettings({ active_persona_id: null });
+        setActivePersonaId(null);
+      } catch (err) {
+        setError("Failed to deactivate persona.");
+        console.error(err);
+      }
+      return;
+    }
+    // Ativa normalmente
+    try {
+      await updateUserSettings({ active_persona_id: personaId });
+      setActivePersonaId(personaId);
+    } catch (err) {
+      setError("Failed to activate persona.");
+      console.error(err);
+    }
+  };
+
   if (isLoading && personas.length === 0) {
     // Mostra loading só na primeira carga
     return (
@@ -200,10 +231,11 @@ const PersonasPage: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {personas.map((persona) => (
-          // <motion.div key={persona.id} layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
           <div
             key={persona.id}
-            className="bg-gray-800 p-6 rounded-lg shadow-lg hover:shadow-2xl transition-shadow duration-300"
+            className={`bg-gray-800 p-6 rounded-lg shadow-lg hover:shadow-2xl transition-shadow duration-300 cursor-pointer ${activePersonaId === persona.id ? 'ring-2 ring-blue-500' : ''}`}
+            onClick={() => handleActivatePersona(persona.id)}
+            title={activePersonaId === persona.id ? 'Ativa' : 'Clique para ativar'}
           >
             <h2 className="text-2xl font-semibold mb-2">{persona.name}</h2>
             <p className="text-gray-400 mb-4 break-words whitespace-pre-wrap">
@@ -213,20 +245,19 @@ const PersonasPage: React.FC = () => {
             </p>
             <div className="flex justify-end space-x-3">
               <button
-                onClick={() => handleOpenModal(persona)}
+                onClick={(e) => { e.stopPropagation(); handleOpenModal(persona); }}
                 className="text-sm bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-1 px-3 rounded-md transition duration-150"
               >
                 Edit
               </button>
               <button
-                onClick={() => handleDelete(persona.id)}
+                onClick={(e) => { e.stopPropagation(); handleDelete(persona.id); }}
                 className="text-sm bg-red-600 hover:bg-red-700 text-white font-semibold py-1 px-3 rounded-md transition duration-150"
               >
                 Delete
               </button>
             </div>
           </div>
-          // </motion.div>
         ))}
       </div>
 

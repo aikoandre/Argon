@@ -39,6 +39,35 @@ body {
   animation: modalShow 0.3s ease-out forwards;
 }
 
+/* React Tags styles */
+.tags-container {
+  @apply flex flex-wrap gap-2;
+}
+
+.tag-input {
+  @apply flex-1;
+}
+
+.tag {
+  @apply bg-blue-600 text-white px-2 py-1 rounded-md text-sm flex items-center;
+}
+
+.tag-remove {
+  @apply ml-1 cursor-pointer;
+}
+
+.tag-suggestions {
+  @apply absolute bg-gray-800 border border-gray-700 rounded-md mt-1 z-10 w-full;
+}
+
+.tag-suggestions li {
+  @apply px-3 py-2 hover:bg-gray-700 cursor-pointer;
+}
+
+.tag-suggestions li mark {
+  @apply bg-yellow-500 text-yellow-900;
+}
+
 /* Font for HomePage title */
 .quintessential-regular {
   font-family: "Quintessential", serif;

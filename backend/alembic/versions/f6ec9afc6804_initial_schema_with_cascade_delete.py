@@ -1,8 +1,8 @@
-"""create initial database schema from current models
+"""initial schema with cascade delete
 
-Revision ID: 1dddbdf57dd0
+Revision ID: f6ec9afc6804
 Revises: 
-Create Date: 2025-05-14 17:46:23.378154
+Create Date: 2025-05-15 13:57:48.502848
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '1dddbdf57dd0'
+revision: str = 'f6ec9afc6804'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -29,7 +29,9 @@ def upgrade() -> None:
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_master_worlds_name'), 'master_worlds', ['name'], unique=True)
+    with op.batch_alter_table('master_worlds', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_master_worlds_name'), ['name'], unique=True)
+
     op.create_table('user_personas',
     sa.Column('id', sa.String(), nullable=False),
     sa.Column('name', sa.String(), nullable=False),
@@ -38,11 +40,14 @@ def upgrade() -> None:
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_user_personas_name'), 'user_personas', ['name'], unique=False)
+    with op.batch_alter_table('user_personas', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_user_personas_name'), ['name'], unique=False)
+
     op.create_table('user_settings',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('selected_llm_model', sa.String(), nullable=True),
     sa.Column('openrouter_api_key', sa.String(), nullable=True),
+    sa.Column('active_persona_id', sa.String(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('character_cards',
@@ -59,8 +64,10 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['master_world_id'], ['master_worlds.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_character_cards_master_world_id'), 'character_cards', ['master_world_id'], unique=False)
-    op.create_index(op.f('ix_character_cards_name'), 'character_cards', ['name'], unique=False)
+    with op.batch_alter_table('character_cards', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_character_cards_master_world_id'), ['master_world_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_character_cards_name'), ['name'], unique=False)
+
     op.create_table('lore_entries',
     sa.Column('id', sa.String(), nullable=False),
     sa.Column('entry_type', sa.String(), nullable=False),
@@ -76,9 +83,11 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['master_world_id'], ['master_worlds.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_lore_entries_entry_type'), 'lore_entries', ['entry_type'], unique=False)
-    op.create_index(op.f('ix_lore_entries_master_world_id'), 'lore_entries', ['master_world_id'], unique=False)
-    op.create_index(op.f('ix_lore_entries_name'), 'lore_entries', ['name'], unique=False)
+    with op.batch_alter_table('lore_entries', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_lore_entries_entry_type'), ['entry_type'], unique=False)
+        batch_op.create_index(batch_op.f('ix_lore_entries_master_world_id'), ['master_world_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_lore_entries_name'), ['name'], unique=False)
+
     op.create_table('scenario_cards',
     sa.Column('id', sa.String(), nullable=False),
     sa.Column('name', sa.String(), nullable=False),
@@ -91,19 +100,21 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['master_world_id'], ['master_worlds.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_scenario_cards_master_world_id'), 'scenario_cards', ['master_world_id'], unique=False)
-    op.create_index(op.f('ix_scenario_cards_name'), 'scenario_cards', ['name'], unique=False)
+    with op.batch_alter_table('scenario_cards', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_scenario_cards_master_world_id'), ['master_world_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_scenario_cards_name'), ['name'], unique=False)
+
     op.create_table('chat_sessions',
     sa.Column('id', sa.String(), nullable=False),
     sa.Column('title', sa.String(), nullable=True),
-    sa.Column('scenario_id', sa.String(), nullable=False),
-    sa.Column('gm_character_id', sa.String(), nullable=False),
-    sa.Column('user_persona_id', sa.String(), nullable=False),
+    sa.Column('scenario_id', sa.String(), nullable=True),
+    sa.Column('gm_character_id', sa.String(), nullable=True),
+    sa.Column('user_persona_id', sa.String(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
     sa.Column('last_active_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
-    sa.ForeignKeyConstraint(['gm_character_id'], ['character_cards.id'], ),
-    sa.ForeignKeyConstraint(['scenario_id'], ['scenario_cards.id'], ),
-    sa.ForeignKeyConstraint(['user_persona_id'], ['user_personas.id'], ),
+    sa.ForeignKeyConstraint(['gm_character_id'], ['character_cards.id'], name='fk_chat_sessions_gm_character_id', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['scenario_id'], ['scenario_cards.id'], name='fk_chat_sessions_scenario_id', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['user_persona_id'], ['user_personas.id'], name='fk_chat_sessions_user_persona_id', ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('chat_messages',
@@ -123,19 +134,29 @@ def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_table('chat_messages')
     op.drop_table('chat_sessions')
-    op.drop_index(op.f('ix_scenario_cards_name'), table_name='scenario_cards')
-    op.drop_index(op.f('ix_scenario_cards_master_world_id'), table_name='scenario_cards')
+    with op.batch_alter_table('scenario_cards', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_scenario_cards_name'))
+        batch_op.drop_index(batch_op.f('ix_scenario_cards_master_world_id'))
+
     op.drop_table('scenario_cards')
-    op.drop_index(op.f('ix_lore_entries_name'), table_name='lore_entries')
-    op.drop_index(op.f('ix_lore_entries_master_world_id'), table_name='lore_entries')
-    op.drop_index(op.f('ix_lore_entries_entry_type'), table_name='lore_entries')
+    with op.batch_alter_table('lore_entries', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_lore_entries_name'))
+        batch_op.drop_index(batch_op.f('ix_lore_entries_master_world_id'))
+        batch_op.drop_index(batch_op.f('ix_lore_entries_entry_type'))
+
     op.drop_table('lore_entries')
-    op.drop_index(op.f('ix_character_cards_name'), table_name='character_cards')
-    op.drop_index(op.f('ix_character_cards_master_world_id'), table_name='character_cards')
+    with op.batch_alter_table('character_cards', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_character_cards_name'))
+        batch_op.drop_index(batch_op.f('ix_character_cards_master_world_id'))
+
     op.drop_table('character_cards')
     op.drop_table('user_settings')
-    op.drop_index(op.f('ix_user_personas_name'), table_name='user_personas')
+    with op.batch_alter_table('user_personas', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_user_personas_name'))
+
     op.drop_table('user_personas')
-    op.drop_index(op.f('ix_master_worlds_name'), table_name='master_worlds')
+    with op.batch_alter_table('master_worlds', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_master_worlds_name'))
+
     op.drop_table('master_worlds')
     # ### end Alembic commands ###

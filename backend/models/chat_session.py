@@ -12,16 +12,16 @@ class ChatSession(Base):
     title = Column(String, nullable=True) # Pode ser gerado ou definido pelo usuário
 
     # Chaves estrangeiras - Assumindo que os IDs nas tabelas referenciadas são String(UUID)
-    scenario_id = Column(String, ForeignKey("scenario_cards.id"), nullable=True)
-    gm_character_id = Column(String, ForeignKey("character_cards.id"), nullable=True)
-    user_persona_id = Column(String, ForeignKey("user_personas.id"), nullable=True)
+    scenario_id = Column(String, ForeignKey("scenario_cards.id", ondelete="CASCADE", name="fk_chat_sessions_scenario_id"), nullable=True)
+    gm_character_id = Column(String, ForeignKey("character_cards.id", ondelete="CASCADE", name="fk_chat_sessions_gm_character_id"), nullable=True)
+    user_persona_id = Column(String, ForeignKey("user_personas.id", ondelete="SET NULL", name="fk_chat_sessions_user_persona_id"), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_active_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relacionamentos (para fácil acesso via ORM)
     scenario = relationship("ScenarioCard") # Nome da classe SQLAlchemy
-    gm_character = relationship("CharacterCard") # Nome da classe SQLAlchemy
+    gm_character = relationship("CharacterCard", back_populates="chat_sessions") # Link back to CharacterCard
     user_persona = relationship("UserPersona") # Nome da classe SQLAlchemy
     messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")
 

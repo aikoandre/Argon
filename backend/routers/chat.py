@@ -172,15 +172,19 @@ def add_message_to_session(
     if db_chat_session is None:
         raise HTTPException(status_code=404, detail="Chat session not found")
 
-    # Por enquanto, apenas salva a mensagem do usuário. A resposta da IA virá depois.
-    # TODO: No futuro, se sender_type for USER, acionar pipeline da IA aqui.
-    
+    # Se houver active_persona_id no metadata, busca o nome e garante que fique salvo
+    message_metadata = message_create.message_metadata or {}
+    if 'active_persona_id' in message_metadata and not message_metadata.get('active_persona_name'):
+        # Busca o nome da persona se não foi fornecido
+        active_persona = db.query(UserPersona).filter(UserPersona.id == message_metadata['active_persona_id']).first()
+        if active_persona:
+            message_metadata['active_persona_name'] = active_persona.name
+
     db_message = ChatMessage(
         chat_session_id=chat_id,
         sender_type=message_create.sender_type,
         content=message_create.content,
-        message_metadata=message_create.message_metadata
-        # id e timestamp são definidos pelo modelo/DB
+        message_metadata=message_metadata
     )
     db.add(db_message)
     
@@ -190,7 +194,6 @@ def add_message_to_session(
 
     db.commit()
     db.refresh(db_message)
-    # db.refresh(db_chat_session) # Para garantir que last_active_at está atualizado na resposta
     return db_message
 
 @router.put("/{chat_id}", response_model=ChatSessionInDB)

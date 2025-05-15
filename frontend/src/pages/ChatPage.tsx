@@ -1,10 +1,12 @@
 // frontend/src/pages/ChatPage.tsx
 import React, { useState, useEffect, type FormEvent, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   getChatSessionMessages,
   addMessageToSession,
   getChatSessionDetails,
+  getUserSettings,
+  getUserPersonaById,
 } from "../services/api";
 import type { ChatMessageData, ChatSessionData } from "../services/api";
 
@@ -14,6 +16,7 @@ const DEFAULT_BOT_AVATAR = "/bot-avatar.png";
 
 const ChatPage: React.FC = () => {
   const { chatId } = useParams<{ chatId: string }>();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [sessionDetails, setSessionDetails] = useState<ChatSessionData | null>(
     null
@@ -22,9 +25,11 @@ const ChatPage: React.FC = () => {
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activePersonaId, setActivePersonaId] = useState<string | null>(null);
+  const [activePersonaName, setActivePersonaName] = useState<string>("User");
 
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
-  const chatContainerRef = useRef<null | HTMLDivElement>(null);
+  const inputAreaRef = useRef<null | HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -57,6 +62,28 @@ const ChatPage: React.FC = () => {
       }
     };
     fetchMessagesAndDetails();
+
+    // Fetch active persona from user settings
+    const fetchActivePersona = async () => {
+      try {
+        const settings = await getUserSettings();
+        setActivePersonaId(settings?.active_persona_id || null);
+        if (settings?.active_persona_id) {
+          try {
+            const persona = await getUserPersonaById(settings.active_persona_id);
+            setActivePersonaName(persona.name || "User");
+          } catch {
+            setActivePersonaName("User");
+          }
+        } else {
+          setActivePersonaName("User");
+        }
+      } catch (err) {
+        setActivePersonaId(null);
+        setActivePersonaName("User");
+      }
+    };
+    fetchActivePersona();
   }, [chatId]);
 
   const handleSendMessage = async (e: FormEvent) => {
@@ -65,40 +92,38 @@ const ChatPage: React.FC = () => {
 
     setIsSending(true);
     setError(null);
-    const tempMessageId = `temp-${Date.now()}`; // ID temporário para exibição otimista
+    const tempMessageId = `temp-${Date.now()}`;
     const userMessage: ChatMessageData = {
       id: tempMessageId,
       chat_session_id: chatId,
       sender_type: "USER",
       content: newMessage.trim(),
       timestamp: new Date().toISOString(),
+      message_metadata: activePersonaId ? { active_persona_id: activePersonaId, active_persona_name: activePersonaName } : undefined,
     };
 
-    // Adição otimista da mensagem do usuário
     setMessages((prevMessages) => [...prevMessages, userMessage]);
     const currentMessageContent = newMessage.trim();
     setNewMessage("");
 
     try {
+      // Envie a mensagem junto com o nome da persona ativa
       const sentMessage = await addMessageToSession(chatId, {
         content: currentMessageContent,
         sender_type: "USER",
+        message_metadata: activePersonaId ? { active_persona_id: activePersonaId, active_persona_name: activePersonaName } : undefined,
       });
-      // Substitui a mensagem temporária pela mensagem real do backend
       setMessages((prevMessages) =>
         prevMessages.map((msg) =>
           msg.id === tempMessageId ? sentMessage : msg
         )
       );
-      // TODO: Aqui é onde você acionaria a IA para responder no futuro
     } catch (err) {
       setError("Failed to send message. Please try again.");
-      console.error(err);
-      // Remove a mensagem otimista se falhar
       setMessages((prevMessages) =>
         prevMessages.filter((msg) => msg.id !== tempMessageId)
       );
-      setNewMessage(currentMessageContent); // Restaura o texto no input
+      setNewMessage(currentMessageContent);
     } finally {
       setIsSending(false);
     }
@@ -147,79 +172,74 @@ const ChatPage: React.FC = () => {
     );
   }
 
-  // Default persona name for the user if not available
-  const defaultUserPersona = "User";
-
   return (
-    <div className="relative h-screen bg-gray-900">
-      {/* No chat header - removed as requested */}
-      
-      {/* Container das mensagens sem padding-top (header removido) */}
-      <div className="h-full overflow-hidden pb-20">
-        <div 
-          ref={chatContainerRef}
-          className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent"
-        >
-          <div className="max-w-4xl mx-auto px-4 pb-4">
-            {messages.length === 0 && (
-              <div className="flex justify-center my-10">
-                <p className="text-gray-500 text-center italic">
-                  No messages yet. Start a conversation!
-                </p>
-              </div>
-            )}
-            
-            {messages.map((msg) => (
-              <div key={msg.id} className="mb-4">
-                <div
-                  className={`rounded-lg ${
-                    msg.sender_type === "USER"
-                      ? "bg-gray-800 text-white"
-                      : "bg-gray-800 text-gray-100"
-                  }`}
-                >
-                  <div className="p-3 flex">
-                    {/* Imagem */}
-                    <div className="flex-shrink-0 w-16 h-24 mr-3">
-                      <img
-                        src={msg.sender_type === "USER" ? DEFAULT_USER_AVATAR : DEFAULT_BOT_AVATAR}
-                        alt={msg.sender_type === "USER" ? "User" : "Bot"}
-                        className="w-full h-full object-cover rounded-lg bg-gray-700"
-                        onError={(e) => {
-                          const fallback = msg.sender_type === "USER"
-                            ? "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'%3E%3C/path%3E%3Ccircle cx='12' cy='7' r='4'%3E%3C/circle%3E%3C/svg%3E"
-                            : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'%3E%3C/circle%3E%3Cpath d='M8 9.05v-.1'%3E%3C/path%3E%3Cpath d='M16 9.05v-.1'%3E%3C/path%3E%3Cpath d='M12 13a4 4 0 0 1-4 4'%3E%3C/path%3E%3Cpath d='M12 13a4 4 0 0 0 4 4'%3E%3C/path%3E%3C/svg%3E";
-                          (e.target as HTMLImageElement).src = fallback;
-                        }}
-                      />
+    <div className="flex flex-col h-screen bg-gray-900 overflow-hidden">
+
+      {/* Área de mensagens com scroll, alinhada ao final */}
+      <div className="flex-1 flex flex-col justify-end w-full overflow-y-auto max-w-full" style={{ maxHeight: '100vh' }}>
+        <div className="max-w-4xl mx-auto px-4 w-full">
+          {messages.length === 0 && (
+            <div className="flex justify-center my-10">
+              <p className="text-gray-500 text-center italic">
+                No messages yet. Start a conversation!
+              </p>
+            </div>
+          )}
+          {messages.map((msg) => (
+            <div key={msg.id} className="mb-4">
+              <div
+                className={`rounded-lg ${
+                  msg.sender_type === "USER"
+                    ? "bg-gray-800 text-white"
+                    : "bg-gray-800 text-gray-100"
+                }`}
+              >
+                <div className="p-3 flex">
+                  {/* Imagem */}
+                  <div className="flex-shrink-0 w-16 h-24 mr-3">
+                    <img
+                      src={msg.sender_type === "USER" ? DEFAULT_USER_AVATAR : DEFAULT_BOT_AVATAR}
+                      alt={msg.sender_type === "USER" ? "User" : "Bot"}
+                      className="w-full h-full object-cover rounded-lg bg-gray-700"
+                      onError={(e) => {
+                        const fallback = msg.sender_type === "USER"
+                          ? "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'%3E%3C/path%3E%3Ccircle cx='12' cy='7' r='4'%3E%3C/circle%3E%3C/svg%3E"
+                          : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'%3E%3C/circle%3E%3Cpath d='M8 9.05v-.1'%3E%3C/path%3E%3Cpath d='M16 9.05v-.1'%3E%3C/path%3E%3Cpath d='M12 13a4 4 0 0 1-4 4'%3E%3C/path%3E%3Cpath d='M12 13a4 4 0 0 0 4 4'%3E%3C/path%3E%3C/svg%3E";
+                        (e.target as HTMLImageElement).src = fallback;
+                      }}
+                    />
+                  </div>
+                  {/* Nome, data/hora e mensagem */}
+                  <div className="flex-1 flex flex-col">
+                    <div className="flex items-center mb-1 flex-wrap">
+                      <span className="font-medium text-purple-400 mr-2">
+                        {msg.sender_type === "USER"
+                          ? msg.message_metadata?.active_persona_name || activePersonaName
+                          : "Assistant"}
+                      </span>
+                      <span className="text-xs text-gray-400 mr-2">
+                        {new Date(msg.timestamp).toLocaleDateString()}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        {formatTime(msg.timestamp)}
+                      </span>
                     </div>
-                    {/* Nome, data/hora e mensagem */}
-                    <div className="flex-1 flex flex-col">
-                      <div className="flex items-center mb-1 flex-wrap">
-                        <span className="font-medium text-purple-400 mr-2">
-                          {msg.sender_type === "USER" ? defaultUserPersona : "Assistant"}
-                        </span>
-                        <span className="text-xs text-gray-400 mr-2">
-                          {new Date(msg.timestamp).toLocaleDateString()}
-                        </span>
-                        <span className="text-xs text-gray-400">
-                          {formatTime(msg.timestamp)}
-                        </span>
-                      </div>
-                      <p className="whitespace-pre-wrap break-words mt-0.5">{msg.content}</p>
-                    </div>
+                    <p className="whitespace-pre-wrap break-words mt-0.5">{msg.content}</p>
                   </div>
                 </div>
               </div>
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
+            </div>
+          ))}
+          <div ref={messagesEndRef} />
         </div>
       </div>
-
-      {/* Container do input fixo no bottom */}
-      <div className="absolute bottom-0 left-0 right-0 py-3">
-        <div className="max-w-4xl mx-auto px-4">
+      {/* Footer/input fixo na base */}
+      <footer className="w-full" style={{ gridArea: 'footer' }}></footer>
+      <div
+        ref={inputAreaRef}
+        className="flex w-full flex-col bg-[var(--bg-800)] shadow-[0_-2px_8px_0_rgba(0,0,0,0.15)]"
+      >
+        <div className="max-w-4xl mx-auto px-2 sm:px-4 py-4 w-full">
           <form onSubmit={handleSendMessage} className="relative">
             <textarea
               rows={1}

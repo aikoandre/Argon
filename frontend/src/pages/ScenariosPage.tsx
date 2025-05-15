@@ -388,7 +388,10 @@ const ScenariosPage: React.FC = () => {
               <h3 className="text-xl font-semibold text-white">{scen.name}</h3>
               <div className="flex space-x-2">
                 <button
-                  onClick={() => handleOpenModal(scen)}
+                  onClick={(e) => { 
+                    e.stopPropagation();
+                    handleOpenModal(scen);
+                  }}
                   className="text-gray-400 hover:text-blue-500 transition-colors"
                   title="Edit Scenario"
                 >
@@ -402,7 +405,7 @@ const ScenariosPage: React.FC = () => {
                   </svg>
                 </button>
                 <button
-                  onClick={() => handleDelete(scen.id)}
+                  onClick={(e) => { e.stopPropagation(); handleDelete(scen.id); }}
                   className="text-gray-400 hover:text-red-500 transition-colors"
                   title="Delete Scenario"
                 >

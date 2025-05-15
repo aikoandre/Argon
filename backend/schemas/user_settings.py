@@ -5,6 +5,7 @@ from typing import Optional
 class UserSettingsBase(BaseModel):
     selected_llm_model: Optional[str] = None
     openrouter_api_key: Optional[str] = None
+    active_persona_id: Optional[str] = None  # ID da persona ativa
     # Adicione mais campos aqui
 
 class UserSettingsCreate(UserSettingsBase):
