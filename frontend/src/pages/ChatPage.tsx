@@ -1,6 +1,6 @@
 // frontend/src/pages/ChatPage.tsx
 import React, { useState, useEffect, type FormEvent, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
   getChatSessionMessages,
   addMessageToSession,
@@ -16,7 +16,6 @@ const DEFAULT_BOT_AVATAR = "/bot-avatar.png";
 
 const ChatPage: React.FC = () => {
   const { chatId } = useParams<{ chatId: string }>();
-  const navigate = useNavigate();
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [sessionDetails, setSessionDetails] = useState<ChatSessionData | null>(
     null
@@ -99,7 +98,8 @@ const ChatPage: React.FC = () => {
       sender_type: "USER",
       content: newMessage.trim(),
       timestamp: new Date().toISOString(),
-      message_metadata: activePersonaId ? { active_persona_id: activePersonaId, active_persona_name: activePersonaName } : undefined,
+      // Only include message_metadata if activePersonaId is a non-empty string
+      message_metadata: activePersonaId && activePersonaId !== "" ? { active_persona_id: activePersonaId, active_persona_name: activePersonaName } : undefined,
     };
 
     setMessages((prevMessages) => [...prevMessages, userMessage]);
@@ -107,11 +107,11 @@ const ChatPage: React.FC = () => {
     setNewMessage("");
 
     try {
-      // Envie a mensagem junto com o nome da persona ativa
+      // Only send message_metadata if activePersonaId is a non-empty string
       const sentMessage = await addMessageToSession(chatId, {
         content: currentMessageContent,
         sender_type: "USER",
-        message_metadata: activePersonaId ? { active_persona_id: activePersonaId, active_persona_name: activePersonaName } : undefined,
+        message_metadata: activePersonaId && activePersonaId !== "" ? { active_persona_id: activePersonaId, active_persona_name: activePersonaName } : undefined,
       });
       setMessages((prevMessages) =>
         prevMessages.map((msg) =>
@@ -143,9 +143,9 @@ const ChatPage: React.FC = () => {
 
   if (isLoadingMessages) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-900">
+      <div className="flex items-center justify-center h-screen">
         <div className="text-center text-gray-400 p-10 animate-pulse">
-          <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-8 h-8 rounded-full animate-spin mx-auto mb-4"></div>
           <p>Loading chat...</p>
         </div>
       </div>
@@ -173,25 +173,25 @@ const ChatPage: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-900 overflow-hidden">
+    <div className="flex flex-col h-[870px] overflow-hidden">
 
       {/* Área de mensagens com scroll, alinhada ao final */}
       <div className="flex-1 flex flex-col justify-end w-full overflow-y-auto max-w-full" style={{ maxHeight: '100vh' }}>
         <div className="max-w-4xl mx-auto px-4 w-full">
           {messages.length === 0 && (
             <div className="flex justify-center my-10">
-              <p className="text-gray-500 text-center italic">
-                No messages yet. Start a conversation!
-              </p>
+              <div className="text-center py-10">
+          <p className="text-xl text-gray-500 mb-4">No messages yet. Send a message!</p>
+        </div>
             </div>
           )}
           {messages.map((msg) => (
             <div key={msg.id} className="mb-4">
               <div
-                className={`rounded-lg ${
+                className={`rounded-2xl ${
                   msg.sender_type === "USER"
-                    ? "bg-gray-800 text-white"
-                    : "bg-gray-800 text-gray-100"
+                    ? "bg-app-surface text-white"
+                    : "bg-app-surface text-gray-100"
                 }`}
               >
                 <div className="p-3 flex">
@@ -212,7 +212,7 @@ const ChatPage: React.FC = () => {
                   {/* Nome, data/hora e mensagem */}
                   <div className="flex-1 flex flex-col">
                     <div className="flex items-center mb-1 flex-wrap">
-                      <span className="font-medium text-purple-400 mr-2">
+                      <span className="font-medium text-white mr-2">
                         {msg.sender_type === "USER"
                           ? msg.message_metadata?.active_persona_name || activePersonaName
                           : "Assistant"}
@@ -237,14 +237,20 @@ const ChatPage: React.FC = () => {
       <footer className="w-full" style={{ gridArea: 'footer' }}></footer>
       <div
         ref={inputAreaRef}
-        className="flex w-full flex-col bg-[var(--bg-800)] shadow-[0_-2px_8px_0_rgba(0,0,0,0.15)]"
+        className="flex w-full flex-col-reverse"
       >
-        <div className="max-w-4xl mx-auto px-2 sm:px-4 py-4 w-full">
+        <div className="max-w-4xl mx-auto px-2 sm:px-4 w-full">
           <form onSubmit={handleSendMessage} className="relative">
             <textarea
               rows={1}
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              onChange={(e) => {
+                setNewMessage(e.target.value);
+                // Auto-resize logic
+                const ta = e.target as HTMLTextAreaElement;
+                ta.style.height = 'auto';
+                ta.style.height = ta.scrollHeight + 'px';
+              }}
               placeholder="Type a message..."
               disabled={isSending}
               onKeyDown={(e) => {
@@ -253,13 +259,13 @@ const ChatPage: React.FC = () => {
                   handleSendMessage(e as any);
                 }
               }}
-              className="w-full p-4 pr-14 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none text-white placeholder-gray-400 outline-none"
-              style={{ minHeight: "50px", maxHeight: "120px" }}
+              className="w-full p-4 pr-14 bg-app-surface rounded-2xl text-white placeholder-gray-400 outline-none resize-none"
+              style={{overflow: 'hidden', minHeight: '48px', maxHeight: '200px'}}
             />
             <button
               type="submit"
               disabled={isSending || !newMessage.trim()}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-purple-600 hover:bg-purple-700 text-white font-bold p-2 rounded-lg w-10 h-10 flex items-center justify-center transition duration-150 ease-in-out disabled:opacity-50"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white font-bold p-2 rounded-lg w-10 h-10 flex items-center justify-center"
             >
               {isSending ? (
                 <span className="animate-spin">⟳</span>

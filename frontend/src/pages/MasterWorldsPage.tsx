@@ -9,6 +9,7 @@ import {
 } from "../services/api";
 import ReactTagInput from "@pathofdev/react-tag-input";
 import "@pathofdev/react-tag-input/build/index.css";
+import { PencilSquare, TrashFill } from 'react-bootstrap-icons';
 
 interface ModalProps {
   isOpen: boolean;
@@ -21,7 +22,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-lg text-white">
+      <div className="bg-app-bg p-6 rounded-lg shadow-xl w-full max-w-lg text-white">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-semibold">{title}</h2>
           <button
@@ -176,9 +177,9 @@ const MasterWorldsPage: React.FC = () => {
         <h1 className="text-4xl font-bold text-white">Worlds</h1>
         <button
           onClick={() => handleOpenModal()}
-          className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md"
+          className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
         >
-          + Create New World
+          New +
         </button>
       </div>
 
@@ -189,41 +190,37 @@ const MasterWorldsPage: React.FC = () => {
       )}
 
       {masterWorlds.length === 0 && !isLoading && (
-        <p className="text-center text-gray-500 py-10">
-          No worlds created yet. Start by creating your first universe!
-        </p>
+        <div className="text-center py-10">
+          <p className="text-xl text-gray-500 mb-4">No worlds created yet. Click in + to create one</p>
+        </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 justify-items-start w-full">
         {masterWorlds.map((world) => (
           <div
             key={world.id}
-            className="bg-gray-800 rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105"
+            className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105"
             onClick={() => navigate(`/world-lore/${world.id}/entries`)}
           >
             {/* Top right icons */}
             <div className="absolute top-2 right-2 flex space-x-2 z-10">
               <button
                 onClick={e => { e.stopPropagation(); handleOpenModal(world); }}
-                className="text-gray-400 hover:text-blue-500 transition-colors"
+                className="text-gray-400 hover:text-app-accent transition-colors"
                 title="Edit World"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                </svg>
+                <PencilSquare className="h-5 w-5" />
               </button>
               <button
                 onClick={e => { e.stopPropagation(); handleDelete(world.id); }}
-                className="text-gray-400 hover:text-red-500 transition-colors"
+                className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full"
                 title="Delete World"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
+                <TrashFill className="h-5 w-5" />
               </button>
             </div>
             {/* Bottom info (footer) */}
-            <div className="absolute bottom-0 left-0 w-full bg-black/40 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
+            <div className="absolute bottom-0 left-0 w-full bg-black/30 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
               <div className="flex w-full items-center justify-between">
                 <h2 className="text-lg font-semibold text-white break-words whitespace-normal mr-2 flex-1 leading-snug" title={world.name}>{world.name}</h2>
               </div>
@@ -262,7 +259,7 @@ const MasterWorldsPage: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Image</label>
             <div className="flex items-center">
-              <button type="button" className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11">
+              <button type="button" className="flex-1 bg-app-surface text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11">
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
@@ -270,8 +267,8 @@ const MasterWorldsPage: React.FC = () => {
                 <span>Select Image</span>
                 <input type="file" accept="image/*" className="hidden" />
               </button>
-              <span className="h-11 w-px bg-gray-600" />
-              <button type="button" className="bg-gray-700 hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11">
+              <span className="h-11 w-px bg-app-surface" />
+              <button type="button" className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
@@ -283,7 +280,7 @@ const MasterWorldsPage: React.FC = () => {
               htmlFor="mw-name"
               className="block text-sm font-medium text-gray-300 mb-1"
             >
-              World Name <span className="text-red-500">*</span>
+              World Name <span className="text-app-accent">*</span>
             </label>
             <input
               type="text"
@@ -292,7 +289,7 @@ const MasterWorldsPage: React.FC = () => {
               value={formData.name}
               onChange={handleInputChange}
               required
-              className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 bg-app-surface rounded-md text-white focus:ring-app-accent"
               autoComplete="off"
             />
           </div>
@@ -309,7 +306,7 @@ const MasterWorldsPage: React.FC = () => {
               rows={5}
               value={formData.description}
               onChange={handleInputChange}
-              className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 bg-app-surface rounded-md text-white focus:ring-app-accent"
               autoComplete="off"
             />
           </div>
@@ -320,24 +317,26 @@ const MasterWorldsPage: React.FC = () => {
             >
               Tags
             </label>
-            <ReactTagInput
-              tags={formData.tags}
-              onChange={(newTags) => setFormData(prev => ({ ...prev, tags: newTags }))}
-              placeholder="Add tags (press enter, comma, or space)"
-            />
+            <div className="bg-app-surface rounded-md">
+              <ReactTagInput
+                tags={formData.tags}
+                onChange={(newTags) => setFormData(prev => ({ ...prev, tags: newTags }))}
+                placeholder="Add tags (press enter, comma, or space)"
+              />
+            </div>
           </div>
           <div className="flex justify-end space-x-3 pt-2">
             <button
               type="button"
               onClick={handleCloseModal}
-              className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-md"
+              className="bg-app-surface text-white font-semibold py-2 px-4 rounded-md"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md disabled:opacity-50"
+              className="bg-app-accent-2 text-app-bg font-semibold py-2 px-4 rounded-md disabled:opacity-50"
             >
               {isSubmitting
                 ? editingWorld

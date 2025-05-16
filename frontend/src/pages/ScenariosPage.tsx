@@ -17,6 +17,7 @@ import {
   type ScenarioCardUpdateData,
   type MasterWorldData,
 } from "../services/api";
+import { PencilSquare, TrashFill } from 'react-bootstrap-icons';
 
 interface SelectOption {
   value: string;
@@ -353,13 +354,13 @@ const ScenariosPage: React.FC = () => {
   return (
     <div className="container mx-auto p-4 md:p-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <h1 className="text-4xl font-bold text-white">Scenarios</h1>
+        <h1 className="text-4xl font-bold text-white font-quintessential">Scenarios</h1>
         <div className="flex items-center gap-2 w-full md:w-auto">
           <button
             onClick={() => handleOpenModal()}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md whitespace-nowrap"
+            className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
           >
-            + Create Scenario
+            New +
           </button>
         </div>
       </div>
@@ -373,16 +374,16 @@ const ScenariosPage: React.FC = () => {
         </p>
       )}
       {!isLoading && !error && scenarios.length === 0 && (
-        <p className="text-center text-gray-500 py-10">
-          No scenarios found. Create one!
-        </p>
+        <div className="text-center py-10">
+          <p className="text-xl text-gray-500 mb-4">No scenarios created yet. Click in + to create one</p>
+        </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {scenarios.map((scen) => (
           <div
             key={scen.id}
-            className="bg-gray-800 rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105"
+            className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105"
             onClick={() => handleScenarioClick(scen.id)}
           >
             {/* Top right icons */}
@@ -392,22 +393,18 @@ const ScenariosPage: React.FC = () => {
                 className="text-gray-400 hover:text-blue-500 transition-colors"
                 title="Edit Scenario"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                </svg>
+                <PencilSquare className="h-5 w-5" />
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); handleDelete(scen.id); }}
-                className="text-gray-400 hover:text-red-500 transition-colors"
+                className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full"
                 title="Delete Scenario"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
+                <TrashFill className="h-5 w-5" />
               </button>
             </div>
             {/* Bottom info (footer) */}
-            <div className="absolute bottom-0 left-0 w-full bg-black/40 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
+            <div className="absolute bottom-0 left-0 w-full bg-black/30 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
               <div className="flex w-full items-center justify-between">
                 <h2 className="text-lg font-semibold text-white break-words whitespace-normal mr-2 flex-1 leading-snug" title={scen.name}>{scen.name}</h2>
               </div>
@@ -473,42 +470,34 @@ const ScenariosPage: React.FC = () => {
                  // Estilos para tema escuro
                 control: (base, state) => ({
                   ...base,
-                  backgroundColor: "#1F2937", // bg-gray-800
-                  borderColor: state.isFocused ? "#3B82F6" : "#4B5563", // border-blue-500 (focus), border-gray-600
-                  boxShadow: state.isFocused ? "0 0 0 1px #3B82F6" : "none",
-                  "&:hover": { borderColor: "#6B7280" }, // border-gray-500 (hover)
+                  backgroundColor: "#343a40", // bg-gray-800
+                  borderColor: state.isFocused ? "#f8f9fa" : "#343a40", // border-blue-500 (focus), border-gray-600
+                  boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
+                  "&:hover": { borderColor: "#f8f9fa" }, // border-gray-500 (hover)
                   minHeight: "42px", // Para alinhar com inputs padrão
                 }),
                 singleValue: (base) => ({ ...base, color: "white" }),
                 menu: (base) => ({
                   ...base,
-                  backgroundColor: "#1F2937",
+                  backgroundColor: "#f8f9fa",
                   zIndex: 10,
                 }),
                 option: (base, { isFocused, isSelected }) => ({
                   ...base,
                   backgroundColor: isSelected
-                  ? "#3B82F6"
+                  ? "#f8f9fa"
                   : isFocused
-                  ? "#374151"
-                  : "#1F2937", // bg-blue-600 (selected), bg-gray-700 (focus)
-                  color: "white",
-                  ":active": { backgroundColor: "#2563EB" }, // bg-blue-700 (active)
+                  ? "#dee2e6"
+                  : "#343a40", // bg-blue-600 (selected), bg-gray-700 (focus)
+                  color: isSelected || isFocused ? "#212529" : "#fff", // text-app-bg or white
+                    ':active': { backgroundColor: "#f8f9fa", color: "#212529" },
                 }),
-    placeholder: (base) => ({ ...base, color: "#9CA3AF" }), // text-gray-400
-    input: (base) => ({ ...base, color: "white" }),
-    dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
-    clearIndicator: (base) => ({
-      ...base,
-      color: "#9CA3AF",
-      ":hover": { color: "white" },
-    }),
-    indicatorSeparator: (base) => ({
-      ...base,
-      backgroundColor: "#4B5563",
-    }),
-                }
-              }
+                  placeholder: (base) => ({ ...base, color: "#9CA3AF" }),
+                  input: (base) => ({ ...base, color: "#fff" }),
+                  dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
+                  clearIndicator: (base) => ({ ...base, color: "#9CA3AF", ':hover': { color: "#fff" } }),
+                  indicatorSeparator: (base) => ({ ...base, backgroundColor: "#343a40" }),
+                }}
             />
           </div>
 

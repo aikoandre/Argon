@@ -28,3 +28,5 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Removed custom sidebar vertical centering styles that conflicted with Tailwind classes */

@@ -479,9 +479,9 @@ export interface ChatMessageData {
 }
 
 export interface ChatSessionBaseData {
-  scenario_id: string;
-  gm_character_id: string;
-  user_persona_id: string;
+  scenario_id?: string; // now optional
+  gm_character_id?: string; // now optional
+  user_persona_id?: string; // now optional
   title?: string | null;
 }
 
@@ -504,8 +504,13 @@ export interface ChatSessionListedData {
 export const createChatSession = async (
   data: ChatSessionCreateData
 ): Promise<ChatSessionData> => {
+  // Remove empty string fields before sending
+  const cleanData: Record<string, any> = { ...data };
+  if (cleanData.scenario_id === "") delete cleanData.scenario_id;
+  if (cleanData.gm_character_id === "") delete cleanData.gm_character_id;
+  if (cleanData.user_persona_id === "") delete cleanData.user_persona_id;
   try {
-    const response = await apiClient.post<ChatSessionData>('/chats/', data); // Adicionar barra no final
+    const response = await apiClient.post<ChatSessionData>('/chats/', cleanData);
     return response.data;
   } catch (error) {
     console.error('Error creating chat session:', error);
@@ -598,10 +603,15 @@ export const deleteChatSession = async (chatId: string): Promise<void> => {
 export const checkExistingChatSession = async (params: {
   gm_character_id?: string;
   scenario_id?: string;
-  user_persona_id?: string | null;
+  user_persona_id?: string;
 }): Promise<ChatSessionData | null> => {
+  // Remove empty string fields before sending
+  const cleanParams: Record<string, any> = { ...params };
+  if (cleanParams.scenario_id === "") delete cleanParams.scenario_id;
+  if (cleanParams.gm_character_id === "") delete cleanParams.gm_character_id;
+  if (cleanParams.user_persona_id === "") delete cleanParams.user_persona_id;
   try {
-    const response = await apiClient.get<ChatSessionData>('/chats/check', { params });
+    const response = await apiClient.get<ChatSessionData>('/chats/check', { params: cleanParams });
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 404) {

@@ -11,62 +11,83 @@ import MasterWorldsPage from "./pages/MasterWorldsPage";
 import LoreEntriesPage from "./pages/LoreEntriesPage";
 import ScenariosPage from "./pages/ScenariosPage";
 import "./App.css";
+import "./styles/colors.css";
+import "./styles/fonts.css";
+import { 
+  HouseDoorFill, 
+  ChatDotsFill, 
+  PeopleFill, 
+  PersonBadgeFill, 
+  CollectionFill, 
+  Globe2, 
+  GearFill 
+} from 'react-bootstrap-icons';
 
 function AppWrapper() {
   const location = useLocation();
 
+  // Bootstrap icon components
+  const HomeIcon = () => <HouseDoorFill className="w-5 h-5 mr-3 inline-block align-middle" />;
+  const ChatsIcon = () => <ChatDotsFill className="w-5 h-5 mr-3 inline-block align-middle" />;
+  const PersonasIcon = () => <PeopleFill className="w-5 h-5 mr-3 inline-block align-middle" />;
+  const CharactersIcon = () => <PersonBadgeFill className="w-5 h-5 mr-3 inline-block align-middle" />;
+  const ScenariosIcon = () => <CollectionFill className="w-5 h-5 mr-3 inline-block align-middle" />;
+  const WorldsIcon = () => <Globe2 className="w-5 h-5 mr-3 inline-block align-middle" />;
+  const SettingsIcon = () => <GearFill className="w-5 h-5 mr-3 inline-block align-middle" />;
+
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-gray-900 text-gray-100">
+    <div className="min-h-screen flex flex-col md:flex-row p-6 gap-4 bg-app-bg text-app-accent">
       {/* Sidebar */}
-      <nav className="bg-gray-800 p-4 shadow-md flex-shrink-0 w-full md:w-64">
-        <div className="flex flex-col space-y-2">
-          <div className="text-3xl px-3 font-bold mb-6 text-center quintessential-regular">
+      <nav className="bg-app-surface p-6 shadow-lg flex-shrink-0 w-full md:w-64 flex flex-col overflow-y-auto rounded-2xl backdrop-blur-sm" 
+           style={{ maxHeight: 'calc(100vh - 2rem)' }}>
+        <div className="flex flex-col space-y-3 w-full">
+          <div className="text-3xl px-3 font-bold mb-6 text-center font-quintessential">
             Argon
           </div>
           <Link
             to="/"
-            className="text-xl montserrat block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
+            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
           >
-            Home
+            <HomeIcon /> Home
           </Link>
           <Link
             to="/chats"
-            className="text-xl montserrat block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
+            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
           >
-            Chats
+            <ChatsIcon /> Chats
           </Link>
           <Link
             to="/personas"
-            className="text-xl montserrat block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
+            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
           >
-            Personas
+            <PersonasIcon /> Personas
           </Link>
           <Link
             to="/characters"
-            className="text-xl montserrat block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
+            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
           >
-            Characters
+            <CharactersIcon /> Characters
           </Link>
           <Link
             to="/scenarios"
-            className="text-xl montserrat block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
+            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
           >
-            Scenarios
-          </Link>{" "}
+            <ScenariosIcon /> Scenarios
+          </Link>
           <Link
             to="/world-lore"
-            className="text-xl montserrat block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
+            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
           >
-            Worlds
-          </Link>{" "}
+            <WorldsIcon /> Worlds
+          </Link>
           <Link
             to="/settings"
-            className="text-xl montserrat block py-2 px-3 rounded hover:bg-gray-700 hover:text-blue-400 transition-colors"
+            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
           >
-            Settings
+            <SettingsIcon /> Settings
           </Link>
         </div>
-      </nav>{" "}
+      </nav>
       {/* Main Content Area */}
       <main className={`flex-grow ${location.pathname.startsWith('/chat/') ? '' : 'p-4 md:p-6'}`}>
         <div className="container mx-auto">

@@ -17,6 +17,7 @@ import {
   type CharacterCardUpdateData,
   type MasterWorldData,
 } from "../services/api";
+import { PencilSquare, TrashFill } from 'react-bootstrap-icons';
 
 interface SelectOption {
   value: string;
@@ -33,12 +34,12 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity duration-300 ease-in-out">
-      <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-lg text-white transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalShow">
+      <div className="bg-app-bg p-6 rounded-lg shadow-xl w-full max-w-lg text-white transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalShow">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-semibold">{title}</h2>
+          <h2 className="text-2xl font-semibold text-center w-full">{title}</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl"
+            className="text-gray-400 hover:text-white text-2xl absolute right-6 top-6"
           >
             ×
           </button>
@@ -324,19 +325,21 @@ const CharactersPage: React.FC = () => {
 
   const handleCardClick = async (characterId: string) => {
     try {
+      // Only send gm_character_id, not scenario_id, and handle persona as optional/blank
       const existingSession = await checkExistingChatSession({
         gm_character_id: characterId,
-        scenario_id: "",
-        user_persona_id: ""
+        // Do not send scenario_id at all
+        // Only send user_persona_id if you have a value, otherwise do not include the key
       });
       if (existingSession) {
         navigate(`/chat/${existingSession.id}`);
       } else {
+        // Only send gm_character_id, not scenario_id, and handle persona as optional/blank
         const newSession = await createChatSession({
           gm_character_id: characterId,
-          scenario_id: "",
-          user_persona_id: "",
-          title: `Chat with ${characters.find(c => c.id === characterId)?.name}`
+          scenario_id: "", // required by type, but will be ignored by backend if blank
+          user_persona_id: "", // required by type, but will be ignored by backend if blank
+          title: `Chat with ${characters.find(c => c.id === characterId)?.name}`,
         });
         navigate(`/chat/${newSession.id}`);
       }
@@ -365,17 +368,15 @@ const CharactersPage: React.FC = () => {
 
   console.log("CharactersPage component returning JSX...");
   return (
-    <div className="container mx-auto p-4 md:p-8">
+    <div className="container mx-auto p-4 md:p-8 text-white">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <h1 className="text-4xl font-bold text-white">Characters</h1>
-        <div className="flex items-center gap-2 w-full md:w-auto">
+        <h1 className="text-4xl font-bold text-white font-quintessential">Characters</h1>
           <button
             onClick={() => handleOpenModal()}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md whitespace-nowrap"
+            className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
           >
-            + Create Character
+            New +
           </button>
-        </div>
       </div>
 
       {isLoading && (
@@ -387,9 +388,9 @@ const CharactersPage: React.FC = () => {
         </p>
       )}
       {!isLoading && !error && characters.length === 0 && (
-        <p className="text-center text-gray-500 py-10">
-          No characters found. Create one!
-        </p>
+        <div className="text-center py-10">
+          <p className="text-xl text-gray-500 mb-4">No characters created yet. Click in + to create one</p>
+        </div>
       )}
 
       {!isLoading && !error && characters.length > 0 && (
@@ -397,32 +398,28 @@ const CharactersPage: React.FC = () => {
           {characters.map((char) => (
             <div
               key={char.id}
-              className="bg-gray-800 rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105"
+              className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105"
               onClick={() => handleCardClick(char.id)}
             >
               {/* Ícones de editar/excluir no topo direito */}
               <div className="absolute top-2 right-2 flex space-x-2 z-10">
                 <button
                 onClick={(e) => { e.stopPropagation(); handleOpenModal(char); }}
-                className="text-gray-400 hover:text-blue-500 transition-colors"
+                className="text-gray-400 hover:text-app-accent transition-colors"
                 title="Edit Character"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                </svg>
+                <PencilSquare className="h-5 w-5" />
               </button>
                 <button
                 onClick={(e) => { e.stopPropagation(); handleDelete(char.id); }}
-                className="text-gray-400 hover:text-red-500 transition-colors"
+                className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full"
                 title="Delete Character"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
+                <TrashFill className="h-5 w-5" />
               </button>
               </div>
               {/* Rodapé translúcido com nome e descrição */}
-              <div className="absolute bottom-0 left-0 w-full bg-black/40 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
+              <div className="absolute bottom-0 left-0 w-full bg-black/30 backdrop-blur-sm p-3 flex items-center rounded-b-lg">
               <div className="flex w-full items-center justify-between">
                 <h2 className="text-lg font-semibold text-white break-words whitespace-normal mr-2 flex-1 leading-snug">{char.name}</h2>
                 </div>
@@ -436,12 +433,12 @@ const CharactersPage: React.FC = () => {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         title={
-          editingCharacter ? "Edit AI Character" : "Create New AI Character"
+          editingCharacter ? "Edit Character" : "Create New Character"
         }
       >
         <form
           onSubmit={handleSubmit}
-          className="space-y-4 max-h-[70vh] overflow-y-auto p-1 pr-2 hide-scrollbar"
+          className="space-y-4 max-h-[70vh] overflow-y-auto p-1 pr-2 hide-scrollbar bg-app-bg rounded-lg"
         >
           {error && isModalOpen && (
             <p className="bg-red-700 text-white p-3 rounded-md text-sm text-center">
@@ -471,42 +468,34 @@ const CharactersPage: React.FC = () => {
                  // Estilos para tema escuro
                 control: (base, state) => ({
                   ...base,
-                  backgroundColor: "#1F2937", // bg-gray-800
-                  borderColor: state.isFocused ? "#3B82F6" : "#4B5563", // border-blue-500 (focus), border-gray-600
-                  boxShadow: state.isFocused ? "0 0 0 1px #3B82F6" : "none",
-                  "&:hover": { borderColor: "#6B7280" }, // border-gray-500 (hover)
+                  backgroundColor: "#343a40", // bg-gray-800
+                  borderColor: state.isFocused ? "#f8f9fa" : "#343a40", // border-blue-500 (focus), border-gray-600
+                  boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
+                  "&:hover": { borderColor: "#f8f9fa" }, // border-gray-500 (hover)
                   minHeight: "42px", // Para alinhar com inputs padrão
                 }),
                 singleValue: (base) => ({ ...base, color: "white" }),
                 menu: (base) => ({
                   ...base,
-                  backgroundColor: "#1F2937",
+                  backgroundColor: "#f8f9fa",
                   zIndex: 10,
                 }),
                 option: (base, { isFocused, isSelected }) => ({
                   ...base,
                   backgroundColor: isSelected
-                  ? "#3B82F6"
+                  ? "#f8f9fa"
                   : isFocused
-                  ? "#374151"
-                  : "#1F2937", // bg-blue-600 (selected), bg-gray-700 (focus)
-                  color: "white",
-                  ":active": { backgroundColor: "#2563EB" }, // bg-blue-700 (active)
+                  ? "#dee2e6"
+                  : "#343a40", // bg-blue-600 (selected), bg-gray-700 (focus)
+                  color: isSelected || isFocused ? "#212529" : "#fff", // text-app-bg or white
+                    ':active': { backgroundColor: "#f8f9fa", color: "#212529" },
                 }),
-    placeholder: (base) => ({ ...base, color: "#9CA3AF" }), // text-gray-400
-    input: (base) => ({ ...base, color: "white" }),
-    dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
-    clearIndicator: (base) => ({
-      ...base,
-      color: "#9CA3AF",
-      ":hover": { color: "white" },
-    }),
-    indicatorSeparator: (base) => ({
-      ...base,
-      backgroundColor: "#4B5563",
-    }),
-                }
-              }
+                  placeholder: (base) => ({ ...base, color: "#9CA3AF" }),
+                  input: (base) => ({ ...base, color: "#fff" }),
+                  dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
+                  clearIndicator: (base) => ({ ...base, color: "#9CA3AF", ':hover': { color: "#fff" } }),
+                  indicatorSeparator: (base) => ({ ...base, backgroundColor: "#343a40" }),
+                }}
             />
           </div>
 
@@ -527,7 +516,7 @@ const CharactersPage: React.FC = () => {
               value={formFields.name}
               onChange={handleStaticInputChange}
               required
-              className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
           <div>
@@ -544,7 +533,7 @@ const CharactersPage: React.FC = () => {
               rows={4}
               value={formFields.description}
               onChange={handleStaticInputChange}
-              className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
           <div>
@@ -561,7 +550,7 @@ const CharactersPage: React.FC = () => {
               rows={4}
               value={formFields.instructions}
               onChange={handleStaticInputChange}
-              className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
@@ -580,7 +569,7 @@ const CharactersPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={addDialogueField}
-                  className="text-xs bg-green-500 hover:bg-green-600 text-white font-semibold py-1 px-2 rounded-md"
+                  className="text-xs bg-app-accent-2 text-app-surface font-semibold py-1 px-2 rounded-md"
                   title="Add New Dialogue"
                 >
                   +
@@ -588,7 +577,7 @@ const CharactersPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={removeCurrentDialogueField}
-                  className="text-xs bg-red-600 hover:bg-red-700 text-white font-semibold py-1 px-2 rounded-md disabled:opacity-50"
+                  className="text-xs bg-app-accent-2 text-app-surface font-semibold py-1 px-2 rounded-md disabled:opacity-50"
                   disabled={
                     currentExampleDialogues.length === 1 &&
                     currentExampleDialogues[0].trim() === ""
@@ -605,7 +594,7 @@ const CharactersPage: React.FC = () => {
               value={currentExampleDialogues[currentDialogueIndex] || ""}
               onChange={(e) => handleCurrentDialogueChange(e.target.value)}
               placeholder={`Example Dialogue ${currentDialogueIndex + 1}`}
-              className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white font-mono text-sm focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white font-mono text-sm focus:ring-blue-500 focus:border-blue-500"
               autoComplete="off"
             />
             <div className="flex justify-start items-center mt-1 space-x-2">
@@ -614,7 +603,7 @@ const CharactersPage: React.FC = () => {
                 type="button"
                 onClick={() => navigateDialogues("prev")}
                 disabled={currentExampleDialogues.length <= 1}
-                className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
+                className="text-xs bg-app-surface hover:bg-app-accent-2 text-white px-2 py-1 rounded-md disabled:opacity-50"
               >
                 Previous
               </button>
@@ -622,7 +611,7 @@ const CharactersPage: React.FC = () => {
                 type="button"
                 onClick={() => navigateDialogues("next")}
                 disabled={currentExampleDialogues.length <= 1}
-                className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
+                className="text-xs bg-app-surface hover:bg-app-accent-2 text-white px-2 py-1 rounded-md disabled:opacity-50"
               >
                 Next
               </button>
@@ -644,7 +633,7 @@ const CharactersPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={addBmgField}
-                  className="text-xs bg-green-500 hover:bg-green-600 text-white font-semibold py-1 px-2 rounded-md"
+                  className="text-xs bg-app-accent-2 text-app-surface font-semibold py-1 px-2 rounded-md"
                   title="Add New Beginning Message"
                 >
                   +
@@ -652,7 +641,7 @@ const CharactersPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={removeCurrentBmgField}
-                  className="text-xs bg-red-600 hover:bg-red-700 text-white font-semibold py-1 px-2 rounded-md disabled:opacity-50"
+                  className="text-xs bg-app-accent-2 text-app-surface font-semibold py-1 px-2 rounded-md disabled:opacity-50"
                   disabled={
                     currentBeginningMessages.length === 1 &&
                     currentBeginningMessages[0].trim() === ""
@@ -669,7 +658,7 @@ const CharactersPage: React.FC = () => {
               value={currentBeginningMessages[currentBmgIndex] || ""}
               onChange={(e) => handleCurrentBmgChange(e.target.value)}
               placeholder={`Beginning Message ${currentBmgIndex + 1}`}
-              className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
               autoComplete="off"
             />
             <div className="flex justify-start items-center mt-1 space-x-2">
@@ -677,7 +666,7 @@ const CharactersPage: React.FC = () => {
                 type="button"
                 onClick={() => navigateBmg("prev")}
                 disabled={currentBmgIndex === 0}
-                className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
+                className="text-xs bg-app-surface hover:bg-app-accent-2 text-white px-2 py-1 rounded-md disabled:opacity-50"
               >
                 Previous
               </button>
@@ -687,7 +676,7 @@ const CharactersPage: React.FC = () => {
                 disabled={
                   currentBmgIndex === currentBeginningMessages.length - 1
                 }
-                className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
+                className="text-xs bg-app-surface hover:bg-app-accent-2 text-white px-2 py-1 rounded-md disabled:opacity-50"
               >
                 Next
               </button>
@@ -696,20 +685,13 @@ const CharactersPage: React.FC = () => {
 
           <div className="flex justify-end space-x-3 pt-2">
             <button
-              type="button"
-              onClick={handleCloseModal}
-              className="px-4 py-2 text-sm text-gray-300 bg-gray-700 hover:bg-gray-600 rounded-md font-medium"
-            >
-              Cancel
-            </button>
-            <button
               type="submit"
               disabled={
                 isSubmitting || !formFields.name.trim()
                 // Remove the Master World requirement
                 // || !selectedMasterWorldForForm?.value
               }
-              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md font-medium disabled:bg-blue-800 disabled:opacity-50"
+              className="px-4 py-2 text-sm bg-app-accent-2 text-app-surface rounded-md font-medium disabled:opacity-50"
             >
               {isSubmitting
                 ? "Saving..."

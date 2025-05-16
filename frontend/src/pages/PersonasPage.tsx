@@ -11,6 +11,7 @@ import {
   type UserPersonaCreateData,
   type UserPersonaUpdateData,
 } from "../services/api";
+import { PencilSquare, TrashFill } from 'react-bootstrap-icons';
 // Importe Framer Motion (se já quiser adicionar animações simples)
 // import { motion, AnimatePresence } from 'framer-motion';
 
@@ -206,14 +207,14 @@ const PersonasPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-8 bg-gray-900 min-h-screen text-white">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-bold">My Personas</h1>
+    <div className="container mx-auto p-4 md:p-8 text-white">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <h1 className="text-4xl font-bold text-white font-quintessential">My Personas</h1>
         <button
           onClick={() => handleOpenModal()}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out"
+          className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
         >
-          + Create Persona
+          New +
         </button>
       </div>
 
@@ -224,38 +225,41 @@ const PersonasPage: React.FC = () => {
       )}
 
       {personas.length === 0 && !isLoading && (
-        <p className="text-center text-gray-500">
-          No personas created yet. Click "Create Persona" to get started!
-        </p>
+        <div className="text-center py-10">
+          <p className="text-xl text-gray-500 mb-4">No persona created yet. Click in + to create one</p>
+        </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {personas.map((persona) => (
           <div
             key={persona.id}
-            className={`bg-gray-800 p-6 rounded-lg shadow-lg hover:shadow-2xl transition-shadow duration-300 cursor-pointer ${activePersonaId === persona.id ? 'ring-2 ring-blue-500' : ''}`}
+            className={`bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105 ${activePersonaId === persona.id ? 'ring-2 ring-app-accent' : ''}`}
             onClick={() => handleActivatePersona(persona.id)}
-            title={activePersonaId === persona.id ? 'Ativa' : 'Clique para ativar'}
+            title={activePersonaId === persona.id ? 'Active' : 'Click to activate'}
+
           >
-            <h2 className="text-2xl font-semibold mb-2">{persona.name}</h2>
-            <p className="text-gray-400 mb-4 break-words whitespace-pre-wrap">
-              {persona.description || (
-                <span className="italic">No description.</span>
+            <div className="absolute top-2 right-2 flex space-x-2 z-10">
+              <button
+                onClick={e => { e.stopPropagation(); handleOpenModal(persona); }}
+                className="text-gray-400 hover:text-app-accent transition-colors"
+                title="Edit Persona"
+              >
+                <PencilSquare className="h-5 w-5" />
+              </button>
+              <button
+                onClick={e => { e.stopPropagation(); handleDelete(persona.id); }}
+                className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full"
+                title="Delete Persona"
+              >
+                <TrashFill className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="absolute bottom-0 left-0 w-full bg-black/30 backdrop-blur-sm p-3 flex items-center rounded-b-lg">
+              <h2 className="text-lg font-semibold text-white break-words whitespace-normal flex-1 leading-snug truncate" title={persona.name}>{persona.name}</h2>
+              {activePersonaId === persona.id && (
+                <span className="ml-2 bg-app-accent text-app-surface text-xs px-2 py-0.5 rounded-full font-semibold">Active</span>
               )}
-            </p>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={(e) => { e.stopPropagation(); handleOpenModal(persona); }}
-                className="text-sm bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-1 px-3 rounded-md transition duration-150"
-              >
-                Edit
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleDelete(persona.id); }}
-                className="text-sm bg-red-600 hover:bg-red-700 text-white font-semibold py-1 px-3 rounded-md transition duration-150"
-              >
-                Delete
-              </button>
             </div>
           </div>
         ))}
@@ -301,13 +305,6 @@ const PersonasPage: React.FC = () => {
             />
           </div>
           <div className="flex justify-end space-x-3 pt-2">
-            <button
-              type="button"
-              onClick={handleCloseModal}
-              className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-md"
-            >
-              Cancel
-            </button>
             <button
               type="submit"
               className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md"

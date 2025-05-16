@@ -36,7 +36,7 @@ const ChatsListPage: React.FC = () => {
   return (
     <div className="container mx-auto p-4 md:p-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-bold text-white">My Chats</h1>
+        <h1 className="text-4xl font-bold text-white font-quintessential">My Chats</h1>
       </div>
 
       {error && (
@@ -55,10 +55,10 @@ const ChatsListPage: React.FC = () => {
         {chatSessions.map((session) => (
           <div
             key={session.id}
-            className="bg-gray-800 p-4 rounded-lg shadow-md hover:bg-gray-700 cursor-pointer transition-colors duration-200"
+            className="bg-app-surface p-4 rounded-lg shadow-md cursor-pointer transform transition-transform duration-300 hover:scale-105"
             onClick={() => navigate(`/chat/${session.id}`)} // Navega para a ChatPage
           >
-            <h2 className="text-xl font-semibold text-blue-400 mb-1">
+            <h2 className="text-xl font-semibold text-app-accent mb-1">
               {session.title || `Chat ${session.id.substring(0, 8)}`}
             </h2>
             <p className="text-sm text-gray-400">
