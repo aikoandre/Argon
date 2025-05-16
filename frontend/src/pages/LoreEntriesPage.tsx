@@ -29,7 +29,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-app-bg p-6 rounded-lg shadow-xl w-full max-w-lg text-white">
+      <div className="bg-app-bg p-6 rounded-2xl shadow-xl w-full max-w-lg text-white transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalShow">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-semibold text-white">{title}</h2>
           <button
@@ -518,7 +518,7 @@ const LoreEntriesPage: React.FC = () => {
             </div>
 
             <div className="flex justify-end space-x-3 pt-2">
-              <button type="submit" disabled={isSubmitting} className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-md disabled:opacity-50">
+              <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm bg-app-accent-2 text-app-surface rounded-md font-medium disabled:opacity-50">
                 {isSubmitting ? (editingEntry ? 'Saving...' : 'Creating...') : (editingEntry ? 'Save Changes' : 'Create Entry')}
               </button>
             </div>

@@ -6,8 +6,10 @@ module.exports = {
       colors: {
         'app-bg': 'var(--color-background)',
         'app-surface': 'var(--color-surface)',
+        'app-flat': 'var(--color-flat)',
         'app-accent': 'var(--color-accent)',
         'app-accent-2': 'var(--color-accent-2)',
+        'app-accent-3': 'var(--color-accent-3)',
       },
       fontFamily: {
         'montserrat': ['Montserrat', 'sans-serif'],

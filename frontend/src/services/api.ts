@@ -75,16 +75,19 @@ export interface UserPersonaData {
   description?: string | null;
   created_at: string;
   updated_at?: string | null;
+  master_world_id?: string | null;
 }
 
 export interface UserPersonaCreateData {
   name: string;
   description?: string | null;
+  master_world_id?: string | null;
 }
 
 export interface UserPersonaUpdateData {
   name?: string;
   description?: string | null;
+  master_world_id?: string | null;
 }
 
 export const createUserPersona = async (
@@ -250,6 +253,7 @@ export interface ScenarioCardData {
   id: string;
   name: string;
   description?: string | null;
+  instructions?: string | null;
   beginning_message?: string[] | null;
   example_dialogues?: string[] | null;
   master_world_id?: string | null;
@@ -261,6 +265,7 @@ export interface ScenarioCardData {
 export interface ScenarioCardCreateData {
   name: string;
   description?: string | null;
+  instructions?: string | null;
   beginning_message?: string[] | null;
   example_dialogues?: string[] | null;
   master_world_id?: string | null;
@@ -270,6 +275,7 @@ export interface ScenarioCardCreateData {
 export interface ScenarioCardUpdateData {
   name?: string;
   description?: string | null;
+  instructions?: string | null;
   beginning_message?: string[] | null;
   example_dialogues?: string[] | null;
   world_card_references?: string[] | null;

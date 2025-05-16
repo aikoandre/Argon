@@ -1,5 +1,6 @@
 // frontend/src/pages/PersonasPage.tsx
 import React, { useState, useEffect, type FormEvent } from "react";
+import Select, { type SingleValue } from "react-select";
 import {
   getAllUserPersonas,
   createUserPersona,
@@ -7,13 +8,21 @@ import {
   deleteUserPersona,
   getUserSettings,
   updateUserSettings,
+  getAllMasterWorlds,
   type UserPersonaData,
   type UserPersonaCreateData,
   type UserPersonaUpdateData,
+  type MasterWorldData,
 } from "../services/api";
 import { PencilSquare, TrashFill } from 'react-bootstrap-icons';
 // Importe Framer Motion (se já quiser adicionar animações simples)
 // import { motion, AnimatePresence } from 'framer-motion';
+
+// Define the SelectOption interface here <-- THIS WAS ADDED PREVIOUSLY AND IS NEEDED AGAIN
+interface SelectOption {
+  value: string;
+  label: string;
+}
 
 // Componente de Modal simples (você pode criar um arquivo separado para ele depois)
 interface ModalProps {
@@ -26,32 +35,8 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
   if (!isOpen) return null;
 
   return (
-    // Use AnimatePresence e motion se for animar
-    // <AnimatePresence>
-    //   {isOpen && (
-    //     <motion.div
-    //       initial={{ opacity: 0 }}
-    //       animate={{ opacity: 1 }}
-    //       exit={{ opacity: 0 }}
-    //       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-    //       onClick={onClose} // Fecha ao clicar fora
-    //     >
-    //       <motion.div
-    //         initial={{ scale: 0.7, opacity: 0 }}
-    //         animate={{ scale: 1, opacity: 1 }}
-    //         exit={{ scale: 0.7, opacity: 0 }}
-    //         className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md text-white"
-    //         onClick={(e) => e.stopPropagation()} // Impede de fechar ao clicar dentro
-    //       >
-    //         <h2 className="text-2xl font-semibold mb-4">{title}</h2>
-    //         {children}
-    //       </motion.div>
-    //     </motion.div>
-    //   )}
-    // </AnimatePresence>
-    // Sem Framer Motion por enquanto:
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md text-white">
+      <div className="bg-app-bg p-6 rounded-2xl shadow-xl w-full max-w-lg text-white transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalShow">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-semibold">{title}</h2>
           <button
@@ -80,6 +65,21 @@ const PersonasPage: React.FC = () => {
   const [formData, setFormData] = useState<
     UserPersonaCreateData | UserPersonaUpdateData
   >({ name: "", description: "" });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  // State for MasterWorld dropdown
+  const [masterWorlds, setMasterWorlds] = useState<MasterWorldData[]>([]);
+  const [isLoadingWorlds, setIsLoadingWorlds] = useState<boolean>(true);
+  const [selectedMasterWorldForForm, setSelectedMasterWorldForForm] =
+    useState<SingleValue<SelectOption>>(null);
+
+  // Handler for Master World dropdown change <-- THIS WAS ADDED PREVIOUSLY AND IS NEEDED AGAIN
+  const handleMasterWorldChangeForForm = (
+    selectedOption: SingleValue<SelectOption>
+  ) => {
+    setSelectedMasterWorldForForm(selectedOption);
+  };
 
   const fetchPersonas = async () => {
     setIsLoading(true);
@@ -94,6 +94,22 @@ const PersonasPage: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  // Effect to fetch Master Worlds
+  useEffect(() => {
+    const fetchWorlds = async () => {
+      setIsLoadingWorlds(true);
+      try {
+        const data = await getAllMasterWorlds();
+        setMasterWorlds(data);
+      } catch (err) {
+        console.error("Failed to load master worlds:", err);
+      } finally {
+        setIsLoadingWorlds(false);
+      }
+    };
+    fetchWorlds();
+  }, []);
 
   useEffect(() => {
     fetchPersonas();
@@ -112,16 +128,42 @@ const PersonasPage: React.FC = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+  };
+
   const handleOpenModal = (persona?: UserPersonaData) => {
+    setError(null);
     if (persona) {
       setEditingPersona(persona);
       setFormData({
         name: persona.name,
         description: persona.description || "",
       });
+      // Set selected Master World in the form dropdown
+      const worldOption = masterWorlds.find(
+        (w) => w.id === persona.master_world_id
+      );
+      setSelectedMasterWorldForForm(
+        worldOption ? { value: worldOption.id, label: worldOption.name } : null
+      );
     } else {
       setEditingPersona(null);
       setFormData({ name: "", description: "" });
+      setSelectedMasterWorldForForm(null);
     }
     setIsModalOpen(true);
   };
@@ -130,29 +172,46 @@ const PersonasPage: React.FC = () => {
     setIsModalOpen(false);
     setEditingPersona(null);
     setFormData({ name: "", description: "" });
+    setSelectedMasterWorldForForm(null);
+    setError(null);
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.name.trim()) {
-      alert("Name is required."); // Validação simples
+      setError("Name is required.");
       return;
     }
-    setIsLoading(true); // Usar um isLoading específico para o form seria melhor
+
+    const payload: UserPersonaCreateData | UserPersonaUpdateData = {
+      ...formData,
+      master_world_id: selectedMasterWorldForForm?.value || null,
+    };
+
+    setIsLoading(true);
+    setError(null);
     try {
       if (editingPersona) {
-        await updateUserPersona(
-          editingPersona.id,
-          formData as UserPersonaUpdateData
-        );
+        const updatePayload: UserPersonaUpdateData = {
+            ...payload,
+            name: payload.name,
+            description: payload.description,
+            master_world_id: payload.master_world_id
+        };
+        await updateUserPersona(editingPersona.id, updatePayload);
       } else {
-        await createUserPersona(formData as UserPersonaCreateData);
+        const createPayload: UserPersonaCreateData = {
+            name: payload.name || '',
+            description: payload.description,
+            master_world_id: payload.master_world_id
+        };
+        await createUserPersona(createPayload);
       }
       handleCloseModal();
-      fetchPersonas(); // Recarrega a lista
-    } catch (err) {
+      fetchPersonas();
+    } catch (err: any) {
       setError(
-        editingPersona
+        err.message || editingPersona
           ? "Failed to update persona."
           : "Failed to create persona."
       );
@@ -199,7 +258,15 @@ const PersonasPage: React.FC = () => {
     }
   };
 
-  if (isLoading && personas.length === 0) {
+  // Prepare options for the Master World dropdown <-- Added this mapping inside the component
+  const masterWorldOptionsForForm: SelectOption[] = masterWorlds.map((w) => ({
+    value: w.id,
+    label: w.name,
+  }));
+  // Add a "No Master World" option
+  masterWorldOptionsForForm.unshift({ value: "", label: "No Master World" });
+
+  if (isLoading && personas.length === 0 && isLoadingWorlds) {
     // Mostra loading só na primeira carga
     return (
       <p className="text-center text-gray-400 p-10">Loading personas...</p>
@@ -224,7 +291,7 @@ const PersonasPage: React.FC = () => {
         </p>
       )}
 
-      {personas.length === 0 && !isLoading && (
+      {personas.length === 0 && !isLoading && !isLoadingWorlds && (
         <div className="text-center py-10">
           <p className="text-xl text-gray-500 mb-4">No persona created yet. Click in + to create one</p>
         </div>
@@ -270,7 +337,91 @@ const PersonasPage: React.FC = () => {
         onClose={handleCloseModal}
         title={editingPersona ? "Edit Persona" : "Create New Persona"}
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto p-1 pr-2 hide-scrollbar bg-app-bg rounded-lg">
+          {error && isModalOpen && (
+            <p className="bg-red-700 text-white p-3 rounded-md text-sm text-center">
+              {error}
+            </p>
+          )}
+          {/* Image Upload Section */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Image</label>
+            <div className="flex items-center">
+              <button type="button" className="flex-1 bg-app-surface hover:bg-gray-600 text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
+                </svg>
+                <span>Select Image</span>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={handleImageUpload}
+                />
+              </button>
+              <span className="h-11 w-px bg-gray-600" />
+              <button 
+                type="button" 
+                onClick={handleRemoveImage}
+                className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div>
+            <label
+              htmlFor="persona-master_world"
+              className="block text-sm font-medium text-gray-300 mb-1"
+            >
+              Master World (Optional)
+            </label>
+            <Select<SelectOption>
+              inputId="persona-master_world"
+              options={masterWorlds.map((w) => ({ value: w.id, label: w.name }))}
+              value={selectedMasterWorldForForm}
+              onChange={handleMasterWorldChangeForForm}
+              isDisabled={isLoadingWorlds}
+              placeholder="Select Master World..."
+              isClearable={true}
+              className="text-black"
+              classNamePrefix="react-select"
+              styles={{
+                control: (base, state) => ({
+                  ...base,
+                  backgroundColor: "#343a40",
+                  borderColor: state.isFocused ? "#f8f9fa" : "#343a40",
+                  boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
+                  "&:hover": { borderColor: "#f8f9fa" },
+                  minHeight: "42px",
+                }),
+                singleValue: (base) => ({ ...base, color: "white" }),
+                menu: (base) => ({
+                  ...base,
+                  backgroundColor: "#495057",
+                  zIndex: 10,
+                }),
+                option: (base, { isFocused, isSelected }) => ({
+                  ...base,
+                  backgroundColor: isSelected
+                    ? "#adb5bd"
+                    : isFocused
+                    ? "#dee2e6"
+                    : "#495057",
+                  color: isSelected || isFocused ? "#212529" : "#fff",
+                  ':active': { backgroundColor: "#f8f9fa", color: "#212529" },
+                }),
+                placeholder: (base) => ({ ...base, color: "#9CA3AF" }),
+                input: (base) => ({ ...base, color: "#fff" }),
+                dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
+                clearIndicator: (base) => ({ ...base, color: "#9CA3AF", ':hover': { color: "#fff" } }),
+                indicatorSeparator: (base) => ({ ...base, backgroundColor: "#343a40" }),
+              }}
+            />
+          </div>
           <div>
             <label
               htmlFor="name"
@@ -285,7 +436,7 @@ const PersonasPage: React.FC = () => {
               value={formData.name}
               onChange={handleInputChange}
               required
-              className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
           <div>
@@ -301,13 +452,13 @@ const PersonasPage: React.FC = () => {
               rows={4}
               value={formData.description || ""}
               onChange={handleInputChange}
-              className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
           <div className="flex justify-end space-x-3 pt-2">
             <button
               type="submit"
-              className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md"
+              className="px-4 py-2 text-sm bg-app-accent-2 text-app-surface rounded-md font-medium disabled:opacity-50"
             >
               {editingPersona ? "Save Changes" : "Create Persona"}
             </button>

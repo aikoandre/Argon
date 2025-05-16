@@ -25,6 +25,7 @@ def create_scenario_card(
     Valida se os world_card_references pertencem ao mesmo mundo, se especificado.
     """
     from ..models.master_world import MasterWorld
+    from ..models.user_persona import UserPersona
     from ..models.lore_entry import LoreEntry
     
     print(f"Attempting to create scenario with data: {scenario.model_dump()}")  # Debug log
@@ -40,8 +41,14 @@ def create_scenario_card(
                 detail="Master world not found"
             )
 
+    # Validate user_persona_id if provided
+    if scenario.user_persona_id:
+        user_persona = db.query(UserPersona).filter(UserPersona.id == scenario.user_persona_id).first()
+        if not user_persona:
+            raise HTTPException(status_code=400, detail="User Persona not found")
+
     try:
-        db_scenario = ScenarioCard(**scenario.model_dump())
+        db_scenario = ScenarioCard(**scenario.model_dump(exclude_unset=True))
         print(f"Scenario object created: {db_scenario}")  # Debug log
         db.add(db_scenario)
         db.commit()

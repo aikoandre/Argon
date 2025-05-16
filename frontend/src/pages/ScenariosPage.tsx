@@ -34,7 +34,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity duration-300 ease-in-out">
-      <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-lg text-white transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalShow">
+      <div className="bg-app-bg p-6 rounded-2xl shadow-xl w-full max-w-lg text-white transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalShow">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-semibold">{title}</h2>
           <button
@@ -53,11 +53,13 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
 interface ScenarioFormData {
   name: string;
   description: string;
+  instructions: string;
 }
 
 const initialFormFields: ScenarioFormData = {
   name: "",
   description: "",
+  instructions: "",
 };
 
 const initialBeginningMessages = [""];
@@ -81,6 +83,8 @@ const ScenariosPage: React.FC = () => {
   const [currentDialogueIndex, setCurrentDialogueIndex] = useState<number>(0);
   const [currentBeginningMessages, setCurrentBeginningMessages] = useState<string[]>(initialBeginningMessages);
   const [currentBmgIndex, setCurrentBmgIndex] = useState<number>(0);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   // Master World states
   const [masterWorlds, setMasterWorlds] = useState<MasterWorldData[]>([]);
@@ -208,6 +212,7 @@ const ScenariosPage: React.FC = () => {
         ? {
             name: scenario.name,
             description: scenario.description || "",
+            instructions: scenario.instructions || "",
           }
         : initialFormFields
     );
@@ -390,7 +395,7 @@ const ScenariosPage: React.FC = () => {
             <div className="absolute top-2 right-2 flex space-x-2 z-10">
               <button
                 onClick={(e) => { e.stopPropagation(); handleOpenModal(scen); }}
-                className="text-gray-400 hover:text-blue-500 transition-colors"
+                className="text-gray-400 hover:text-app-accent transition-colors"
                 title="Edit Scenario"
               >
                 <PencilSquare className="h-5 w-5" />
@@ -421,7 +426,7 @@ const ScenariosPage: React.FC = () => {
       >
         <form
           onSubmit={handleSubmit}
-          className="space-y-4 max-h-[70vh] overflow-y-auto p-1 pr-2 hide-scrollbar"
+          className="space-y-4 max-h-[70vh] overflow-y-auto p-1 pr-2 custom-scrollbar"
         >
           {error && isModalOpen && (
             <p className="bg-red-700 text-white p-3 rounded-md text-sm text-center">
@@ -432,7 +437,7 @@ const ScenariosPage: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Image</label>
             <div className="flex items-center">
-              <button type="button" className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11">
+              <button type="button" className="flex-1 bg-app-surface hover:bg-gray-600 text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11">
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
@@ -441,7 +446,7 @@ const ScenariosPage: React.FC = () => {
                 <input type="file" accept="image/*" className="hidden" />
               </button>
               <span className="h-11 w-px bg-gray-600" />
-              <button type="button" className="bg-gray-700 hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11">
+              <button type="button" className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
@@ -479,16 +484,16 @@ const ScenariosPage: React.FC = () => {
                 singleValue: (base) => ({ ...base, color: "white" }),
                 menu: (base) => ({
                   ...base,
-                  backgroundColor: "#f8f9fa",
+                  backgroundColor: "#495057",
                   zIndex: 10,
                 }),
                 option: (base, { isFocused, isSelected }) => ({
                   ...base,
                   backgroundColor: isSelected
-                  ? "#f8f9fa"
+                  ? "#adb5bd"
                   : isFocused
                   ? "#dee2e6"
-                  : "#343a40", // bg-blue-600 (selected), bg-gray-700 (focus)
+                  : "#495057", // bg-blue-600 (selected), bg-gray-700 (focus)
                   color: isSelected || isFocused ? "#212529" : "#fff", // text-app-bg or white
                     ':active': { backgroundColor: "#f8f9fa", color: "#212529" },
                 }),
@@ -516,7 +521,7 @@ const ScenariosPage: React.FC = () => {
               value={formFields.name}
               onChange={handleStaticInputChange}
               required
-              className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
@@ -534,7 +539,25 @@ const ScenariosPage: React.FC = () => {
               rows={4}
               value={formFields.description}
               onChange={handleStaticInputChange}
-              className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="scen-instructions"
+              className="block text-sm font-medium text-gray-300 mb-1"
+            >
+              Instructions
+            </label>
+            <textarea
+              name="instructions"
+              id="scen-instructions"
+              autoComplete="off"
+              rows={4}
+              value={formFields.instructions}
+              onChange={handleStaticInputChange}
+              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
@@ -547,7 +570,7 @@ const ScenariosPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={addBmgField}
-                  className="text-xs bg-green-500 hover:bg-green-600 text-white font-semibold py-1 px-2 rounded-md"
+                  className="text-xs bg-app-accent-3 hover:bg-app-accent text-black font-semibold py-1 px-2 rounded-md"
                   title="Add New Beginning Message"
                 >
                   +
@@ -555,7 +578,7 @@ const ScenariosPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={removeCurrentBmgField}
-                  className="text-xs bg-red-600 hover:bg-red-700 text-white font-semibold py-1 px-2 rounded-md disabled:opacity-50"
+                  className="text-xs bg-app-accent-3 hover:bg-app-accent text-black font-semibold py-1 px-2 rounded-md disabled:opacity-50"
                   disabled={currentBeginningMessages.length === 1 && currentBeginningMessages[0].trim() === ""}
                   title="Remove Current Beginning Message"
                 >
@@ -568,7 +591,7 @@ const ScenariosPage: React.FC = () => {
               rows={3}
               value={currentBeginningMessages[currentBmgIndex] || ""}
               onChange={(e) => handleCurrentBmgChange(e.target.value)}
-              className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white font-mono text-sm focus:ring-blue-500 focus:border-blue-500"
             />
             <div className="flex justify-start space-x-2 mt-1">
               <button
@@ -600,14 +623,14 @@ const ScenariosPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={addDialogueField}
-                  className="text-xs bg-green-500 hover:bg-green-600 text-white font-semibold py-1 px-2 rounded-md"
+                  className="text-xs bg-app-accent-3 hover:bg-app-accent text-black font-semibold py-1 px-2 rounded-md"
                 >
                   +
                 </button>
                 <button
                   type="button"
                   onClick={removeCurrentDialogueField}
-                  className="text-xs bg-red-600 hover:bg-red-700 text-white font-semibold py-1 px-2 rounded-md disabled:opacity-50"
+                  className="text-xs bg-app-accent-3 hover:bg-app-accent text-black font-semibold py-1 px-2 rounded-md disabled:opacity-50"
                   disabled={currentExampleDialogues.length === 1 && currentExampleDialogues[0].trim() === ""}
                 >
                   -
@@ -618,7 +641,7 @@ const ScenariosPage: React.FC = () => {
               rows={3}
               value={currentExampleDialogues[currentDialogueIndex] || ""}
               onChange={(e) => handleCurrentDialogueChange(e.target.value)}
-              className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
             />
             <div className="flex justify-start space-x-2 mt-1">
               <button
@@ -642,13 +665,6 @@ const ScenariosPage: React.FC = () => {
 
           <div className="flex justify-end space-x-3 pt-2">
             <button
-              type="button"
-              onClick={handleCloseModal}
-              className="px-4 py-2 text-sm text-gray-300 bg-gray-700 hover:bg-gray-600 rounded-md font-medium"
-            >
-              Cancel
-            </button>
-            <button
               type="submit"
               disabled={
                 isSubmitting || 
@@ -656,7 +672,7 @@ const ScenariosPage: React.FC = () => {
               }
               onClick={() => console.log("Submit button clicked, disabled state:", 
                 isSubmitting || !formFields.name.trim())} // Debug log
-              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md font-medium disabled:bg-blue-800 disabled:opacity-50"
+              className="px-4 py-2 text-sm bg-app-accent-2 text-app-surface rounded-md font-medium disabled:opacity-50"
             >
               {isSubmitting
                 ? "Saving..."

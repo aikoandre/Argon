@@ -29,4 +29,57 @@
   color: #888;
 }
 
+/* Custom Scrollbar Styles */
+/* For Webkit browsers (Chrome, Safari) */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  background-color: transparent; /* Make the track transparent */
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background-color: transparent; /* Ensure the track is transparent */
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(128, 128, 128, 0.5); /* Slightly visible thumb */
+  border-radius: 4px; /* Optional: round the thumb */
+  visibility: hidden; /* Hide the thumb by default */
+}
+
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
+  visibility: visible; /* Show the thumb on hover */
+}
+
+/* For Firefox */
+.custom-scrollbar {
+  scrollbar-width: thin; /* Make the scrollbar thin */
+  scrollbar-color: rgba(128, 128, 128, 0.5) transparent; /* thumb color track color */
+}
+
+/* For Edge and IE */
+.custom-scrollbar {
+  -ms-overflow-style: none; /* Hide scrollbar in Edge and IE */
+}
+
+/* Optional: For a completely hidden scrollbar across most browsers */
+.hide-scrollbar {
+  /* For Webkit browsers */
+  &::-webkit-scrollbar {
+    display: none; /* Hide scrollbar */
+    width: 0; /* Ensure no width is taken */
+  }
+
+  /* For Firefox */
+  scrollbar-width: none; /* Hide scrollbar */
+
+  /* For Edge and IE */
+  -ms-overflow-style: none; /* Hide scrollbar */
+}
+
+
+/* Add other global styles here */
+body {
+  /* prevent default background color */
+  background-color: var(--app-bg);
+}
 /* Removed custom sidebar vertical centering styles that conflicted with Tailwind classes */

@@ -1,5 +1,4 @@
 // frontend/src/App.tsx
-import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
 import HomePage from "./pages/HomePage";
 import SettingsPage from "./pages/SettingsPage";
@@ -21,18 +20,11 @@ import {
   PersonBadgeFill, 
   CollectionFill, 
   Globe2, 
-  GearFill,
-  ChevronLeft,
-  ChevronRight
+  GearFill
 } from 'react-bootstrap-icons';
 
 function AppWrapper() {
   const location = useLocation();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
 
   // Bootstrap icon components
   const HomeIcon = ({ className }: { className?: string }) => <HouseDoorFill className={`w-5 h-5 inline-block align-middle ${className}`} />;
@@ -44,82 +36,75 @@ function AppWrapper() {
   const SettingsIcon = ({ className }: { className?: string }) => <GearFill className={`w-5 h-5 inline-block align-middle ${className}`} />;
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row p-6 bg-app-bg text-app-accent">
+    <div className="min-h-screen flex flex-col md:flex-row p-6 bg-app-bg text-white">
       {/* Sidebar Container */}
       <div
-        className={`relative flex-shrink-0 transition-all duration-300 ease-in-out ${isSidebarOpen ? 'md:w-64' : 'md:w-16'} w-full`}
+        className="relative flex-shrink-0 transition-all duration-300 ease-in-out md:w-64 w-full"
         style={{ maxHeight: 'calc(100vh - 2rem)' }}
       >
         {/* Sidebar Content */}
-        <div className="bg-app-surface shadow-lg rounded-2xl backdrop-blur-sm h-full overflow-y-auto" style={{ padding: isSidebarOpen ? '1.5rem' : '0.5rem' }}>
+        <div className="bg-app-surface shadow-lg rounded-2xl backdrop-blur-sm h-full overflow-y-auto p-6">
           <nav className="flex flex-col h-full">
-            <div className={`flex flex-col space-y-3 w-full ${isSidebarOpen ? '' : 'pt-10'}`}>
-              <div className={`text-3xl px-3 font-bold mb-6 text-center font-quintessential ${isSidebarOpen ? 'block' : 'hidden'}`}>
+            <div className="flex flex-col w-full gap-y-3 pt-6">
+              <div className="text-3xl px-3 font-bold mb-3 text-center font-quintessential">
                 Argon
               </div>
           <Link
             to="/"
             className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
           >
-            <HomeIcon className={`${isSidebarOpen ? 'mr-3' : 'mx-auto'}`} />
-            <span className={`${isSidebarOpen ? 'block' : 'hidden'}`}>Home</span>
+            <HomeIcon className="mr-3" />
+            <span>Home</span>
           </Link>
           <Link
             to="/chats"
             className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
           >
-            <ChatsIcon className={`${isSidebarOpen ? 'mr-3' : 'mx-auto'}`} />
-            <span className={`${isSidebarOpen ? 'block' : 'hidden'}`}>Chats</span>
+            <ChatsIcon className="mr-3" />
+            <span>Chats</span>
           </Link>
           <Link
             to="/personas"
             className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
           >
-            <PersonasIcon className={`${isSidebarOpen ? 'mr-3' : 'mx-auto'}`} />
-            <span className={`${isSidebarOpen ? 'block' : 'hidden'}`}>Personas</span>
+            <PersonasIcon className="mr-3" />
+            <span>Personas</span>
           </Link>
           <Link
             to="/characters"
             className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
           >
-            <CharactersIcon className={`${isSidebarOpen ? 'mr-3' : 'mx-auto'}`} />
-            <span className={`${isSidebarOpen ? 'block' : 'hidden'}`}>Characters</span>
+            <CharactersIcon className="mr-3" />
+            <span>Characters</span>
           </Link>
           <Link
             to="/scenarios"
             className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
           >
-            <ScenariosIcon className={`${isSidebarOpen ? 'mr-3' : 'mx-auto'}`} />
-            <span className={`${isSidebarOpen ? 'block' : 'hidden'}`}>Scenarios</span>
+            <ScenariosIcon className="mr-3" />
+            <span>Scenarios</span>
           </Link>
           <Link
             to="/world-lore"
             className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
           >
-            <WorldsIcon className={`${isSidebarOpen ? 'mr-3' : 'mx-auto'}`} />
-            <span className={`${isSidebarOpen ? 'block' : 'hidden'}`}>Worlds</span>
+            <WorldsIcon className="mr-3" />
+            <span>Worlds</span>
           </Link>
           <Link
             to="/settings"
             className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
           >
-            <SettingsIcon className={`${isSidebarOpen ? 'mr-3' : 'mx-auto'}`} />
-            <span className={`${isSidebarOpen ? 'block' : 'hidden'}`}>Settings</span>
+            <SettingsIcon className="mr-3" />
+            <span>Settings</span>
           </Link>
             </div>
           </nav>
         </div>
 
-        <button
-          onClick={toggleSidebar}
-          className={`hidden md:block absolute top-6 -right-4 z-20 p-1.5 bg-app-surface text-app-accent rounded-full shadow-lg border border-app-accent/20 focus:outline-none transition-all duration-300 ease-in-out`}
-          aria-label={isSidebarOpen ? "Hide sidebar" : "Show sidebar"}
-        >
-          {isSidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
-        </button>
       </div>
       {/* Main Content Area */}
-      <main className={`flex-grow overflow-hidden transition-all duration-300 ease-in-out ${isSidebarOpen ? 'md:ml-4' : ''} ${location.pathname.startsWith('/chat/') ? '' : 'p-4 md:p-6'}`}>
+      <main className={`flex-grow overflow-hidden transition-all duration-300 ease-in-out md:ml-4 ${location.pathname.startsWith('/chat/') ? '' : 'p-4 md:p-6'}`}>
         <div className="container mx-auto">
           <Routes>
             <Route path="/" element={<HomePage />} />
