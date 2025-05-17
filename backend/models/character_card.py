@@ -10,7 +10,8 @@ class CharacterCard(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, nullable=False, index=True)
-    description = Column(Text, nullable=True) # Descrição geral, história
+    description = Column(Text, nullable=True)
+    image_url = Column(String, nullable=True)
     instructions = Column(Text, nullable=True) # Como a IA deve se comportar/formatar
     example_dialogues = Column(JSON, nullable=True, default=lambda: []) # Lista de strings ou objetos de diálogo
     beginning_messages = Column(JSON, nullable=True, default=lambda: []) # Mensagem inicial específica se este GM iniciar o chat

@@ -8,6 +8,7 @@ class CharacterCardBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = None
     instructions: Optional[str] = None
+    image_url: Optional[str] = None
     example_dialogues: Optional[List[str]] = Field(default_factory=list)
     beginning_messages: Optional[List[str]] = Field(default_factory=list)
     linked_lore_ids: Optional[List[str]] = Field(default_factory=list)
@@ -19,7 +20,8 @@ class CharacterCardUpdate(BaseModel): # Permite atualização parcial mais flex�
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = None
     instructions: Optional[str] = None
-    example_dialogues: Optional[List[Dict[str, str]]] = None
+    image_url: Optional[str] = None
+    example_dialogues: Optional[List[str]] = None
     beginning_messages: Optional[List[str]] = None
     linked_lore_ids: Optional[List[str]] = None
     master_world_id: Optional[str] = None

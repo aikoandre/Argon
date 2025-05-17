@@ -7,6 +7,7 @@ class MasterWorldBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=150)
     description: Optional[str] = None
     tags: Optional[List[str]] = Field(default_factory=list)
+    image_url: Optional[str] = None
 
 class MasterWorldCreate(MasterWorldBase):
     pass
@@ -15,6 +16,7 @@ class MasterWorldUpdate(BaseModel): # Para atualização parcial
     name: Optional[str] = Field(None, min_length=1, max_length=150)
     description: Optional[str] = None
     tags: Optional[List[str]] = None
+    image_url: Optional[str] = None
 
 class MasterWorldInDB(MasterWorldBase):
     id: str

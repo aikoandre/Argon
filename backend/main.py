@@ -5,7 +5,8 @@ import os
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, PROJECT_ROOT)
 
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks, UploadFile
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import asyncio
@@ -16,6 +17,8 @@ from backend.routers.lore_entries import lore_entry_ops_router, master_world_rou
 from backend.routers.chat import router as chat_router
 from backend.routers.scenarios import router as scenarios_router
 from backend.routers.personas import router as personas_router
+from backend.routers.images import router as images_router
+from backend.routers import images
 from backend.routers.characters import router as characters_router
 from backend.routers.master_worlds import router as master_worlds_router
 from backend.routers.settings import router as settings_router
@@ -25,6 +28,13 @@ from backend import models as db_models
 
 
 app = FastAPI(title="Advanced Roleplay Engine API")
+
+import pathlib
+
+# Serve static files (including uploaded images)
+static_dir = pathlib.Path("backend/static")
+static_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # --- CORS Configuration ---
 origins = [
@@ -47,6 +57,9 @@ async def startup_event():
     """Função executada quando o FastAPI inicia."""
     global background_worker_task
     print("API Iniciando...")
+    
+    # Ensure static directories exist
+    (pathlib.Path("backend/static/images")).mkdir(parents=True, exist_ok=True)
 
 
     # 1. Inicializa o cliente Mistral (carrega API Key, etc.)

@@ -5,23 +5,30 @@ import {
   getAllUserPersonas,
   createUserPersona,
   updateUserPersona,
+  updateUserPersonaWithImage,
   deleteUserPersona,
   getUserSettings,
   updateUserSettings,
   getAllMasterWorlds,
   type UserPersonaData,
-  type UserPersonaCreateData,
-  type UserPersonaUpdateData,
   type MasterWorldData,
+  type UserPersonaUpdateData
 } from "../services/api";
 import { PencilSquare, TrashFill } from 'react-bootstrap-icons';
 // Importe Framer Motion (se já quiser adicionar animações simples)
 // import { motion, AnimatePresence } from 'framer-motion';
 
-// Define the SelectOption interface here <-- THIS WAS ADDED PREVIOUSLY AND IS NEEDED AGAIN
+// Define the SelectOption interface here
 interface SelectOption {
   value: string;
   label: string;
+}
+
+// Define a form data interface to avoid type errors
+interface PersonaFormData {
+  name: string;
+  description: string | null;
+  master_world_id: string | null;
 }
 
 // Componente de Modal simples (você pode criar um arquivo separado para ele depois)
@@ -62,9 +69,11 @@ const PersonasPage: React.FC = () => {
   const [editingPersona, setEditingPersona] = useState<UserPersonaData | null>(
     null
   );
-  const [formData, setFormData] = useState<
-    UserPersonaCreateData | UserPersonaUpdateData
-  >({ name: "", description: "" });
+  const [formData, setFormData] = useState<PersonaFormData>({
+    name: "",
+    description: null,
+    master_world_id: null
+  });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
@@ -151,7 +160,8 @@ const PersonasPage: React.FC = () => {
       setEditingPersona(persona);
       setFormData({
         name: persona.name,
-        description: persona.description || "",
+        description: persona.description || null,
+        master_world_id: persona.master_world_id || null
       });
       // Set selected Master World in the form dropdown
       const worldOption = masterWorlds.find(
@@ -162,7 +172,11 @@ const PersonasPage: React.FC = () => {
       );
     } else {
       setEditingPersona(null);
-      setFormData({ name: "", description: "" });
+      setFormData({ 
+        name: "", 
+        description: null,
+        master_world_id: null
+      });
       setSelectedMasterWorldForForm(null);
     }
     setIsModalOpen(true);
@@ -171,7 +185,11 @@ const PersonasPage: React.FC = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingPersona(null);
-    setFormData({ name: "", description: "" });
+    setFormData({ 
+      name: "", 
+      description: null,
+      master_world_id: null
+    });
     setSelectedMasterWorldForForm(null);
     setError(null);
   };
@@ -183,37 +201,67 @@ const PersonasPage: React.FC = () => {
       return;
     }
 
-    const payload: UserPersonaCreateData | UserPersonaUpdateData = {
-      ...formData,
-      master_world_id: selectedMasterWorldForForm?.value || null,
-    };
-
     setIsLoading(true);
     setError(null);
     try {
       if (editingPersona) {
-        const updatePayload: UserPersonaUpdateData = {
-            ...payload,
-            name: payload.name,
-            description: payload.description,
-            master_world_id: payload.master_world_id
-        };
-        await updateUserPersona(editingPersona.id, updatePayload);
+        // For updating an existing persona
+        if (imageFile) {
+          // If there's a new image, use a FormData approach for the update too
+          const updateFormData = new FormData();
+          updateFormData.append("name", formData.name);
+          
+          if (formData.description) {
+            updateFormData.append("description", formData.description);
+          } else {
+            updateFormData.append("description", ""); // Send empty string for null
+          }
+          
+          if (selectedMasterWorldForForm?.value) {
+            updateFormData.append("master_world_id", selectedMasterWorldForForm.value);
+          }
+          
+          updateFormData.append("image", imageFile);
+          
+          // Use a single API call that handles both data update and image upload
+          await updateUserPersonaWithImage(editingPersona.id, updateFormData);
+        } else {
+          // No new image, use the regular JSON update
+          const updatePayload: UserPersonaUpdateData = {
+            name: formData.name,
+            description: formData.description,
+            master_world_id: selectedMasterWorldForForm?.value || null
+          };
+          await updateUserPersona(editingPersona.id, updatePayload);
+        }
       } else {
-        const createPayload: UserPersonaCreateData = {
-            name: payload.name || '',
-            description: payload.description,
-            master_world_id: payload.master_world_id
-        };
-        await createUserPersona(createPayload);
+        // For creating a new persona, always use FormData approach
+        const personaFormData = new FormData();
+        personaFormData.append("name", formData.name);
+        
+        if (formData.description) {
+          personaFormData.append("description", formData.description);
+        }
+        
+        if (selectedMasterWorldForForm?.value) {
+          personaFormData.append("master_world_id", selectedMasterWorldForForm.value);
+        }
+        
+        if (imageFile) {
+          personaFormData.append("image", imageFile);
+        }
+        
+        await createUserPersona(personaFormData);
       }
+      
+      // After successful operation, clean up and refresh
       handleCloseModal();
       fetchPersonas();
     } catch (err: any) {
       setError(
-        err.message || editingPersona
+        err.message || (editingPersona
           ? "Failed to update persona."
-          : "Failed to create persona."
+          : "Failed to create persona.")
       );
       console.error(err);
     } finally {
@@ -304,8 +352,14 @@ const PersonasPage: React.FC = () => {
             className={`bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105 ${activePersonaId === persona.id ? 'ring-2 ring-app-accent' : ''}`}
             onClick={() => handleActivatePersona(persona.id)}
             title={activePersonaId === persona.id ? 'Active' : 'Click to activate'}
-
           >
+            {persona.image_url && (
+              <img 
+                src={persona.image_url} 
+                alt={persona.name}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            )}
             <div className="absolute top-2 right-2 flex space-x-2 z-10">
               <button
                 onClick={e => { e.stopPropagation(); handleOpenModal(persona); }}
@@ -371,6 +425,15 @@ const PersonasPage: React.FC = () => {
                 </svg>
               </button>
             </div>
+            {imagePreview && (
+              <div className="mt-2 relative w-full h-32 bg-gray-800 rounded-md overflow-hidden">
+                <img 
+                  src={imagePreview} 
+                  alt="Preview" 
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            )}
           </div>
           <div>
             <label

@@ -1,5 +1,5 @@
 // frontend/src/pages/ScenariosPage.tsx
-import React, { useState, useEffect, type FormEvent } from "react";
+import React, { useState, useEffect, type FormEvent, useRef } from "react";
 import Select, { type SingleValue } from "react-select";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -12,11 +12,10 @@ import {
   updateScenarioCard,
   deleteScenarioCard,
   getAllMasterWorlds,
-  type ScenarioCardData,
-  type ScenarioCardCreateData,
-  type ScenarioCardUpdateData,
   type MasterWorldData,
+  type ScenarioCardData,
 } from "../services/api";
+import apiClient from "../services/api";
 import { PencilSquare, TrashFill } from 'react-bootstrap-icons';
 
 interface SelectOption {
@@ -30,6 +29,7 @@ interface ModalProps {
   children: React.ReactNode;
   title: string;
 }
+
 const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
   if (!isOpen) return null;
   return (
@@ -65,6 +65,13 @@ const initialFormFields: ScenarioFormData = {
 const initialBeginningMessages = [""];
 
 const ScenariosPage: React.FC = () => {
+  // Helper function for truncating filenames
+  const truncateFilename = (filename: string | null | undefined, maxLength = 20): string => {
+    if (!filename) return "Select Image";
+    if (filename.length <= maxLength) return filename;
+    return filename.substring(0, maxLength - 3) + '...';
+  };
+
   const navigate = useNavigate(); // Add this line
 
   const [scenarios, setScenarios] = useState<ScenarioCardData[]>([]);
@@ -83,8 +90,29 @@ const ScenariosPage: React.FC = () => {
   const [currentDialogueIndex, setCurrentDialogueIndex] = useState<number>(0);
   const [currentBeginningMessages, setCurrentBeginningMessages] = useState<string[]>(initialBeginningMessages);
   const [currentBmgIndex, setCurrentBmgIndex] = useState<number>(0);
+  // Image states
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setImagePreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+  };
 
   // Master World states
   const [masterWorlds, setMasterWorlds] = useState<MasterWorldData[]>([]);
@@ -202,41 +230,38 @@ const ScenariosPage: React.FC = () => {
   };
 
   const handleOpenModal = (scenario?: ScenarioCardData) => {
-    console.log("handleOpenModal called with scenario:", scenario);
     setError(null);
-
-    // Reset form state for creation or populate for editing
     setEditingScenario(scenario || null);
-    setFormFields(
-      scenario
-        ? {
-            name: scenario.name,
-            description: scenario.description || "",
-            instructions: scenario.instructions || "",
-          }
-        : initialFormFields
-    );
+    
+    if (scenario) {
+      setImagePreview(scenario.image_url || null);
+      setFormFields({
+        name: scenario.name,
+        description: scenario.description || "",
+        instructions: scenario.instructions || "",
+      });
+      
+      setCurrentExampleDialogues(
+        scenario.example_dialogues ? [...scenario.example_dialogues] : [""]
+      );
+      setCurrentBeginningMessages(
+        scenario.beginning_message ? [...scenario.beginning_message] : [""]
+      );
+      
+      const worldOption = masterWorlds.find(w => w.id === scenario.master_world_id);
+      setSelectedMasterWorldForForm(
+        worldOption ? { value: worldOption.id, label: worldOption.name } : null
+      );
+    } else {
+      setImagePreview(null);
+      setFormFields(initialFormFields);
+      setCurrentExampleDialogues([""]);
+      setCurrentBeginningMessages([""]);
+      setSelectedMasterWorldForForm(null);
+    }
 
-    // Initialize example dialogues
-    const dialogues = scenario?.example_dialogues 
-      ? [...scenario.example_dialogues]
-      : [""];
-    setCurrentExampleDialogues(dialogues);
     setCurrentDialogueIndex(0);
-
-    // Initialize beginning messages
-    const bmg = scenario?.beginning_message ? [...scenario.beginning_message] : [""];
-    setCurrentBeginningMessages(bmg);
     setCurrentBmgIndex(0);
-
-    // Set MasterWorld selection based on scenario or null for new scenario
-    const worldOption = scenario
-      ? masterWorlds.find((w) => w.id === scenario.master_world_id)
-      : null;
-    setSelectedMasterWorldForForm(
-      worldOption ? { value: worldOption.id, label: worldOption.name } : null
-    );
-
     setIsModalOpen(true);
   };
 
@@ -249,67 +274,55 @@ const ScenariosPage: React.FC = () => {
   };
 
   const handleSubmit = async (e: FormEvent) => {
-    console.log("handleSubmit called."); // Debug log
     e.preventDefault();
     if (!formFields.name.trim()) {
-      console.log("Name is empty"); // Debug log
       setError("Name is required.");
       return;
     }
-    console.log("Name trimmed:", formFields.name.trim()); // Debug log
 
-    const finalDialogues = currentExampleDialogues
-      .map(d => d.trim())
-      .filter(d => d);
-
-    const finalBeginningMessages = currentBeginningMessages
-      .map(m => m.trim())
-      .filter(m => m);
-
-    // Cria um payload limpo, sem user_persona_id e world_card_references
-    const { user_persona_id, world_card_references, ...safeFields } = formFields as any;
-    let payload: ScenarioCardCreateData = {
-      ...safeFields,
-      master_world_id: selectedMasterWorldForForm?.value || null,
-      example_dialogues: finalDialogues.length > 0 ? finalDialogues : null,
-      beginning_message: finalBeginningMessages.length > 0 ? finalBeginningMessages : null,
-    };
-
-    // Garantia extra: remove se vier de outro lugar
-    delete (payload as any).user_persona_id;
-    delete (payload as any).world_card_references;
-
-    console.log("Submitting scenario with payload:", payload); // Debug log
+    // Ensure formData is correctly declared
+    const formData = new FormData();
+    formData.append('name', formFields.name);
+    formData.append('description', formFields.description || '');
+    formData.append('instructions', formFields.instructions || '');
+    formData.append('example_dialogues', JSON.stringify(
+      currentExampleDialogues.map(d => d.trim()).filter(d => d)
+    ));
+    formData.append('beginning_message', JSON.stringify(
+      currentBeginningMessages.map(m => m.trim()).filter(m => m)
+    ));
+    if (selectedMasterWorldForForm?.value) {
+      formData.append('master_world_id', selectedMasterWorldForForm.value);
+    }
+    if (imageFile) {
+      formData.append('image', imageFile);
+    }
+    // If editing, and imagePreview is null (meaning the user removed the existing image)
+    else if (editingScenario && imagePreview === null && editingScenario.image_url) {
+      formData.append('remove_image', 'true');
+    }
 
     setIsSubmitting(true);
     setError(null);
 
     try {
-      let response;
       if (editingScenario) {
-        console.log("Updating existing scenario:", editingScenario.id); // Debug log
-        response = await updateScenarioCard(
+        await updateScenarioCard(
           editingScenario.id,
-          payload as ScenarioCardUpdateData
+          formData
         );
       } else {
-        console.log("Creating new scenario"); // Debug log
-        response = await createScenarioCard(payload);
+        await createScenarioCard(
+          formData
+        );
       }
-      console.log("API response:", response); // Debug log
-      
-      // Refresh scenarios list
+
       const data = await getAllScenarioCards();
-      console.log("Refreshed scenarios list:", data); // Debug log
       setScenarios(data);
       handleCloseModal();
     } catch (err: any) {
+      setError(err.response?.data?.detail || "Failed to save scenario");
       console.error("Failed to save scenario:", err);
-      if (err.response) {
-        console.error("Response data:", err.response.data); // Debug log
-        console.error("Response status:", err.response.status); // Debug log
-      }
-      setError(err.message || "Failed to save scenario");
     } finally {
       setIsSubmitting(false);
     }
@@ -391,6 +404,13 @@ const ScenariosPage: React.FC = () => {
             className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105"
             onClick={() => handleScenarioClick(scen.id)}
           >
+            {/* Background image */}
+            {scen.image_url && (
+              <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${scen.image_url})` }}>
+                <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+              </div>
+            )}
+            
             {/* Top right icons */}
             <div className="absolute top-2 right-2 flex space-x-2 z-10">
               <button
@@ -437,21 +457,46 @@ const ScenariosPage: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Image</label>
             <div className="flex items-center">
-              <button type="button" className="flex-1 bg-app-surface hover:bg-gray-600 text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11">
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <button 
+                type="button" 
+                onClick={triggerFileInput}
+                className="flex-1 bg-app-surface hover:bg-gray-600 text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11 overflow-hidden whitespace-nowrap"
+              >
+                <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
                 </svg>
-                <span>Select Image</span>
-                <input type="file" accept="image/*" className="hidden" />
+                <span className="block truncate">
+                  {truncateFilename(imageFile?.name || imagePreview?.split('/').pop())}
+                </span>
               </button>
+              <input 
+                ref={fileInputRef}
+                type="file" 
+                accept="image/*" 
+                className="hidden" 
+                onChange={handleImageUpload}
+              />
               <span className="h-11 w-px bg-gray-600" />
-              <button type="button" className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11">
+              <button 
+                type="button" 
+                onClick={handleRemoveImage}
+                className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11"
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
               </button>
             </div>
+            {imagePreview && (
+              <div className="mt-2">
+                <img 
+                  src={imagePreview}
+                  alt="Scenario preview"
+                  className="max-h-32 object-cover rounded"
+                />
+              </div>
+            )}
           </div>
 
           <div>

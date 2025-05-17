@@ -98,6 +98,23 @@ const LoreEntriesPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingEntry, setEditingEntry] = useState<LoreEntryData | null>(null);
   const [formData, setFormData] = useState<LoreEntryFormData>(initialFormData);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setImagePreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+  };
 
   const entryTypeOptions: SelectOption[] = VALID_ENTRY_TYPES.map(type => ({
   value: type,
@@ -178,9 +195,21 @@ const LoreEntriesPage: React.FC = () => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     if (!masterWorldId) { setError("Cannot save: Master World context is missing."); return; }
     if (!formData.name.trim()) { setError("Name is required."); return; }
     if (!formData.entry_type) { setError("Entry Type is required."); return; }
+
+    const formDataToSend = new FormData();
+    formDataToSend.append('name', formData.name);
+    formDataToSend.append('entry_type', formData.entry_type);
+    formDataToSend.append('description', formData.description);
+    if (imageFile) {
+      formDataToSend.append('image', imageFile);
+    }
+    // Clear image states after submission
+    setImageFile(null);
+    setImagePreview(null);
 
     const tagsForApi = formData.tags;
     const aliasesForApi = formData.aliases;
@@ -357,7 +386,12 @@ const LoreEntriesPage: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
                   </svg>
                   <span>Select Image</span>
-                  <input type="file" accept="image/*" className="hidden" />
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={handleImageUpload}
+                  />
                 </button>
                 <span className="h-11 w-px bg-gray-600" />
                 <button type="button" className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11">

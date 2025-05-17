@@ -8,6 +8,7 @@ class UserPersonaBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = None
     master_world_id: Optional[str] = None
+    image_url: Optional[str] = None
 
 class UserPersonaCreate(UserPersonaBase):
     pass

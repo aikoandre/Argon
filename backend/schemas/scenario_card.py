@@ -8,6 +8,7 @@ class ScenarioCardBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=150)
     description: Optional[str] = None
     instructions: Optional[str] = None
+    image_url: Optional[str] = None
     beginning_message: Optional[List[str]] = None
     example_dialogues: Optional[List[str]] = None
     world_card_references: Optional[List[str]] = None

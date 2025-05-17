@@ -62,7 +62,29 @@ const MasterWorldsPage: React.FC = () => {
   );
   const [formData, setFormData] =
     useState<MasterWorldFormData>(initialFormData);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {};
+      reader.readAsDataURL(file);
+    }
+  };
+
+
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
 
   const fetchMasterWorlds = async () => {
     setIsLoading(true);
@@ -119,19 +141,30 @@ const MasterWorldsPage: React.FC = () => {
       return;
     }
 
-    const payload = {
-      name: formData.name,
-      description: formData.description,
-      tags: formData.tags.length > 0 ? formData.tags : null,
-    };
+    const formDataToSend = new FormData();
+    formDataToSend.append('name', formData.name);
+    formDataToSend.append('description', formData.description || '');
+    formDataToSend.append('tags', JSON.stringify(formData.tags.length > 0 ? formData.tags : null));
+    if (imageFile) {
+      formDataToSend.append('image', imageFile);
+    }
+    
+    // Clear image states after submission
+    setImageFile(null);
 
     setIsSubmitting(true);
     setError(null);
     try {
       if (editingWorld) {
-        await updateMasterWorld(editingWorld.id, payload);
+        const updateData = {
+          name: formData.name,
+          description: formData.description,
+          tags: formData.tags,
+          image: imageFile ? await convertFileToBase64(imageFile) : null
+        };
+        await updateMasterWorld(editingWorld.id, updateData);
       } else {
-        await createMasterWorld(payload);
+        await createMasterWorld(formDataToSend);
       }
       handleCloseModal();
       fetchMasterWorlds();
@@ -265,7 +298,12 @@ const MasterWorldsPage: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
                 </svg>
                 <span>Select Image</span>
-                <input type="file" accept="image/*" className="hidden" />
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={handleImageUpload}
+                />
               </button>
               <span className="h-11 w-px bg-app-surface" />
               <button type="button" className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11">

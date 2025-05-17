@@ -1,5 +1,5 @@
 // frontend/src/pages/CharactersPage.tsx
-import React, { useState, useEffect, type FormEvent } from "react";
+import React, { useState, useEffect, type FormEvent, useRef } from "react";
 import Select, { type SingleValue } from "react-select"; // Removido MultiValue
 import { useNavigate } from 'react-router-dom';
 import {
@@ -13,8 +13,6 @@ import {
   deleteCharacterCard,
   getAllMasterWorlds,
   type CharacterCardData,
-  type CharacterCardCreateData,
-  type CharacterCardUpdateData,
   type MasterWorldData,
 } from "../services/api";
 import { PencilSquare, TrashFill } from 'react-bootstrap-icons';
@@ -64,6 +62,13 @@ const initialFormFields: CharacterFormData = {
 };
 
 const CharactersPage: React.FC = () => {
+  // Helper function for truncating filenames
+  const truncateFilename = (filename: string | null | undefined, maxLength = 35): string => {
+    if (!filename) return "Select Image";
+    if (filename.length <= maxLength) return filename;
+    return filename.substring(0, maxLength - 3) + '...';
+  };
+
   console.log("CharactersPage component rendering...");
 
   const navigate = useNavigate(); // <-- Add this line
@@ -84,6 +89,7 @@ const CharactersPage: React.FC = () => {
   // Image states
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Estados para listas dinâmicas
   const [currentExampleDialogues, setCurrentExampleDialogues] = useState<
@@ -235,6 +241,10 @@ const CharactersPage: React.FC = () => {
     }
   };
 
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
   const handleRemoveImage = () => {
     setImageFile(null);
     setImagePreview(null);
@@ -277,9 +287,11 @@ const CharactersPage: React.FC = () => {
       setFormFields(initialFormFields);
       setCurrentExampleDialogues([""]);
       setCurrentDialogueIndex(0);
+      setImageFile(null);
+      setImagePreview(null);
       setCurrentBeginningMessages([""]);
       setCurrentBmgIndex(0);
-      setSelectedMasterWorldForForm(null); // No pre-selection
+      setSelectedMasterWorldForForm(null);
     }
     setIsModalOpen(true);
   };
@@ -298,7 +310,6 @@ const CharactersPage: React.FC = () => {
   };
 
   const handleSubmit = async (e: FormEvent) => {
-    console.log("handleSubmit called.");
     e.preventDefault();
     if (!formFields.name.trim()) {
       setError("Name is required.");
@@ -312,33 +323,47 @@ const CharactersPage: React.FC = () => {
       .map((m) => m.trim())
       .filter((m) => m);
 
-    const payload: CharacterCardCreateData = {
-      // CharacterCardUpdateData é similar
-      ...formFields,
-      // Use the selected Master World if available, otherwise it will be null
-      master_world_id: selectedMasterWorldForForm?.value || null,
-      example_dialogues: finalDialogues.length > 0 ? finalDialogues : null,
-      beginning_messages:
-        finalBeginningMessages.length > 0 ? finalBeginningMessages : null,
-    };
+    const characterFormData = new FormData();
+    characterFormData.append('name', formFields.name);
+    characterFormData.append('description', formFields.description || '');
+    characterFormData.append('instructions', formFields.instructions || '');
+    characterFormData.append('example_dialogues', JSON.stringify(finalDialogues));
+    characterFormData.append('beginning_messages', JSON.stringify(finalBeginningMessages));
+
+    const linkedLoreIds = editingCharacter?.linked_lore_ids || [];
+    characterFormData.append('linked_lore_ids', JSON.stringify(linkedLoreIds));
+
+    if (selectedMasterWorldForForm?.value) {
+      characterFormData.append('master_world_id', selectedMasterWorldForForm.value);
+    } else if (editingCharacter) {
+      characterFormData.append('master_world_id', '');
+    }
+
+    if (imageFile) {
+      characterFormData.append('image', imageFile);
+    } else if (editingCharacter && imagePreview === null) {
+      characterFormData.append('remove_image', 'true');
+    }
 
     setIsSubmitting(true);
     setError(null);
     try {
       if (editingCharacter) {
-        await updateCharacterCard(
-          editingCharacter.id,
-          payload as CharacterCardUpdateData
-        );
+        await updateCharacterCard(editingCharacter.id, characterFormData);
       } else {
-        await createCharacterCard(payload);
+        await createCharacterCard(characterFormData);
       }
       handleCloseModal();
-      // Refresh all characters
       const refreshedData = await getAllCharacterCards();
       setCharacters(refreshedData);
     } catch (err: any) {
-      /* ... tratamento de erro ... */
+      const apiError =
+        err.response?.data?.detail || (editingCharacter ? "Failed to update character." : "Failed to create character.");
+      if (Array.isArray(err.response?.data?.detail)) {
+        setError(err.response.data.detail.map((e: any) => e.msg).join(' | '));
+      } else {
+        setError(apiError);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -422,6 +447,18 @@ const CharactersPage: React.FC = () => {
               className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105"
               onClick={() => handleCardClick(char.id)}
             >
+              {char.image_url && (
+                <div className="absolute inset-0">
+                  <img 
+                    src={char.image_url}
+                    alt={char.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none'
+                    }}
+                  />
+                </div>
+              )}
               {/* Ícones de editar/excluir no topo direito */}
               <div className="absolute top-2 right-2 flex space-x-2 z-10">
                 <button
@@ -453,102 +490,107 @@ const CharactersPage: React.FC = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        title={
-          editingCharacter ? "Edit Character" : "Create New Character"
-        }
+        title={editingCharacter ? "Edit Character" : "Create New Character"}
       >
         <form
           onSubmit={handleSubmit}
           className="space-y-4 max-h-[70vh] overflow-y-auto p-1 pr-2 custom-scrollbar"
         >
           {error && isModalOpen && (
-            <p className="bg-red-700 text-white p-3 rounded-md text-sm text-center">
+            <p className="bg-red-700 text-white p-3 rounded-md text-sm text-center col-span-2">
               {error}
             </p>
           )}
-
-          {/* Image Upload Section */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Image</label>
-            <div className="flex items-center">
-              <button type="button" className="flex-1 bg-app-surface hover:bg-gray-600 text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11">
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
-                </svg>
-                <span>Select Image</span>
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  className="hidden" 
-                  onChange={handleImageUpload}
+          {/* Changed to a single column grid */}
+          <div className="grid grid-cols-1 gap-6 space-y-4">
+              {/* Image upload section */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Image</label>
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex-1 bg-app-surface hover:bg-gray-600 text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11 overflow-hidden whitespace-nowrap"
+                  >
+                    <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
+                    </svg>
+                    <span className="block truncate">
+                      {truncateFilename(imageFile?.name || imagePreview?.split('/').pop())}
+                    </span>
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                  />
+                  <span className="h-11 w-px bg-gray-600" />
+                  <button
+                    type="button"
+                    onClick={() => { setImageFile(null); setImagePreview(null); }}
+                    className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              {/* Select Master World Section */}
+              <div>
+                <label
+                  htmlFor="char-master_world"
+                  className="block text-sm font-medium text-gray-300 mb-1"
+                >
+                  Master World
+                </label>
+                <Select<SelectOption>
+                  inputId="char-master_world"
+                  options={masterWorldOptionsForForm}
+                  value={selectedMasterWorldForForm}
+                  onChange={handleMasterWorldChangeForForm}
+                  isDisabled={isLoadingWorlds}
+                  placeholder="Select Master World..."
+                  className="text-black"
+                  classNamePrefix="react-select"
+                  styles={{
+                    control: (base, state) => ({
+                      ...base,
+                      backgroundColor: "#343a40",
+                      borderColor: state.isFocused ? "#f8f9fa" : "#343a40",
+                      boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
+                      "&:hover": { borderColor: "#f8f9fa" },
+                      minHeight: "42px",
+                    }),
+                    singleValue: (base) => ({ ...base, color: "white" }),
+                    menu: (base) => ({
+                      ...base,
+                      backgroundColor: "#495057",
+                      zIndex: 10,
+                    }),
+                    option: (base, { isFocused, isSelected }) => ({
+                      ...base,
+                      backgroundColor: isSelected
+                        ? "#adb5bd"
+                        : isFocused
+                        ? "#dee2e6"
+                        : "#495057",
+                      color: isSelected || isFocused ? "#212529" : "#fff",
+                      ':active': { backgroundColor: "#f8f9fa", color: "#212529" },
+                    }),
+                    placeholder: (base) => ({ ...base, color: "#9CA3AF" }),
+                    input: (base) => ({ ...base, color: "#fff" }),
+                    dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
+                    clearIndicator: (base) => ({ ...base, color: "#9CA3AF", ':hover': { color: "#fff" } }),
+                    indicatorSeparator: (base) => ({ ...base, backgroundColor: "#343a40" }),
+                  }}
                 />
-              </button>
-              <span className="h-11 w-px bg-gray-600" />
-              <button 
-                type="button" 
-                onClick={handleRemoveImage}
-                className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
-          </div>
+              </div>
 
-          {/* Select Master World NO FORMULÁRIO */}
-          <div>
-            <label
-              htmlFor="char-master_world"
-              className="block text-sm font-medium text-gray-300 mb-1"
-            >
-              Master World
-            </label>
-            <Select<SelectOption>
-              inputId="char-master_world"
-              options={masterWorldOptionsForForm}
-              value={selectedMasterWorldForForm}
-              onChange={handleMasterWorldChangeForForm}
-              isDisabled={isLoadingWorlds} // Desabilita se estiver editando (não muda o mundo de um char existente)
-              placeholder="Select Master World..."
-              className="text-black"
-              classNamePrefix="react-select"
-              styles={
-                {
-                 // Estilos para tema escuro
-                control: (base, state) => ({
-                  ...base,
-                  backgroundColor: "#343a40", // bg-gray-800
-                  borderColor: state.isFocused ? "#f8f9fa" : "#343a40", // border-blue-500 (focus), border-gray-600
-                  boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
-                  "&:hover": { borderColor: "#f8f9fa" }, // border-gray-500 (hover)
-                  minHeight: "42px", // Para alinhar com inputs padrão
-                }),
-                singleValue: (base) => ({ ...base, color: "white" }),
-                menu: (base) => ({
-                  ...base,
-                  backgroundColor: "#495057",
-                  zIndex: 10,
-                }),
-                option: (base, { isFocused, isSelected }) => ({
-                  ...base,
-                  backgroundColor: isSelected
-                  ? "#adb5bd"
-                  : isFocused
-                  ? "#dee2e6"
-                  : "#495057", // bg-blue-600 (selected), bg-gray-700 (focus)
-                  color: isSelected || isFocused ? "#212529" : "#fff", // text-app-bg or white
-                    ':active': { backgroundColor: "#f8f9fa", color: "#212529" },
-                }),
-                  placeholder: (base) => ({ ...base, color: "#9CA3AF" }),
-                  input: (base) => ({ ...base, color: "#fff" }),
-                  dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
-                  clearIndicator: (base) => ({ ...base, color: "#9CA3AF", ':hover': { color: "#fff" } }),
-                  indicatorSeparator: (base) => ({ ...base, backgroundColor: "#343a40" }),
-                }}
-            />
-          </div>
+
 
           {/* Name, Description, Instructions (usando formFields e handleStaticInputChange) */}
           {/* ... */}
@@ -734,25 +776,24 @@ const CharactersPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex justify-end space-x-3 pt-2">
-            <button
-              type="submit"
-              disabled={
-                isSubmitting || !formFields.name.trim()
-                // Remove the Master World requirement
-                // || !selectedMasterWorldForForm?.value
-              }
-              className="px-4 py-2 text-sm bg-app-accent-2 text-app-surface rounded-md font-medium disabled:opacity-50"
-            >
-              {isSubmitting
-                ? "Saving..."
-                : editingCharacter
-                ? "Save Changes"
-                : "Create Character"}
-            </button>
-          </div>
-        </form>
+              {/* Save Button */}
+              <div className="flex justify-end space-x-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !formFields.name.trim()}
+                  className="px-4 py-2 text-sm bg-app-accent-2 text-app-surface rounded-md font-medium disabled:opacity-50"
+                >
+                  {isSubmitting
+                    ? "Saving..."
+                    : editingCharacter
+                    ? "Save Changes"
+                    : "Create Character"}
+                </button>
+              </div>
+            </div> 
+          </form>
       </Modal>
+
     </div>
   );
 };

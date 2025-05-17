@@ -1,7 +1,9 @@
 # backend/routers/characters.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import json
+from ..file_storage import save_uploaded_file, delete_image_file
 
 # Importe o modelo SQLAlchemy e os schemas Pydantic
 from ..models.character_card import CharacterCard
@@ -15,27 +17,54 @@ router = APIRouter(
 )
 
 @router.post("", response_model=CharacterCardInDB, status_code=status.HTTP_201_CREATED)
-def create_character_card(
-    character: CharacterCardCreate, db: Session = Depends(get_db)
+async def create_character(
+    name: str = Form(...),
+    description: Optional[str] = Form(None),
+    instructions: Optional[str] = Form(None),
+    example_dialogues: Optional[str] = Form(None),
+    beginning_messages: Optional[str] = Form(None),
+    master_world_id: Optional[str] = Form(None),
+    linked_lore_ids: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db)
 ):
+    """Create a new character with optional image upload"""
     """
-    Cria um novo Character Card (NPC/GM para a IA).
-    Se master_world_id for fornecido, valida se ele existe.
-    Valida se os linked_lore_ids pertencem ao mesmo mundo, se especificado.
+    Creates a new character with optional image upload.
     """
     from ..models.master_world import MasterWorld
-    from ..models.lore_entry import LoreEntry
     
-    # Verifica se o master_world existe, se fornecido
-    if character.master_world_id:
-        master_world = db.query(MasterWorld).filter(MasterWorld.id == character.master_world_id).first()
+    # Validate master world if provided
+    if master_world_id:
+        master_world = db.query(MasterWorld).filter(MasterWorld.id == master_world_id).first()
         if not master_world:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Master world not found"
             )
 
-    db_character = CharacterCard(**character.model_dump())
+    # Handle image upload
+    image_url = None
+    if image and image.filename:
+        image_url = await save_uploaded_file(image)
+    
+    # Parse JSON strings
+    example_dialogues_list = json.loads(example_dialogues) if example_dialogues else []
+    beginning_messages_list = json.loads(beginning_messages) if beginning_messages else []
+    linked_lore_ids_list = json.loads(linked_lore_ids) if linked_lore_ids else []
+    
+    character_data = {
+        "name": name,
+        "description": description,
+        "instructions": instructions,
+        "image_url": image_url,
+        "example_dialogues": example_dialogues_list,
+        "beginning_messages": beginning_messages_list,
+        "master_world_id": master_world_id,
+        "linked_lore_ids": linked_lore_ids_list
+    }
+
+    db_character = CharacterCard(**character_data)
     db.add(db_character)
     db.commit()
     db.refresh(db_character)
@@ -69,35 +98,61 @@ def get_character_card(character_id: str, db: Session = Depends(get_db)):
     return db_character
 
 @router.put("/{character_id}", response_model=CharacterCardInDB)
-def update_character_card(
-    character_id: str, character_update: CharacterCardUpdate, db: Session = Depends(get_db)
+async def update_character(
+    character_id: str,
+    name: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    instructions: Optional[str] = Form(None),
+    example_dialogues: Optional[str] = Form(None),
+    beginning_messages: Optional[str] = Form(None),
+    master_world_id: Optional[str] = Form(None),
+    linked_lore_ids: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db)
 ):
     """
-    Atualiza um Character Card existente. Permite atualização parcial.
+    Updates a character including optional image update.
     """
     from ..models.master_world import MasterWorld
-    from ..models.lore_entry import LoreEntry
 
     db_character = db.query(CharacterCard).filter(CharacterCard.id == character_id).first()
-    if db_character is None:
-        raise HTTPException(status_code=404, detail="Character Card not found")
+    if not db_character:
+        raise HTTPException(status_code=404, detail="Character not found")
 
-    # Usar CharacterCardUpdate (que tem todos os campos como Optional)
-    update_data = character_update.model_dump(exclude_unset=True) # Pydantic V2
+    # Handle image update
+    if image and image.filename:
+        # Delete old image if exists
+        if db_character.image_url:
+            delete_image_file(db_character.image_url)
+        # Save new image
+        db_character.image_url = await save_uploaded_file(image)
 
-    # Validar master_world_id se for atualizado
-    if 'master_world_id' in update_data and update_data['master_world_id']:
-        master_world = db.query(MasterWorld).filter(MasterWorld.id == update_data['master_world_id']).first()
-        if not master_world:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Master world not found"
-            )
+    # Parse JSON fields
+    if example_dialogues is not None:
+        db_character.example_dialogues = json.loads(example_dialogues)
+    if beginning_messages is not None:
+        db_character.beginning_messages = json.loads(beginning_messages)
+    if linked_lore_ids is not None:
+        db_character.linked_lore_ids = json.loads(linked_lore_ids)
 
+    # Update other fields
+    if name is not None:
+        db_character.name = name
+    if description is not None:
+        db_character.description = description
+    if instructions is not None:
+        db_character.instructions = instructions
+    if master_world_id is not None:
+        # Validate master world if provided
+        if master_world_id:
+            master_world = db.query(MasterWorld).filter(MasterWorld.id == master_world_id).first()
+            if not master_world:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Master world not found"
+                )
+        db_character.master_world_id = master_world_id
 
-    for key, value in update_data.items():
-        setattr(db_character, key, value)
-    db.add(db_character)
     db.commit()
     db.refresh(db_character)
     return db_character

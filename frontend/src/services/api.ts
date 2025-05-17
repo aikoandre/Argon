@@ -23,6 +23,18 @@ export const getApiHealth = async () => {
   }
 };
 
+// --- Image Upload ---
+export const uploadImage = async (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await apiClient.post('/images/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  });
+  return response.data.url;
+};
+
 // --- User Settings ---
 export const getUserSettings = async (): Promise<UserSettingsData | null> => {
   try {
@@ -73,6 +85,7 @@ export interface UserPersonaData {
   id: string;
   name: string;
   description?: string | null;
+  image_url?: string | null;
   created_at: string;
   updated_at?: string | null;
   master_world_id?: string | null;
@@ -90,14 +103,18 @@ export interface UserPersonaUpdateData {
   master_world_id?: string | null;
 }
 
+const fileApi = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL,
+  headers: {
+    "Content-Type": "multipart/form-data",
+  },
+});
+
 export const createUserPersona = async (
-  personaData: UserPersonaCreateData
+  formData: FormData
 ): Promise<UserPersonaData> => {
   try {
-    const response = await apiClient.post<UserPersonaData>(
-      "/personas",
-      personaData
-    );
+    const response = await fileApi.post<UserPersonaData>("/personas", formData);
     return response.data;
   } catch (error) {
     console.error("Error creating user persona:", error);
@@ -154,11 +171,32 @@ export const deleteUserPersona = async (personaId: string): Promise<void> => {
   }
 };
 
+export const uploadPersonaImage = async (personaId: string, file: File): Promise<UserPersonaData> => {
+  const formData = new FormData();
+  formData.append("image", file);
+  const response = await fileApi.post<UserPersonaData>(`/personas/${personaId}/image`, formData);
+  return response.data;
+};
+
+export const updateUserPersonaWithImage = async (
+  personaId: string,
+  formData: FormData
+): Promise<UserPersonaData> => {
+  try {
+    const response = await fileApi.put<UserPersonaData>(`/personas/${personaId}`, formData);
+    return response.data;
+  } catch (error) {
+    console.error(`Error updating user persona ${personaId} with image:`, error);
+    throw error;
+  }
+};
+
 // --- Character Cards (NPCs/GM) ---
 export interface CharacterCardData {
   id: string;
   name: string;
   description?: string | null;
+  image_url?: string | null;
   instructions?: string | null;
   example_dialogues?: Record<string, any>[] | string[] | null;
   beginning_messages: string[] | null;
@@ -168,37 +206,32 @@ export interface CharacterCardData {
   updated_at?: string | null;
 }
 
-export interface CharacterCardCreateData {
-  name: string;
-  description?: string | null;
-  instructions?: string | null;
-  example_dialogues?: Record<string, any>[] | string[] | null;
-  beginning_messages?: string[] | null;
-  master_world_id?: string | null;
-  linked_lore_ids?: string[] | null;
-}
-
-export interface CharacterCardUpdateData {
-  name?: string;
-  description?: string | null;
-  instructions?: string | null;
-  example_dialogues?: Record<string, any>[] | string[] | null;
-  beginning_messages: string[] | null;
-  linked_lore_ids: string[] | null;
-}
-
 export const createCharacterCard = async (
-  characterData: CharacterCardCreateData
+  characterData: FormData // Expect FormData from the component
 ): Promise<CharacterCardData> => {
   try {
+    // The FormData object is already prepared by the caller (CharactersPage.tsx)
     const response = await apiClient.post<CharacterCardData>(
       "/characters",
-      characterData
+      characterData, // Send the FormData directly
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      }
     );
     return response.data;
   } catch (error: any) {
     if (error.response && error.response.data && error.response.data.detail) {
-      throw new Error(error.response.data.detail);
+       // Handle potential validation errors returning array of details
+       if (Array.isArray(error.response.data.detail)) {
+         const messages = error.response.data.detail.map((e: any) => {
+            // Construct a user-friendly message, potentially including field name
+            return e.loc && e.loc.length > 1 ? `${e.loc[1]}: ${e.msg}` : e.msg;
+         }).join(' | ');
+         throw new Error(messages);
+       }
+       throw new Error(error.response.data.detail);
     }
     throw error;
   }
@@ -233,12 +266,16 @@ export const getCharacterCardById = async (
 
 export const updateCharacterCard = async (
   characterId: string,
-  characterData: CharacterCardUpdateData
+  characterData: FormData // Expect FormData from the component
+  // The CharactersPage.tsx handleSubmit function *already* prepares FormData
 ): Promise<CharacterCardData> => {
+  // Expect FormData for multipart/form-data, including image and other fields
   const response = await apiClient.put<CharacterCardData>(
     `/characters/${characterId}`,
-    characterData
-  );
+    characterData, // Send the FormData
+    {
+       headers: { 'Content-Type': 'multipart/form-data' }
+    });
   return response.data;
 };
 
@@ -254,6 +291,7 @@ export interface ScenarioCardData {
   name: string;
   description?: string | null;
   instructions?: string | null;
+  image_url?: string | null;
   beginning_message?: string[] | null;
   example_dialogues?: string[] | null;
   master_world_id?: string | null;
@@ -262,34 +300,14 @@ export interface ScenarioCardData {
   created_at: string;
   updated_at?: string | null;
 }
-export interface ScenarioCardCreateData {
-  name: string;
-  description?: string | null;
-  instructions?: string | null;
-  beginning_message?: string[] | null;
-  example_dialogues?: string[] | null;
-  master_world_id?: string | null;
-  world_card_references?: string[] | null;
-  user_persona_id?: string | null;
-}
-export interface ScenarioCardUpdateData {
-  name?: string;
-  description?: string | null;
-  instructions?: string | null;
-  beginning_message?: string[] | null;
-  example_dialogues?: string[] | null;
-  world_card_references?: string[] | null;
-  master_world_id?: string | null;
-  user_persona_id?: string | null;
-}
 
 export const createScenarioCard = async (
-  scenarioData: ScenarioCardCreateData
+  scenarioFormData: FormData
 ): Promise<ScenarioCardData> => {
   try {
     const response = await apiClient.post<ScenarioCardData>(
       "/scenarios",
-      scenarioData
+      scenarioFormData
     );
     return response.data;
   } catch (error: any) {
@@ -329,11 +347,11 @@ export const getScenarioCardById = async (
 
 export const updateScenarioCard = async (
   scenarioId: string,
-  scenarioData: ScenarioCardUpdateData
+  scenarioFormData: FormData
 ): Promise<ScenarioCardData> => {
   const response = await apiClient.put<ScenarioCardData>(
     `/scenarios/${scenarioId}`,
-    scenarioData
+    scenarioFormData
   );
   return response.data;
 };
@@ -364,14 +382,15 @@ export const getAllMasterWorlds = async (): Promise<MasterWorldData[]> => {
   return response.data;
 };
 
-export const createMasterWorld = async (data: {
-  name: string;
-  description?: string | null;
-  tags?: string[] | null;
-}): Promise<MasterWorldData> => {
-  const response = await apiClient.post<MasterWorldData>(
+export const createMasterWorld = async (formData: FormData): Promise<MasterWorldData> => {
+  const response = await fileApi.post<MasterWorldData>(
     "/master_worlds",
-    data
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    }
   );
   return response.data;
 };
