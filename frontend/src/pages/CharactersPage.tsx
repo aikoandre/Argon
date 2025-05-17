@@ -1,13 +1,9 @@
 // frontend/src/pages/CharactersPage.tsx
 import React, { useState, useEffect, type FormEvent, useRef } from "react";
 import Select, { type SingleValue } from "react-select"; // Removido MultiValue
-import { useNavigate } from 'react-router-dom';
+import { CharacterImage } from "../components/CharacterImage";
 import {
-  checkExistingChatSession,
-  createChatSession
-} from "../services/api";
-import {
-  getAllCharacterCards, // Esta função precisará aceitar masterWorldId como filtro
+  getAllCharacterCards,
   createCharacterCard,
   updateCharacterCard,
   deleteCharacterCard,
@@ -15,7 +11,7 @@ import {
   type CharacterCardData,
   type MasterWorldData,
 } from "../services/api";
-import { PencilSquare, TrashFill } from 'react-bootstrap-icons';
+
 
 interface SelectOption {
   value: string;
@@ -71,8 +67,6 @@ const CharactersPage: React.FC = () => {
 
   console.log("CharactersPage component rendering...");
 
-  const navigate = useNavigate(); // <-- Add this line
-
   const [characters, setCharacters] = useState<CharacterCardData[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true); // Loading geral da página/lista
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -90,6 +84,7 @@ const CharactersPage: React.FC = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   // Estados para listas dinâmicas
   const [currentExampleDialogues, setCurrentExampleDialogues] = useState<
@@ -100,6 +95,7 @@ const CharactersPage: React.FC = () => {
     string[]
   >([""]);
   const [currentBmgIndex, setCurrentBmgIndex] = useState<number>(0);
+
 
   // Estados para MasterWorld
   const [masterWorlds, setMasterWorlds] = useState<MasterWorldData[]>([]); // Lista de todos os mundos
@@ -133,7 +129,7 @@ const CharactersPage: React.FC = () => {
       setError(null);
       try {
         const data = await getAllCharacterCards(); // No filter
-        console.log("Fetched Characters:", data);
+        console.log("Fetched Characters:", data); // ADDED CONSOLE LOG
         setCharacters(data);
       } catch (err) {
         setError("Failed to load characters.");
@@ -241,14 +237,12 @@ const CharactersPage: React.FC = () => {
     }
   };
 
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
-
   const handleRemoveImage = () => {
     setImageFile(null);
     setImagePreview(null);
   };
+
+  console.log("CharactersPage component rendering...");
 
   const handleOpenModal = (character?: CharacterCardData) => {
     console.log("handleOpenModal called with character:", character);
@@ -260,6 +254,10 @@ const CharactersPage: React.FC = () => {
         description: character.description || "",
         instructions: character.instructions || "",
       });
+
+      // Handle image preview for existing character
+      setImageFile(null);
+      setImagePreview(character.image_url || null);
 
       // Ensure we have valid arrays for dialogues and messages
       const dialogues = Array.isArray(character.example_dialogues)
@@ -369,37 +367,11 @@ const CharactersPage: React.FC = () => {
     }
   };
 
-  const handleCardClick = async (characterId: string) => {
-    try {
-      // Only send gm_character_id, not scenario_id, and handle persona as optional/blank
-      const existingSession = await checkExistingChatSession({
-        gm_character_id: characterId,
-        // Do not send scenario_id at all
-        // Only send user_persona_id if you have a value, otherwise do not include the key
-      });
-      if (existingSession) {
-        navigate(`/chat/${existingSession.id}`);
-      } else {
-        // Only send gm_character_id, not scenario_id, and handle persona as optional/blank
-        const newSession = await createChatSession({
-          gm_character_id: characterId,
-          scenario_id: "", // required by type, but will be ignored by backend if blank
-          user_persona_id: "", // required by type, but will be ignored by backend if blank
-          title: `Chat with ${characters.find(c => c.id === characterId)?.name}`,
-        });
-        navigate(`/chat/${newSession.id}`);
-      }
-    } catch (error) {
-      console.error('Error handling chat session:', error);
-      setError('Could not start chat session');
-    }
-  };
 
   const handleDelete = async (characterId: string) => {
-    console.log("handleDelete called for ID:", characterId);
     try {
       await deleteCharacterCard(characterId);
-      // Refresh the character list
+      // Refresh the characters list
       const data = await getAllCharacterCards();
       setCharacters(data);
     } catch (err) {
@@ -407,10 +379,13 @@ const CharactersPage: React.FC = () => {
       setError("Failed to delete character");
     }
   };
+
   const masterWorldOptionsForForm = masterWorlds.map((w) => ({
     value: w.id,
     label: w.name,
   }));
+
+  console.log("Characters data:", characters);
 
   console.log("CharactersPage component returning JSX...");
   return (
@@ -440,59 +415,74 @@ const CharactersPage: React.FC = () => {
       )}
 
       {!isLoading && !error && characters.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 justify-items-center w-full">
           {characters.map((char) => (
             <div
               key={char.id}
-              className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105"
-              onClick={() => handleCardClick(char.id)}
+              className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer group"
+              onClick={() => handleOpenModal(char)}
             >
-              {char.image_url && (
-                <div className="absolute inset-0">
-                  <img 
-                    src={char.image_url}
-                    alt={char.name}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none'
-                    }}
-                  />
-                </div>
-              )}
-              {/* Ícones de editar/excluir no topo direito */}
+              {/* Background image with gradient */}
+              <CharacterImage
+                imageUrl={char.image_url ? `/api/images/${char.image_url.replace('static/', '')}` : null}
+                className="absolute inset-0"
+              />
+
+              {/* Top right icons */}
               <div className="absolute top-2 right-2 flex space-x-2 z-10">
                 <button
-                onClick={(e) => { e.stopPropagation(); handleOpenModal(char); }}
-                className="text-gray-400 hover:text-app-accent transition-colors"
-                title="Edit Character"
-              >
-                <PencilSquare className="h-5 w-5" />
-              </button>
+                  onClick={(e) => { e.stopPropagation(); handleOpenModal(char); }}
+                  className="text-gray-400 hover:text-app-accent transition-colors"
+                  title="Edit Character"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                  </svg>
+                </button>
                 <button
-                onClick={(e) => { e.stopPropagation(); handleDelete(char.id); }}
-                className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full"
-                title="Delete Character"
-              >
-                <TrashFill className="h-5 w-5" />
-              </button>
+                  onClick={(e) => { e.stopPropagation(); handleDelete(char.id); }}
+                  className="text-gray-400 hover:text-red-500 transition-colors"
+                  title="Delete Character"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </button>
               </div>
-              {/* Rodapé translúcido com nome e descrição */}
-              <div className="absolute bottom-0 left-0 w-full bg-black/30 backdrop-blur-sm p-3 flex items-center rounded-b-lg">
-              <div className="flex w-full items-center justify-between">
-                <h2 className="text-lg font-semibold text-white break-words whitespace-normal mr-2 flex-1 leading-snug">{char.name}</h2>
+              
+              {/* Bottom info (footer) */}
+              <div className="absolute bottom-0 left-0 w-full">
+                <div className="w-full bg-black/30 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
+                  <div className="flex w-full items-center justify-between">
+                    <h2 className="text-lg font-semibold text-white break-words whitespace-normal mr-2 flex-1 leading-snug" title={char.name}>{char.name}</h2>
+                  </div>
+                  {char.master_world_id && (
+                    <div className="mt-2 inline-block bg-app-accent-2/80 text-app-surface text-xs px-2 py-1 rounded-full">
+                      {char.master_world_id}
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* Placeholder for characters without images */}
+              {!char.image_url && (
+                <div className="absolute inset-0 flex items-center justify-center z-0 text-gray-500">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                </div>
+              )}
             </div>
           ))}
         </div>
       )}
-
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         title={editingCharacter ? "Edit Character" : "Create New Character"}
       >
         <form
+          ref={formRef}
           onSubmit={handleSubmit}
           className="space-y-4 max-h-[70vh] overflow-y-auto p-1 pr-2 custom-scrollbar"
         >
@@ -527,11 +517,11 @@ const CharactersPage: React.FC = () => {
                     className="hidden"
                     onChange={handleImageUpload}
                   />
-                  <span className="h-11 w-px bg-gray-600" />
+                  <span className="h-11 w-px bg-gray-600" aria-hidden="true" />
                   <button
                     type="button"
-                    onClick={() => { setImageFile(null); setImagePreview(null); }}
-                    className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11"
+                    onClick={handleRemoveImage}
+                    className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -539,6 +529,7 @@ const CharactersPage: React.FC = () => {
                   </button>
                 </div>
               </div>
+
               {/* Select Master World Section */}
               <div>
                 <label
@@ -790,10 +781,9 @@ const CharactersPage: React.FC = () => {
                     : "Create Character"}
                 </button>
               </div>
-            </div> 
+            </div>
           </form>
-      </Modal>
-
+        </Modal>
     </div>
   );
 };

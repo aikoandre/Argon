@@ -15,7 +15,6 @@ import {
   type MasterWorldData,
   type ScenarioCardData,
 } from "../services/api";
-import apiClient from "../services/api";
 import { PencilSquare, TrashFill } from 'react-bootstrap-icons';
 
 interface SelectOption {
@@ -145,6 +144,7 @@ const ScenariosPage: React.FC = () => {
       setError(null);
       try {
         const data = await getAllScenarioCards();
+        console.log("Fetched Scenarios:", data); // ADDED CONSOLE LOG
         setScenarios(data);
       } catch (err) {
         setError("Failed to load scenarios.");
@@ -280,49 +280,56 @@ const ScenariosPage: React.FC = () => {
       return;
     }
 
-    // Ensure formData is correctly declared
-    const formData = new FormData();
-    formData.append('name', formFields.name);
-    formData.append('description', formFields.description || '');
-    formData.append('instructions', formFields.instructions || '');
-    formData.append('example_dialogues', JSON.stringify(
-      currentExampleDialogues.map(d => d.trim()).filter(d => d)
-    ));
-    formData.append('beginning_message', JSON.stringify(
-      currentBeginningMessages.map(m => m.trim()).filter(m => m)
-    ));
-    if (selectedMasterWorldForForm?.value) {
-      formData.append('master_world_id', selectedMasterWorldForForm.value);
-    }
-    if (imageFile) {
-      formData.append('image', imageFile);
-    }
-    // If editing, and imagePreview is null (meaning the user removed the existing image)
-    else if (editingScenario && imagePreview === null && editingScenario.image_url) {
-      formData.append('remove_image', 'true');
-    }
+    // Filter out empty strings from arrays
+    const filteredExampleDialogues = currentExampleDialogues
+      .map(d => d.trim())
+      .filter(d => d.length > 0);
+    
+    const filteredBeginningMessages = currentBeginningMessages
+      .map(m => m.trim())
+      .filter(m => m.length > 0);
+
+    // Create base scenario data
+    const scenarioData = {
+      name: formFields.name.trim(),
+      description: formFields.description?.trim() || "",
+      instructions: formFields.instructions?.trim() || "",
+      example_dialogues: filteredExampleDialogues,
+      beginning_message: filteredBeginningMessages,
+      master_world_id: selectedMasterWorldForForm?.value || "",
+    };
 
     setIsSubmitting(true);
     setError(null);
 
     try {
+      // Always use FormData, append scenarioData as JSON string
+      const formData = new FormData();
+      formData.append('data', JSON.stringify(scenarioData));
+      
+      // Append image if exists
+      if (imageFile) {
+        formData.append('image', imageFile);
+      }
+      
+      // Handle remove_image flag for editing
+      if (editingScenario && imagePreview === null && editingScenario.image_url) {
+        formData.append('remove_image', 'true');
+      }
+
+      // Submit to API
       if (editingScenario) {
-        await updateScenarioCard(
-          editingScenario.id,
-          formData
-        );
+        await updateScenarioCard(editingScenario.id, formData);
       } else {
-        await createScenarioCard(
-          formData
-        );
+        await createScenarioCard(formData);
       }
 
       const data = await getAllScenarioCards();
       setScenarios(data);
       handleCloseModal();
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to save scenario");
       console.error("Failed to save scenario:", err);
+      setError(err.response?.data?.detail || "Failed to save scenario");
     } finally {
       setIsSubmitting(false);
     }
@@ -369,6 +376,15 @@ const ScenariosPage: React.FC = () => {
     label: w.name,
   }));
 
+  // Helper function to get proper image URL for scenario images
+  const getImageUrl = (imageUrl: string | null) => {
+    if (!imageUrl) return null;
+    if (imageUrl.startsWith('data:')) return imageUrl;
+    if (imageUrl.startsWith('/api/images/serve/')) return imageUrl;
+    const cleanPath = imageUrl.replace(/^\/static\//, '');
+    return `/api/images/serve/${cleanPath}`;
+  };
+
   return (
     <div className="container mx-auto p-4 md:p-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -397,7 +413,7 @@ const ScenariosPage: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 justify-items-start w-full">
         {scenarios.map((scen) => (
           <div
             key={scen.id}
@@ -406,7 +422,7 @@ const ScenariosPage: React.FC = () => {
           >
             {/* Background image */}
             {scen.image_url && (
-              <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${scen.image_url})` }}>
+              <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${getImageUrl(scen.image_url)})` }}>
                 <div className="absolute inset-0 bg-black bg-opacity-40"></div>
               </div>
             )}

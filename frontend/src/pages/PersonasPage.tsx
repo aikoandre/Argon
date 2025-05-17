@@ -75,7 +75,6 @@ const PersonasPage: React.FC = () => {
     master_world_id: null
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   // State for MasterWorld dropdown
   const [masterWorlds, setMasterWorlds] = useState<MasterWorldData[]>([]);
@@ -143,7 +142,7 @@ const PersonasPage: React.FC = () => {
       setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreview(reader.result as string);
+        // setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
@@ -151,7 +150,6 @@ const PersonasPage: React.FC = () => {
 
   const handleRemoveImage = () => {
     setImageFile(null);
-    setImagePreview(null);
   };
 
   const handleOpenModal = (persona?: UserPersonaData) => {
@@ -306,6 +304,15 @@ const PersonasPage: React.FC = () => {
     }
   };
 
+  // Helper function to get proper image URL for persona images
+  const getImageUrl = (imageUrl: string | null) => {
+    if (!imageUrl) return null;
+    if (imageUrl.startsWith('data:')) return imageUrl;
+    if (imageUrl.startsWith('/api/images/serve/')) return imageUrl;
+    const cleanPath = imageUrl.replace(/^\/static\//, '');
+    return `/api/images/serve/${cleanPath}`;
+  };
+
   // Prepare options for the Master World dropdown <-- Added this mapping inside the component
   const masterWorldOptionsForForm: SelectOption[] = masterWorlds.map((w) => ({
     value: w.id,
@@ -345,7 +352,7 @@ const PersonasPage: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 justify-items-start w-full">
         {personas.map((persona) => (
           <div
             key={persona.id}
@@ -355,7 +362,7 @@ const PersonasPage: React.FC = () => {
           >
             {persona.image_url && (
               <img 
-                src={persona.image_url} 
+                src={getImageUrl(persona.image_url) || undefined}
                 alt={persona.name}
                 className="absolute inset-0 w-full h-full object-cover"
               />
@@ -425,15 +432,6 @@ const PersonasPage: React.FC = () => {
                 </svg>
               </button>
             </div>
-            {imagePreview && (
-              <div className="mt-2 relative w-full h-32 bg-gray-800 rounded-md overflow-hidden">
-                <img 
-                  src={imagePreview} 
-                  alt="Preview" 
-                  className="w-full h-full object-contain"
-                />
-              </div>
-            )}
           </div>
           <div>
             <label

@@ -6,7 +6,7 @@ import type {
 } from "../types/settings";
 
 const apiClient = axios.create({
-  baseURL: "http://localhost:8000/api", // URL do seu backend FastAPI
+  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api",
   headers: {
     "Content-Type": "application/json",
   },
@@ -307,11 +307,24 @@ export const createScenarioCard = async (
   try {
     const response = await apiClient.post<ScenarioCardData>(
       "/scenarios",
-      scenarioFormData
+      scenarioFormData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      }
     );
     return response.data;
   } catch (error: any) {
     if (error.response && error.response.data && error.response.data.detail) {
+      // Handle potential validation errors returning array of details
+      if (Array.isArray(error.response.data.detail)) {
+        const messages = error.response.data.detail.map((e: any) => {
+          // Construct a user-friendly message, potentially including field name
+          return e.loc && e.loc.length > 1 ? `${e.loc[1]}: ${e.msg}` : e.msg;
+        }).join(' | ');
+        throw new Error(messages);
+      }
       throw new Error(error.response.data.detail);
     }
     throw error;
@@ -349,11 +362,27 @@ export const updateScenarioCard = async (
   scenarioId: string,
   scenarioFormData: FormData
 ): Promise<ScenarioCardData> => {
-  const response = await apiClient.put<ScenarioCardData>(
-    `/scenarios/${scenarioId}`,
-    scenarioFormData
-  );
-  return response.data;
+   try {
+       // Use fileApi for multipart/form-data requests
+       const response = await fileApi.put<ScenarioCardData>(
+         `/scenarios/${scenarioId}`,
+         scenarioFormData
+       );
+       return response.data;
+   } catch (error: any) {
+       if (error.response && error.response.data && error.response.data.detail) {
+            // Handle potential validation errors returning array of details
+            if (Array.isArray(error.response.data.detail)) {
+              const messages = error.response.data.detail.map((e: any) => {
+                 // Construct a user-friendly message, potentially including field name
+                 return e.loc && e.loc.length > 1 ? `${e.loc[1]}: ${e.msg}` : e.msg;
+              }).join(' | ');
+              throw new Error(messages);
+            }
+            throw new Error(error.response.data.detail);
+       }
+       throw error;
+   }
 };
 
 export const deleteScenarioCard = async (scenarioId: string): Promise<void> => {

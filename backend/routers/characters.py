@@ -46,7 +46,7 @@ async def create_character(
     # Handle image upload
     image_url = None
     if image and image.filename:
-        image_url = await save_uploaded_file(image)
+        image_url = await save_uploaded_file(image, entity_name=name) # Pass the name
     
     # Parse JSON strings
     example_dialogues_list = json.loads(example_dialogues) if example_dialogues else []
@@ -125,7 +125,8 @@ async def update_character(
         if db_character.image_url:
             delete_image_file(db_character.image_url)
         # Save new image
-        db_character.image_url = await save_uploaded_file(image)
+        # Use the potentially updated name when saving the new image
+        db_character.image_url = await save_uploaded_file(image, entity_name=name if name is not None else db_character.name)
 
     # Parse JSON fields
     if example_dialogues is not None:
@@ -169,6 +170,9 @@ def delete_character_card(character_id: str, db: Session = Depends(get_db)):
     # Cuidado: Se houver ChatSessions usando este character, você pode
     # querer impedir a exclusão ou lidar com isso (ex: definir FK como NULL?).
     # Por enquanto, apenas deleta.
+    
+    # Delete the associated image file if it exists
+    delete_image_file(db_character.image_url)
     db.delete(db_character)
     db.commit()
     return None

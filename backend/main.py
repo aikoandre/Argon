@@ -5,7 +5,9 @@ import os
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, PROJECT_ROOT)
 
-from fastapi import FastAPI, BackgroundTasks, UploadFile
+from starlette.responses import FileResponse # Import FileResponse
+
+from fastapi import FastAPI, BackgroundTasks, UploadFile, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -30,11 +32,52 @@ from backend import models as db_models
 app = FastAPI(title="Advanced Roleplay Engine API")
 
 import pathlib
+import logging # Import logging
+import mimetypes  # Import mimetypes for proper content type handling
+
+logger = logging.getLogger(__name__) # Get logger instance
+
+# Initialize mimetypes
+mimetypes.init()
+# Add any missing image types
+mimetypes.add_type('image/webp', '.webp')
+mimetypes.add_type('image/jpeg', '.jpg')
+mimetypes.add_type('image/jpeg', '.jpeg')
+mimetypes.add_type('image/png', '.png')
+mimetypes.add_type('image/gif', '.gif')
+mimetypes.add_type('image/svg+xml', '.svg')
 
 # Serve static files (including uploaded images)
-static_dir = pathlib.Path("backend/static")
-static_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+static_dir = pathlib.Path("static").resolve()  # Point to the static folder at the project root using absolute path
+logger.info(f"Mounting static files from directory: {static_dir}")  # Log the resolved path
+
+# Create custom StaticFiles instance with strict content type handling
+static_files = StaticFiles(
+    directory=str(static_dir)
+)
+
+# Mount static files under both /static and /api/images paths
+app.mount("/static", static_files, name="static")
+app.mount("/api/images", static_files, name="images")
+
+# Add middleware to set default content types
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class ContentTypeMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+
+        # Only set content-type for API endpoints if not already set and not a 204 response
+        path = request.url.path.lower()
+        if (path.startswith("/api/")
+            and "content-type" not in response.headers
+            and not path.startswith("/api/images/serve")
+            and response.status_code != 204):
+            response.headers["content-type"] = "application/json"
+        # Never set or override content-type for /static/ files
+        return response
+
+app.add_middleware(ContentTypeMiddleware)
 
 # --- CORS Configuration ---
 origins = [
@@ -59,7 +102,7 @@ async def startup_event():
     print("API Iniciando...")
     
     # Ensure static directories exist
-    (pathlib.Path("backend/static/images")).mkdir(parents=True, exist_ok=True)
+    (pathlib.Path("static/images")).mkdir(parents=True, exist_ok=True) # Ensure images dir exists within root static
 
 
     # 1. Inicializa o cliente Mistral (carrega API Key, etc.)
@@ -139,15 +182,25 @@ async def health_check():
     """
     return {"status": "ok", "message": "API is healthy"}
 
-# --- Adicione outros routers aqui ---
-# Ex: app.include_router(settings_router, prefix="/api")
+@app.get("/test-serve-image")
+async def test_serve_image():
+    """TEMPORARY: Test serving a specific image file using FileResponse."""
+    image_path = static_dir / "images" / "Albedo_878760aa.jpg" # Replace with the actual filename from your static/images folder
+    if not image_path.exists() or not image_path.is_file():
+        logger.error(f"Test image file not found: {image_path.resolve()}")
+        raise HTTPException(status_code=404, detail="Test image file not found")
+    logger.info(f"Attempting to serve test image using FileResponse: {image_path.resolve()}")
+    return FileResponse(image_path)
 
-# Inclui os routers de lore entries
+
+# Include other routers
 app.include_router(lore_entry_ops_router)
 app.include_router(master_world_lore_router)
 app.include_router(chat_router, prefix="/api/chats")
 app.include_router(scenarios_router)
 app.include_router(personas_router)
+app.include_router(images_router, prefix="/api/images")
+
 app.include_router(characters_router)
 app.include_router(master_worlds_router)
 app.include_router(settings_router)

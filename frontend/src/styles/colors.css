@@ -1,0 +1,9 @@
+/* filepath: /mnt/sda1/VSCode/advanced-roleplay-engine/frontend/src/styles/colors.css */
+:root {
+  --color-background: #212529;    /* Main background color */
+  --color-surface: #343a40;
+  --color-flat: #495057;       /* Surface/Sidebar color */
+  --color-accent: #f8f9fa;
+  --color-accent-2: #dee2e6;
+  --color-accent-3: #adb5bd;       /* Highlight/Button color */
+}
