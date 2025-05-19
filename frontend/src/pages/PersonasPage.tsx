@@ -233,23 +233,26 @@ const PersonasPage: React.FC = () => {
           await updateUserPersona(editingPersona.id, updatePayload);
         }
       } else {
-        // For creating a new persona, always use FormData approach
-        const personaFormData = new FormData();
-        personaFormData.append("name", formData.name);
-        
-        if (formData.description) {
-          personaFormData.append("description", formData.description);
-        }
-        
-        if (selectedMasterWorldForForm?.value) {
-          personaFormData.append("master_world_id", selectedMasterWorldForForm.value);
-        }
-        
+        // For creating a new persona, use FormData only if imageFile exists
         if (imageFile) {
+          const personaFormData = new FormData();
+          personaFormData.append("name", formData.name);
+          if (formData.description) {
+            personaFormData.append("description", formData.description);
+          }
+          if (selectedMasterWorldForForm?.value) {
+            personaFormData.append("master_world_id", selectedMasterWorldForForm.value);
+          }
           personaFormData.append("image", imageFile);
+          await createUserPersona(personaFormData);
+        } else {
+          // No image: send plain JSON
+          await createUserPersona({
+            name: formData.name,
+            description: formData.description,
+            master_world_id: selectedMasterWorldForForm?.value || null
+          });
         }
-        
-        await createUserPersona(personaFormData);
       }
       
       // After successful operation, clean up and refresh

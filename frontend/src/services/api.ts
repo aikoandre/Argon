@@ -111,11 +111,18 @@ const fileApi = axios.create({
 });
 
 export const createUserPersona = async (
-  formData: FormData
+  data: FormData | UserPersonaCreateData
 ): Promise<UserPersonaData> => {
   try {
-    const response = await fileApi.post<UserPersonaData>("/personas", formData);
-    return response.data;
+    if (data instanceof FormData) {
+      // If FormData (image upload), use fileApi
+      const response = await fileApi.post<UserPersonaData>("/personas", data);
+      return response.data;
+    } else {
+      // If plain JSON, use apiClient
+      const response = await apiClient.post<UserPersonaData>("/personas", data);
+      return response.data;
+    }
   } catch (error) {
     console.error("Error creating user persona:", error);
     throw error;
@@ -523,6 +530,11 @@ export const deleteLoreEntry = async (entryId: string): Promise<void> => {
 };
 
 // --- Chat Sessions & Messages ---
+export const createOrGetCardChat = async (cardType: 'character'|'scenario', cardId: string): Promise<string> => {
+  const response = await apiClient.post<{ id: string }>(`/chat/sessions/${cardType}/${cardId}`);
+  return response.data.id;
+};
+
 export interface ChatMessageData {
   id: string;
   chat_session_id: string;
@@ -552,7 +564,10 @@ export interface ChatSessionListedData {
   id: string;
   title?: string | null;
   last_active_at: string;
-  // Adicione outros campos se seu endpoint de listagem os retorna
+  card_type?: string;
+  card_id?: string;
+  card_name?: string;
+  card_image_url?: string;
 }
 
 export const createChatSession = async (
@@ -564,7 +579,7 @@ export const createChatSession = async (
   if (cleanData.gm_character_id === "") delete cleanData.gm_character_id;
   if (cleanData.user_persona_id === "") delete cleanData.user_persona_id;
   try {
-    const response = await apiClient.post<ChatSessionData>('/chats/', cleanData);
+    const response = await apiClient.post<ChatSessionData>('/chat/', cleanData);
     return response.data;
   } catch (error) {
     console.error('Error creating chat session:', error);
@@ -588,7 +603,7 @@ export const getChatSessionDetails = async (
   chatId: string
 ): Promise<ChatSessionData> => {
   try {
-    const response = await apiClient.get<ChatSessionData>(`/chats/${chatId}`);
+    const response = await apiClient.get<ChatSessionData>(`/chat/${chatId}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching chat session ${chatId} details:`, error);
@@ -601,7 +616,7 @@ export const getChatSessionMessages = async (
 ): Promise<ChatMessageData[]> => {
   try {
     const response = await apiClient.get<ChatMessageData[]>(
-      `/chats/${chatId}/messages`
+      `/chat/${chatId}/messages`
     );
     return response.data;
   } catch (error) {
@@ -620,7 +635,7 @@ export const addMessageToSession = async (
 ): Promise<ChatMessageData> => {
   try {
     const response = await apiClient.post<ChatMessageData>(
-      `/chats/${chatId}/messages`,
+      `/chat/${chatId}/messages`,
       messageData
     );
     return response.data;
@@ -635,7 +650,7 @@ export const updateChatSessionTitle = async (
   title: string
 ): Promise<ChatSessionData> => {
   try {
-    const response = await apiClient.put<ChatSessionData>(`/chats/${chatId}`, {
+    const response = await apiClient.put<ChatSessionData>(`/chat/${chatId}`, {
       title,
     });
     return response.data;
@@ -647,7 +662,7 @@ export const updateChatSessionTitle = async (
 
 export const deleteChatSession = async (chatId: string): Promise<void> => {
   try {
-    await apiClient.delete(`/chats/${chatId}`);
+    await apiClient.delete(`/chat/${chatId}`);
   } catch (error) {
     console.error(`Error deleting chat session ${chatId}:`, error);
     throw error;
@@ -665,7 +680,7 @@ export const checkExistingChatSession = async (params: {
   if (cleanParams.gm_character_id === "") delete cleanParams.gm_character_id;
   if (cleanParams.user_persona_id === "") delete cleanParams.user_persona_id;
   try {
-    const response = await apiClient.get<ChatSessionData>('/chats/check', { params: cleanParams });
+    const response = await apiClient.get<ChatSessionData>('/chat/check', { params: cleanParams });
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 404) {

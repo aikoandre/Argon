@@ -5,9 +5,8 @@ import os
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, PROJECT_ROOT)
 
-from starlette.responses import FileResponse # Import FileResponse
-
-from fastapi import FastAPI, BackgroundTasks, UploadFile, HTTPException
+from starlette.responses import FileResponse, JSONResponse # Import FileResponse and JSONResponse
+from fastapi import FastAPI, BackgroundTasks, UploadFile, HTTPException, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -65,17 +64,37 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 class ContentTypeMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
-        response = await call_next(request)
-
-        # Only set content-type for API endpoints if not already set and not a 204 response
-        path = request.url.path.lower()
-        if (path.startswith("/api/")
-            and "content-type" not in response.headers
-            and not path.startswith("/api/images/serve")
-            and response.status_code != 204):
-            response.headers["content-type"] = "application/json"
-        # Never set or override content-type for /static/ files
-        return response
+        try:
+            response = await call_next(request)
+            
+            # Only set content-type for API endpoints if not already set and not a 204 response
+            path = request.url.path.lower()
+            if (path.startswith("/api/")
+                and "content-type" not in response.headers
+                and not path.startswith("/api/images/serve")
+                and response.status_code != 204):
+                response.headers["content-type"] = "application/json"
+                
+            # Ensure CORS headers are set
+            if request.headers.get("origin") in origins:
+                response.headers["Access-Control-Allow-Origin"] = request.headers["origin"]
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+                response.headers["Access-Control-Allow-Methods"] = "*"
+                response.headers["Access-Control-Allow-Headers"] = "*"
+            
+            return response
+            
+        except Exception as e:
+            print(f"Error in middleware: {str(e)}")
+            response = JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"detail": str(e)}
+            )
+            # Ensure CORS headers are set even for errors
+            if request.headers.get("origin") in origins:
+                response.headers["Access-Control-Allow-Origin"] = request.headers["origin"]
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
 
 app.add_middleware(ContentTypeMiddleware)
 
@@ -196,7 +215,7 @@ async def test_serve_image():
 # Include other routers
 app.include_router(lore_entry_ops_router)
 app.include_router(master_world_lore_router)
-app.include_router(chat_router, prefix="/api/chats")
+app.include_router(chat_router, prefix="/api/chat")
 app.include_router(scenarios_router)
 app.include_router(personas_router)
 app.include_router(images_router, prefix="/api/images")

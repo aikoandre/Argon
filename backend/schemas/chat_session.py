@@ -33,11 +33,11 @@ class ChatSessionInDBBase(ChatSessionBase): # Base para respostas que incluem o 
 class ChatSessionListed(BaseModel):
     id: str
     title: Optional[str]
-    # Você pode querer incluir nomes aqui em vez de apenas IDs
-    # scenario_name: Optional[str]
-    # gm_character_name: Optional[str]
-    # user_persona_name: Optional[str]
     last_active_at: datetime
+    card_type: Optional[str] = None
+    card_id: Optional[str] = None
+    card_name: Optional[str] = None
+    card_image_url: Optional[str] = None
 
     class Config:
         from_attributes = True

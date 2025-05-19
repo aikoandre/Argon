@@ -3,8 +3,7 @@ import React, { useState, useEffect, type FormEvent, useRef } from "react";
 import Select, { type SingleValue } from "react-select";
 import { useNavigate } from "react-router-dom";
 import { 
-  checkExistingChatSession,
-  createChatSession 
+  createOrGetCardChat,
 } from "../services/api";
 import {
   getAllScenarioCards,
@@ -16,6 +15,7 @@ import {
   type ScenarioCardData,
 } from "../services/api";
 import { PencilSquare, TrashFill } from 'react-bootstrap-icons';
+import { CharacterImage } from "../components/CharacterImage";
 
 interface SelectOption {
   value: string;
@@ -349,22 +349,8 @@ const ScenariosPage: React.FC = () => {
 
   const handleScenarioClick = async (scenarioId: string) => {
     try {
-      const existingSession = await checkExistingChatSession({
-        scenario_id: scenarioId,
-        user_persona_id: undefined, // undefined para não enviar campo
-      });
-
-      if (existingSession) {
-        navigate(`/chat/${existingSession.id}`);
-      } else {
-        const newSession = await createChatSession({
-          scenario_id: scenarioId,
-          gm_character_id: "", // string vazia para não enviar valor
-          user_persona_id: "", // string vazia para não enviar valor
-          title: `Scenario: ${scenarios.find(s => s.id === scenarioId)?.name}`,
-        });
-        navigate(`/chat/${newSession.id}`);
-      }
+      const chatId = await createOrGetCardChat('scenario', scenarioId);
+      navigate(`/chat/${chatId}`);
     } catch (error) {
       console.error('Error handling scenario session:', error);
       setError('Could not start scenario session');
@@ -375,15 +361,6 @@ const ScenariosPage: React.FC = () => {
     value: w.id,
     label: w.name,
   }));
-
-  // Helper function to get proper image URL for scenario images
-  const getImageUrl = (imageUrl: string | null) => {
-    if (!imageUrl) return null;
-    if (imageUrl.startsWith('data:')) return imageUrl;
-    if (imageUrl.startsWith('/api/images/serve/')) return imageUrl;
-    const cleanPath = imageUrl.replace(/^\/static\//, '');
-    return `/api/images/serve/${cleanPath}`;
-  };
 
   return (
     <div className="container mx-auto p-4 md:p-8">
@@ -417,16 +394,14 @@ const ScenariosPage: React.FC = () => {
         {scenarios.map((scen) => (
           <div
             key={scen.id}
-            className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105"
+            className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer group"
             onClick={() => handleScenarioClick(scen.id)}
           >
-            {/* Background image */}
-            {scen.image_url && (
-              <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${getImageUrl(scen.image_url)})` }}>
-                <div className="absolute inset-0 bg-black bg-opacity-40"></div>
-              </div>
-            )}
-            
+            {/* Use CharacterImage for scenario images */}
+            <CharacterImage
+              imageUrl={scen.image_url ? `/api/images/${scen.image_url.replace('static/', '')}` : null}
+              className="absolute inset-0"
+            />
             {/* Top right icons */}
             <div className="absolute top-2 right-2 flex space-x-2 z-10">
               <button
@@ -445,12 +420,26 @@ const ScenariosPage: React.FC = () => {
               </button>
             </div>
             {/* Bottom info (footer) */}
-            <div className="absolute bottom-0 left-0 w-full bg-black/30 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
-              <div className="flex w-full items-center justify-between">
-                <h2 className="text-lg font-semibold text-white break-words whitespace-normal mr-2 flex-1 leading-snug" title={scen.name}>{scen.name}</h2>
+            <div className="absolute bottom-0 left-0 w-full">
+              <div className="w-full bg-black/30 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
+                <div className="flex w-full items-center justify-between">
+                  <h2 className="text-lg font-semibold text-white break-words whitespace-normal mr-2 flex-1 leading-snug" title={scen.name}>{scen.name}</h2>
+                </div>
+                {scen.master_world_id && (
+                  <div className="mt-2 inline-block bg-app-accent-2/80 text-app-surface text-xs px-2 py-1 rounded-full">
+                    {scen.master_world_id}
+                  </div>
+                )}
               </div>
-              {/* Não exibe tags */}
             </div>
+            {/* Placeholder for scenarios without images */}
+            {!scen.image_url && (
+              <div className="absolute inset-0 flex items-center justify-center z-0 text-gray-500">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -625,7 +614,7 @@ const ScenariosPage: React.FC = () => {
           <div className="space-y-1">
             <div className="flex justify-between items-center">
               <label className="block text-sm font-medium text-gray-300">
-                Beginning Message ({currentBmgIndex + 1}/{currentBeginningMessages.length})
+                Beginning Messages ({currentBmgIndex + 1}/{currentBeginningMessages.length})
               </label>
               <div className="flex space-x-2">
                 <button
@@ -678,7 +667,7 @@ const ScenariosPage: React.FC = () => {
           <div className="space-y-1">
             <div className="flex justify-between items-center">
               <label className="block text-sm font-medium text-gray-300">
-                Example Dialogue ({currentDialogueIndex + 1}/{currentExampleDialogues.length})
+                Example Dialogues ({currentDialogueIndex + 1}/{currentExampleDialogues.length})
               </label>
               <div className="flex space-x-2">
                 <button

@@ -2,7 +2,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
+from uuid import UUID
 import uuid # Para gerar IDs de sessão se necessário (embora o modelo já faça isso)
 
 # Importe modelos SQLAlchemy
@@ -21,60 +22,78 @@ from backend.database import get_db
 from backend.db.crud import create_chat_session as crud_create_chat_session
 
 router = APIRouter(
-    prefix="",
     tags=["chat_sessions"],
 )
 
-@router.post("/", response_model=ChatSessionInDB, status_code=status.HTTP_201_CREATED)
-def create_chat_session(
-    session_create: ChatSessionCreate, db: Session = Depends(get_db)
-    ):
-    # --- Corrected Validation ---
-    # Ensure exactly one of scenario_id or gm_character_id is provided
-    provided_ids = [id for id in [session_create.scenario_id, session_create.gm_character_id] if id is not None]
-    if len(provided_ids) != 1:
-         raise HTTPException(
+# Change card_id type from UUID to str for compatibility with string IDs in the database
+@router.post("/sessions/{card_type}/{card_id}", response_model=ChatSessionInDB, status_code=status.HTTP_201_CREATED)
+def create_or_get_chat_session(
+    card_type: str,
+    card_id: str,  # Changed from UUID to str
+    db: Session = Depends(get_db)
+):
+    """Create or get existing chat session for a card"""
+    # Validate card type
+    if card_type not in {"character", "scenario"}:
+        raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Must provide exactly one of: scenario_id or gm_character_id"
+            detail="Invalid card type. Must be 'character' or 'scenario'"
         )
+    
+    # Debug logging for troubleshooting
+    print(f"[DEBUG] create_or_get_chat_session called with card_type={card_type}, card_id={card_id}")
+    # Get card details
+    if card_type == "character":
+        card = db.query(CharacterCard).filter(CharacterCard.id == str(card_id)).first()
+        print(f"[DEBUG] CharacterCard query result: {card}")
+    else:
+        card = db.query(ScenarioCard).filter(ScenarioCard.id == str(card_id)).first()
+        print(f"[DEBUG] ScenarioCard query result: {card}")
+    
+    if not card:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"{card_type.capitalize()} with id {card_id} not found"
+        )
+    
+    # Find existing session
+    existing = db.query(ChatSession).filter(
+        ChatSession.card_type == card_type,
+        ChatSession.card_id == str(card_id)
+    ).order_by(ChatSession.created_at.desc()).first()
+    
+    if existing:
+        return existing
+    
+    # Create new session
+    title = f"Chat with {card.name if card_type == 'character' else card.title}"
+    new_chat = ChatSession(
+        card_type=card_type,
+        card_id=str(card_id),
+        title=title
+    )
+    
+    db.add(new_chat)
+    db.commit()
+    db.refresh(new_chat)
+    return new_chat
 
-    # Check if the provided IDs exist (only if they were provided)
-    scenario = None # Initialize to None
-    if session_create.scenario_id:
-        scenario = db.query(ScenarioCard).filter(ScenarioCard.id == session_create.scenario_id).first()
-        if not scenario:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Scenario with id {session_create.scenario_id} not found")
-
-    gm_character = None # Initialize to None
-    if session_create.gm_character_id:
-        gm_character = db.query(CharacterCard).filter(CharacterCard.id == session_create.gm_character_id).first()
-        if not gm_character:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"GM Character with id {session_create.gm_character_id} not found")
-
-    # Check if user_persona_id exists ONLY if it was provided (it's optional)
-    user_persona = None # Initialize to None
-    if session_create.user_persona_id is not None:
-        user_persona = db.query(UserPersona).filter(UserPersona.id == session_create.user_persona_id).first()
-        if not user_persona:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"User Persona with id {session_create.user_persona_id} not found")
-    # --- End Corrected Validation ---
-
-
-    # Gerar um título inicial se não for fornecido
-    title = session_create.title
-    if not title:
-        # Use the name of the provided card (scenario or character)
-        if session_create.scenario_id and scenario:
-             title = f"Scenario: {scenario.name}"
-        elif session_create.gm_character_id and gm_character:
-             title = f"Chat with {gm_character.name}"
-        # Optionally add persona name if provided
-        if session_create.user_persona_id and user_persona:
-             title += f" (as {user_persona.name})"
-        elif session_create.user_persona_id is None:
-             title += " (No Persona)" # Indicate no persona if none provided
-
-        title = title[:150] # Limita o tamanho do título, se necessário
+# Keep old endpoint for compatibility during transition
+@router.post("/", response_model=ChatSessionInDB, status_code=status.HTTP_201_CREATED, deprecated=True)
+async def create_chat_session_legacy(
+    session_create: ChatSessionCreate,
+    db: Session = Depends(get_db)
+):
+    """Legacy endpoint - prefer /sessions/{card_type}/{card_id}"""
+    # Convert legacy request to new format
+    card_type = "character" if session_create.gm_character_id else "scenario"
+    card_id = session_create.gm_character_id or session_create.scenario_id
+    
+    return await create_or_get_chat_session(
+        card_type=card_type,
+        card_id=card_id,
+        db=db
+    )
 
     # Use the CRUD function to create the session
     # Ensure your crud_create_chat_session function accepts the ChatSessionCreate schema
@@ -132,12 +151,56 @@ async def check_existing_session(
     # Return the session or None. FastAPI will return 200 with null body if session is None.
     return session
 
-@router.get("", response_model=List[ChatSessionListed])
-def list_chat_sessions(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    sessions = db.query(ChatSession).order_by(ChatSession.last_active_at.desc()).offset(skip).limit(limit).all()
-    # Para ChatSessionListed, você pode querer fazer joins para pegar nomes, ou iterar e buscar
-    # Por simplicidade agora, vamos retornar apenas o que está na tabela ChatSession
-    return sessions
+@router.get("", response_model=List[ChatSessionListed])  # Now using proper response model
+async def list_chat_sessions(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    try:
+        # Get chat sessions with ordering
+        query = db.query(ChatSession).order_by(ChatSession.last_active_at.desc())
+        sessions = query.offset(skip).limit(limit).all()
+
+        result = []
+        for session in sessions:
+            try:
+                # Start with basic session data
+                session_data = {
+                    "id": str(session.id),
+                    "title": session.title,
+                    "last_active_at": session.last_active_at,
+                    "card_type": session.card_type,
+                    "card_id": str(session.card_id) if session.card_id else None,
+                    "card_name": None,
+                    "card_image_url": None
+                }
+
+                # Get card details based on card_type
+                if session.card_type == "character":
+                    card = db.query(CharacterCard).filter(CharacterCard.id == session.card_id).first()
+                    if card:
+                        session_data["card_name"] = card.name
+                        session_data["card_image_url"] = card.image_url
+                elif session.card_type == "scenario":
+                    card = db.query(ScenarioCard).filter(ScenarioCard.id == session.card_id).first()
+                    if card:
+                        session_data["card_name"] = card.title
+                        session_data["card_image_url"] = card.image_url
+
+                result.append(session_data)
+            except Exception as session_error:
+                print(f"Error processing session {session.id}: {str(session_error)}")
+                continue
+
+        return result
+        
+    except Exception as e:
+        print(f"Error in list_chat_sessions: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 @router.get("/{chat_id}", response_model=ChatSessionInDB)
 def get_chat_session_details(chat_id: str, db: Session = Depends(get_db)):

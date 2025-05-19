@@ -23,8 +23,9 @@ class CharacterCard(Base):
     # Add relationship to ChatSession with cascade delete
     chat_sessions = relationship(
         "ChatSession",
-        back_populates="gm_character",
-        cascade="all, delete-orphan"
+        back_populates="character",
+        cascade="all, delete-orphan",
+        primaryjoin="and_(CharacterCard.id==foreign(ChatSession.card_id), ChatSession.card_type=='character')"
     )
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())

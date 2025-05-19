@@ -1,6 +1,7 @@
 // frontend/src/pages/CharactersPage.tsx
 import React, { useState, useEffect, type FormEvent, useRef } from "react";
-import Select, { type SingleValue } from "react-select"; // Removido MultiValue
+import { useNavigate } from "react-router-dom";
+import Select, { type SingleValue } from "react-select";
 import { CharacterImage } from "../components/CharacterImage";
 import {
   getAllCharacterCards,
@@ -8,6 +9,7 @@ import {
   updateCharacterCard,
   deleteCharacterCard,
   getAllMasterWorlds,
+  createOrGetCardChat,
   type CharacterCardData,
   type MasterWorldData,
 } from "../services/api";
@@ -45,7 +47,6 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
 };
 
 interface CharacterFormData {
-  // Campos que o usuário preenche diretamente no formulário
   name: string;
   description: string;
   instructions: string;
@@ -57,7 +58,19 @@ const initialFormFields: CharacterFormData = {
   instructions: "",
 };
 
+
 const CharactersPage: React.FC = () => {
+  const navigate = useNavigate();
+
+  const handleOpenChat = async (character: CharacterCardData) => {
+    try {
+      const chatId = await createOrGetCardChat('character', character.id);
+      navigate(`/chat/${chatId}`);
+    } catch (err) {
+      setError("Failed to start chat session");
+    }
+  };
+
   // Helper function for truncating filenames
   const truncateFilename = (filename: string | null | undefined, maxLength = 35): string => {
     if (!filename) return "Select Image";
@@ -65,28 +78,18 @@ const CharactersPage: React.FC = () => {
     return filename.substring(0, maxLength - 3) + '...';
   };
 
-  console.log("CharactersPage component rendering...");
 
   const [characters, setCharacters] = useState<CharacterCardData[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true); // Loading geral da página/lista
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingCharacter, setEditingCharacter] =
     useState<CharacterCardData | null>(null);
-
-  // Estado para os campos de texto simples do formulário
   const [formFields, setFormFields] =
     useState<CharacterFormData>(initialFormFields);
 
-  // Image states
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-
-  // Estados para listas dinâmicas
   const [currentExampleDialogues, setCurrentExampleDialogues] = useState<
     string[]
   >([""]);
@@ -95,6 +98,11 @@ const CharactersPage: React.FC = () => {
     string[]
   >([""]);
   const [currentBmgIndex, setCurrentBmgIndex] = useState<number>(0);
+
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
 
   // Estados para MasterWorld
@@ -261,13 +269,13 @@ const CharactersPage: React.FC = () => {
 
       // Ensure we have valid arrays for dialogues and messages
       const dialogues = Array.isArray(character.example_dialogues)
-        ? character.example_dialogues.map((d) => String(d))
+        ? character.example_dialogues.map((d: any) => String(d))
         : [""];
       setCurrentExampleDialogues(dialogues);
       setCurrentDialogueIndex(0);
 
       const messages = Array.isArray(character.beginning_messages)
-        ? character.beginning_messages.map((m) => String(m))
+        ? character.beginning_messages.map((m: any) => String(m))
         : [""];
       setCurrentBeginningMessages(messages);
       setCurrentBmgIndex(0);
@@ -420,7 +428,7 @@ const CharactersPage: React.FC = () => {
             <div
               key={char.id}
               className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer group"
-              onClick={() => handleOpenModal(char)}
+              onClick={() => handleOpenChat(char)}
             >
               {/* Background image with gradient */}
               <CharacterImage

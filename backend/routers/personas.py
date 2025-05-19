@@ -27,7 +27,10 @@ def create_user_persona(
         world = db.query(MasterWorld).filter(MasterWorld.id == persona.master_world_id).first()
         if not world:
             raise HTTPException(status_code=400, detail="Master World not found")
-    db_persona = UserPersona(**persona.model_dump()) # Pydantic V2
+    # Remove image_url if present in persona.model_dump()
+    persona_data = persona.model_dump()
+    persona_data.pop("image_url", None)
+    db_persona = UserPersona(**persona_data) # Pydantic V2
     # Para Pydantic V1: db_persona = UserPersona(**persona.dict())
     db.add(db_persona)
     db.commit()
