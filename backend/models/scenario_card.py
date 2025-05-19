@@ -12,6 +12,7 @@ class ScenarioCard(Base):
     name = Column(String, nullable=False, index=True)
     description = Column(Text, nullable=True)
     instructions = Column(Text, nullable=True)
+    image_url = Column(String, nullable=True)  # <-- Added for scenario images
     beginning_message = Column(JSON, nullable=True)
     example_dialogues = Column(JSON, nullable=True)
     world_card_references = Column(JSON, nullable=True)

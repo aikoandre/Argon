@@ -15,7 +15,7 @@ import {
   type ScenarioCardData,
 } from "../services/api";
 import { PencilSquare, TrashFill } from 'react-bootstrap-icons';
-import { CharacterImage } from "../components/CharacterImage";
+import { CharacterImage } from '../components/CharacterImage';
 
 interface SelectOption {
   value: string;
@@ -34,11 +34,11 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity duration-300 ease-in-out">
       <div className="bg-app-bg p-6 rounded-2xl shadow-xl w-full max-w-lg text-white transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalShow">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-semibold">{title}</h2>
+        <div className="flex justify-between items-center mb-4 relative">
+          <h2 className="text-2xl font-semibold text-center w-full">{title}</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl"
+            className="text-gray-400 hover:text-white text-2xl absolute right-6 top-6"
           >
             ×
           </button>
@@ -296,7 +296,7 @@ const ScenariosPage: React.FC = () => {
       instructions: formFields.instructions?.trim() || "",
       example_dialogues: filteredExampleDialogues,
       beginning_message: filteredBeginningMessages,
-      master_world_id: selectedMasterWorldForForm?.value || "",
+      master_world_id: selectedMasterWorldForForm?.value || ""
     };
 
     setIsSubmitting(true);
@@ -390,14 +390,14 @@ const ScenariosPage: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 justify-items-start w-full">
+      <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 justify-items-center w-full">
         {scenarios.map((scen) => (
           <div
             key={scen.id}
             className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer group"
             onClick={() => handleScenarioClick(scen.id)}
           >
-            {/* Use CharacterImage for scenario images */}
+            {/* Use CharacterImage for scenario images for consistent backend handling */}
             <CharacterImage
               imageUrl={scen.image_url ? `/api/images/${scen.image_url.replace('static/', '')}` : null}
               className="absolute inset-0"
@@ -405,41 +405,33 @@ const ScenariosPage: React.FC = () => {
             {/* Top right icons */}
             <div className="absolute top-2 right-2 flex space-x-2 z-10">
               <button
-                onClick={(e) => { e.stopPropagation(); handleOpenModal(scen); }}
+                onClick={e => { e.stopPropagation(); handleOpenModal(scen); }}
                 className="text-gray-400 hover:text-app-accent transition-colors"
                 title="Edit Scenario"
               >
-                <PencilSquare className="h-5 w-5" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13h3l8-8a2.828 2.828 0 10-4-4l-8 8v3zm0 0v3h3" />
+                </svg>
               </button>
               <button
-                onClick={(e) => { e.stopPropagation(); handleDelete(scen.id); }}
-                className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full"
+                onClick={e => { e.stopPropagation(); handleDelete(scen.id); }}
+                className="text-gray-400 hover:text-red-500 transition-colors"
                 title="Delete Scenario"
               >
-                <TrashFill className="h-5 w-5" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
             {/* Bottom info (footer) */}
             <div className="absolute bottom-0 left-0 w-full">
               <div className="w-full bg-black/30 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
-                <div className="flex w-full items-center justify-between">
-                  <h2 className="text-lg font-semibold text-white break-words whitespace-normal mr-2 flex-1 leading-snug" title={scen.name}>{scen.name}</h2>
-                </div>
-                {scen.master_world_id && (
-                  <div className="mt-2 inline-block bg-app-accent-2/80 text-app-surface text-xs px-2 py-1 rounded-full">
-                    {scen.master_world_id}
-                  </div>
+                <div className="font-semibold text-lg truncate text-white drop-shadow-md">{scen.name}</div>
+                {scen.description && (
+                  <div className="text-xs text-gray-200 mt-1 line-clamp-2">{scen.description}</div>
                 )}
               </div>
             </div>
-            {/* Placeholder for scenarios without images */}
-            {!scen.image_url && (
-              <div className="absolute inset-0 flex items-center justify-center z-0 text-gray-500">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-              </div>
-            )}
           </div>
         ))}
       </div>

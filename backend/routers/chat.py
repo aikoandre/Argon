@@ -66,7 +66,8 @@ def create_or_get_chat_session(
         return existing
     
     # Create new session
-    title = f"Chat with {card.name if card_type == 'character' else card.title}"
+    # Use .name for scenario, .name for character
+    title = f"Chat with {card.name if card_type == 'character' else card.name}"
     new_chat = ChatSession(
         card_type=card_type,
         card_id=str(card_id),
