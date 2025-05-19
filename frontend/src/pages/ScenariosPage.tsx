@@ -409,18 +409,14 @@ const ScenariosPage: React.FC = () => {
                 className="text-gray-400 hover:text-app-accent transition-colors"
                 title="Edit Scenario"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13h3l8-8a2.828 2.828 0 10-4-4l-8 8v3zm0 0v3h3" />
-                </svg>
+                <PencilSquare className="h-5 w-5" />
               </button>
               <button
                 onClick={e => { e.stopPropagation(); handleDelete(scen.id); }}
                 className="text-gray-400 hover:text-red-500 transition-colors"
                 title="Delete Scenario"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <TrashFill className="h-5 w-5" />
               </button>
             </div>
             {/* Bottom info (footer) */}
@@ -485,15 +481,6 @@ const ScenariosPage: React.FC = () => {
                 </svg>
               </button>
             </div>
-            {imagePreview && (
-              <div className="mt-2">
-                <img 
-                  src={imagePreview}
-                  alt="Scenario preview"
-                  className="max-h-32 object-cover rounded"
-                />
-              </div>
-            )}
           </div>
 
           <div>
