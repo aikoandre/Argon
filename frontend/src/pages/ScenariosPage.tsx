@@ -33,12 +33,12 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity duration-300 ease-in-out">
-      <div className="bg-app-bg p-6 rounded-2xl shadow-xl w-full max-w-lg text-white transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalShow">
-        <div className="flex justify-between items-center mb-4 relative">
-          <h2 className="text-2xl font-semibold text-center w-full">{title}</h2>
+      <div className="bg-app-bg p-6 rounded-lg shadow-xl w-full max-w-lg text-white transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalShow">
+        <div className="flex justify-between items-center mb-6 relative">
+          <h2 className="text-xl font-semibold text-app-accent text-center w-full">{title}</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl absolute right-6 top-6"
+            className="text-app-accent-3 hover:text-app-accent transition-colors text-2xl absolute right-6 top-6"
           >
             ×
           </button>
@@ -242,10 +242,10 @@ const ScenariosPage: React.FC = () => {
       });
       
       setCurrentExampleDialogues(
-        scenario.example_dialogues ? [...scenario.example_dialogues] : [""]
+        scenario.example_dialogues?.length ? [...scenario.example_dialogues] : [""]
       );
       setCurrentBeginningMessages(
-        scenario.beginning_message ? [...scenario.beginning_message] : [""]
+        scenario.beginning_message?.length ? [...scenario.beginning_message] : [""]
       );
       
       const worldOption = masterWorlds.find(w => w.id === scenario.master_world_id);
@@ -448,7 +448,7 @@ const ScenariosPage: React.FC = () => {
           )}
           {/* Campo de imagem opcional - antes do campo Name, label em cima */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Image</label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Image</label>
             <div className="flex items-center">
               <button 
                 type="button" 
@@ -486,7 +486,7 @@ const ScenariosPage: React.FC = () => {
           <div>
             <label
               htmlFor="scen-master_world"
-              className="block text-sm font-medium text-gray-300 mb-1"
+              className="block text-sm font-medium text-gray-300 mb-2"
             >
               Master World
             </label>
@@ -538,7 +538,7 @@ const ScenariosPage: React.FC = () => {
           <div>
             <label
               htmlFor="scen-name"
-              className="block text-sm font-medium text-gray-300 mb-1"
+              className="block text-sm font-medium text-gray-300 mb-2"
             >
               Name <span className="text-red-500">*</span>
             </label>
@@ -557,7 +557,7 @@ const ScenariosPage: React.FC = () => {
           <div>
             <label
               htmlFor="scen-description"
-              className="block text-sm font-medium text-gray-300 mb-1"
+              className="block text-sm font-medium text-gray-300 mb-2"
             >
               Description
             </label>
@@ -575,7 +575,7 @@ const ScenariosPage: React.FC = () => {
           <div>
             <label
               htmlFor="scen-instructions"
-              className="block text-sm font-medium text-gray-300 mb-1"
+              className="block text-sm font-medium text-gray-300 mb-2"
             >
               Instructions
             </label>
@@ -590,7 +590,7 @@ const ScenariosPage: React.FC = () => {
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-2 mt-2">
             <div className="flex justify-between items-center">
               <label className="block text-sm font-medium text-gray-300">
                 Beginning Messages ({currentBmgIndex + 1}/{currentBeginningMessages.length})
@@ -622,7 +622,7 @@ const ScenariosPage: React.FC = () => {
               onChange={(e) => handleCurrentBmgChange(e.target.value)}
               className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white font-mono text-sm focus:ring-blue-500 focus:border-blue-500"
             />
-            <div className="flex justify-start space-x-2 mt-1">
+            <div className="flex justify-start space-x-2 mt-2">
               <button
                 type="button"
                 onClick={() => navigateBmg("prev")}
@@ -643,7 +643,7 @@ const ScenariosPage: React.FC = () => {
           </div>
 
           {/* Example Dialogues Section */}
-          <div className="space-y-1">
+          <div className="space-y-2 mb-2">
             <div className="flex justify-between items-center">
               <label className="block text-sm font-medium text-gray-300">
                 Example Dialogues ({currentDialogueIndex + 1}/{currentExampleDialogues.length})
@@ -672,7 +672,7 @@ const ScenariosPage: React.FC = () => {
               onChange={(e) => handleCurrentDialogueChange(e.target.value)}
               className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
             />
-            <div className="flex justify-start space-x-2 mt-1">
+            <div className="flex justify-start space-x-2 mt-2">
               <button
                 type="button"
                 onClick={() => navigateDialogues("prev")}

@@ -31,12 +31,12 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity duration-300 ease-in-out">
-      <div className="bg-app-bg p-6 rounded-2xl shadow-xl w-full max-w-lg text-white transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalShow">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-semibold text-center w-full">{title}</h2>
+      <div className="bg-app-bg p-6 rounded-lg shadow-xl w-full max-w-lg text-white transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalShow">
+        <div className="flex justify-between items-center mb-6 relative">
+          <h2 className="text-xl font-semibold text-app-accent text-center w-full">{title}</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl absolute right-6 top-6"
+            className="text-app-accent-3 hover:text-app-accent transition-colors text-2xl absolute right-6 top-6"
           >
             ×
           </button>
@@ -165,8 +165,11 @@ const CharactersPage: React.FC = () => {
   };
 
   const addDialogueField = () => {
-    setCurrentExampleDialogues((prevDialogues) => [...prevDialogues, ""]);
-    setCurrentDialogueIndex((prevIndex) => prevIndex + 1);
+    setCurrentExampleDialogues((prev) => {
+      const newDialogues = [...prev, ""];
+      setCurrentDialogueIndex(newDialogues.length - 1);
+      return newDialogues;
+    });
   };
 
   const removeCurrentDialogueField = () => {
@@ -202,8 +205,11 @@ const CharactersPage: React.FC = () => {
   };
 
   const addBmgField = () => {
-    setCurrentBeginningMessages((prevMessages) => [...prevMessages, ""]);
-    setCurrentBmgIndex((prevIndex) => prevIndex + 1);
+    setCurrentBeginningMessages((prev) => {
+      const newMessages = [...prev, ""];
+      setCurrentBmgIndex(newMessages.length - 1);
+      return newMessages;
+    });
   };
 
   const removeCurrentBmgField = () => {
@@ -268,13 +274,13 @@ const CharactersPage: React.FC = () => {
       setImagePreview(null);
 
       // Ensure we have valid arrays for dialogues and messages
-      const dialogues = Array.isArray(character.example_dialogues)
+      const dialogues = character.example_dialogues?.length
         ? character.example_dialogues.map((d: any) => String(d))
         : [""];
       setCurrentExampleDialogues(dialogues);
       setCurrentDialogueIndex(0);
 
-      const messages = Array.isArray(character.beginning_messages)
+      const messages = character.beginning_messages?.length
         ? character.beginning_messages.map((m: any) => String(m))
         : [""];
       setCurrentBeginningMessages(messages);
@@ -488,18 +494,18 @@ const CharactersPage: React.FC = () => {
         <form
           ref={formRef}
           onSubmit={handleSubmit}
-          className="space-y-4 max-h-[70vh] overflow-y-auto p-1 pr-2 custom-scrollbar"
+          className="space-y-2 max-h-[70vh] overflow-y-auto p-1 pr-4 custom-scrollbar"
         >
           {error && isModalOpen && (
-            <p className="bg-red-700 text-white p-3 rounded-md text-sm text-center col-span-2">
-              {error}
-            </p>
+            <div className="bg-app-accent-2/20 border border-app-accent-3 text-app-accent p-3 rounded-md mb-4 text-sm">
+              ⚠️ {error}
+            </div>
           )}
           {/* Changed to a single column grid */}
-          <div className="grid grid-cols-1 gap-6 space-y-4">
+          <div className="grid grid-cols-1 gap-2">
               {/* Image upload section */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Image</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Image</label>
                 <div className="flex items-center">
                   <button 
                     type="button" 
@@ -540,7 +546,7 @@ const CharactersPage: React.FC = () => {
               <div>
                 <label
                   htmlFor="char-master_world"
-                  className="block text-sm font-medium text-gray-300 mb-1"
+                  className="block text-sm font-medium text-gray-300 mb-2 mt-2"
                 >
                   Master World
                 </label>
@@ -551,7 +557,7 @@ const CharactersPage: React.FC = () => {
                   onChange={handleMasterWorldChangeForForm}
                   isDisabled={isLoadingWorlds}
                   placeholder="Select Master World..."
-                  className="text-black"
+                  className="text-black mb-2"
                   classNamePrefix="react-select"
                   styles={{
                     control: (base, state) => ({
@@ -594,7 +600,7 @@ const CharactersPage: React.FC = () => {
           <div>
             <label
               htmlFor="char-name"
-              className="block text-sm font-medium text-gray-300 mb-1"
+              className="block text-sm font-medium text-app-accent-2 mb-2"
             >
               Name <span className="text-red-500">*</span>
             </label>
@@ -606,13 +612,13 @@ const CharactersPage: React.FC = () => {
               value={formFields.name}
               onChange={handleStaticInputChange}
               required
-              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500 mb-2"
             />
           </div>
           <div>
             <label
               htmlFor="char-description"
-              className="block text-sm font-medium text-gray-300 mb-1"
+              className="block text-sm font-medium text-app-accent-2 mb-2"
             >
               Description
             </label>
@@ -623,13 +629,13 @@ const CharactersPage: React.FC = () => {
               rows={4}
               value={formFields.description}
               onChange={handleStaticInputChange}
-              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500 mb-2"
             />
           </div>
           <div>
             <label
               htmlFor="char-instructions"
-              className="block text-sm font-medium text-gray-300 mb-1"
+              className="block text-sm font-medium text-app-accent-2 mb-2"
             >
               Instructions
             </label>
@@ -640,13 +646,13 @@ const CharactersPage: React.FC = () => {
               rows={4}
               value={formFields.instructions}
               onChange={handleStaticInputChange}
-              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500 mb-2"
             />
           </div>
 
           {/* Example Dialogues Section (como antes) */}
           {/* ... */}
-          <div className="space-y-1">
+          <div className="space-y-2">
             <div className="flex justify-between items-center">
               <label
                 htmlFor="char-current_dialogue"
@@ -687,12 +693,12 @@ const CharactersPage: React.FC = () => {
               className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white font-mono text-sm focus:ring-blue-500 focus:border-blue-500"
               autoComplete="off"
             />
-            <div className="flex justify-start items-center mt-1 space-x-2">
+            <div className="flex justify-start items-center mt-1 gap-2">
               {" "}
               <button
                 type="button"
                 onClick={() => navigateDialogues("prev")}
-                disabled={currentExampleDialogues.length <= 1}
+                disabled={currentDialogueIndex === 0}
                 className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
               >
                 Previous
@@ -700,7 +706,7 @@ const CharactersPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => navigateDialogues("next")}
-                disabled={currentExampleDialogues.length <= 1}
+                disabled={currentDialogueIndex === currentExampleDialogues.length - 1}
                 className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
               >
                 Next
@@ -710,7 +716,7 @@ const CharactersPage: React.FC = () => {
 
           {/* Beginning Messages Section (como antes) */}
           {/* ... */}
-          <div className="space-y-1 mt-4">
+          <div className="space-y-2 mt-2">
             <div className="flex justify-between items-center">
               <label
                 htmlFor="char-current_bmg"
@@ -751,7 +757,7 @@ const CharactersPage: React.FC = () => {
               className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
               autoComplete="off"
             />
-            <div className="flex justify-start items-center mt-1 space-x-2">
+            <div className="flex justify-start items-center mt-1 gap-2">
               <button
                 type="button"
                 onClick={() => navigateBmg("prev")}
@@ -763,9 +769,7 @@ const CharactersPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => navigateBmg("next")}
-                disabled={
-                  currentBmgIndex === currentBeginningMessages.length - 1
-                }
+                disabled={currentBmgIndex === currentBeginningMessages.length - 1}
                 className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
               >
                 Next
@@ -774,11 +778,11 @@ const CharactersPage: React.FC = () => {
           </div>
 
               {/* Save Button */}
-              <div className="flex justify-end space-x-3 pt-2">
+              <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="submit"
                   disabled={isSubmitting || !formFields.name.trim()}
-                  className="px-4 py-2 text-sm bg-app-accent-2 text-app-surface rounded-md font-medium disabled:opacity-50"
+                  className="px-4 py-2 bg-app-accent-2 hover:bg-app-accent-3 text-app-surface rounded-md font-medium disabled:opacity-50 transition-colors"
                 >
                   {isSubmitting
                     ? "Saving..."
