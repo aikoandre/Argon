@@ -13,33 +13,39 @@ import ScenariosPage from "./pages/ScenariosPage";
 import "./App.css";
 import "./styles/colors.css";
 import "./styles/fonts.css";
-import { 
-  HouseDoorFill, 
-  ChatDotsFill, 
-  PeopleFill, 
-  PersonBadgeFill, 
-  CollectionFill, 
-  Globe2, 
-  GearFill
-} from 'react-bootstrap-icons';
 
 function AppWrapper() {
   const location = useLocation();
 
-  // Bootstrap icon components
-  const HomeIcon = ({ className }: { className?: string }) => <HouseDoorFill className={`w-5 h-5 inline-block align-middle ${className}`} />;
-  const ChatsIcon = ({ className }: { className?: string }) => <ChatDotsFill className={`w-5 h-5 inline-block align-middle ${className}`} />;
-  const PersonasIcon = ({ className }: { className?: string }) => <PeopleFill className={`w-5 h-5 inline-block align-middle ${className}`} />;
-  const CharactersIcon = ({ className }: { className?: string }) => <PersonBadgeFill className={`w-5 h-5 inline-block align-middle ${className}`} />;
-  const ScenariosIcon = ({ className }: { className?: string }) => <CollectionFill className={`w-5 h-5 inline-block align-middle ${className}`} />;
-  const WorldsIcon = ({ className }: { className?: string }) => <Globe2 className={`w-5 h-5 inline-block align-middle ${className}`} />;
-  const SettingsIcon = ({ className }: { className?: string }) => <GearFill className={`w-5 h-5 inline-block align-middle ${className}`} />;
+  // Use Material Icons Outlined for no fill
+  const iconBaseClass = "material-icons-outlined text-2xl flex-shrink-0";
+  const HomeIcon = ({ className }: { className?: string }) => (
+    <span className={`${iconBaseClass} ${className || ''}`.trim()}>home</span>
+  );
+  const ChatsIcon = ({ className }: { className?: string }) => (
+    <span className={`${iconBaseClass} ${className || ''}`.trim()}>chat</span>
+  );
+  const PersonasIcon = ({ className }: { className?: string }) => (
+    <span className={`${iconBaseClass} ${className || ''}`.trim()}>groups</span>
+  );
+  const CharactersIcon = ({ className }: { className?: string }) => (
+    <span className={`${iconBaseClass} ${className || ''}`.trim()}>person</span>
+  );
+  const ScenariosIcon = ({ className }: { className?: string }) => (
+    <span className={`${iconBaseClass} ${className || ''}`.trim()}>view_list</span>
+  );
+  const WorldsIcon = ({ className }: { className?: string }) => (
+    <span className={`${iconBaseClass} ${className || ''}`.trim()}>public</span>
+  );
+  const SettingsIcon = ({ className }: { className?: string }) => (
+    <span className={`${iconBaseClass} ${className || ''}`.trim()}>settings</span>
+  );
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row p-6 bg-app-bg text-white">
       {/* Sidebar Container */}
       <div
-        className="relative flex-shrink-0 transition-all duration-300 ease-in-out md:w-64 w-full"
+        className="relative flex-shrink-0 w-[250px]"
         style={{ maxHeight: 'calc(100vh - 2rem)' }}
       >
         {/* Sidebar Content */}
@@ -51,49 +57,49 @@ function AppWrapper() {
               </div>
           <Link
             to="/"
-            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
+            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center ml-6"
           >
             <HomeIcon className="mr-3" />
             <span>Home</span>
           </Link>
           <Link
             to="/chats"
-            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
+            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center ml-6"
           >
             <ChatsIcon className="mr-3" />
             <span>Chats</span>
           </Link>
           <Link
             to="/personas"
-            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
+            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center ml-6"
           >
             <PersonasIcon className="mr-3" />
             <span>Personas</span>
           </Link>
           <Link
             to="/characters"
-            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
+            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center ml-6"
           >
             <CharactersIcon className="mr-3" />
             <span>Characters</span>
           </Link>
           <Link
             to="/scenarios"
-            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
+            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center ml-6"
           >
             <ScenariosIcon className="mr-3" />
             <span>Scenarios</span>
           </Link>
           <Link
             to="/world-lore"
-            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
+            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center ml-6"
           >
             <WorldsIcon className="mr-3" />
             <span>Worlds</span>
           </Link>
           <Link
             to="/settings"
-            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center"
+            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center ml-6"
           >
             <SettingsIcon className="mr-3" />
             <span>Settings</span>

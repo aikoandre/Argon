@@ -402,6 +402,7 @@ export interface MasterWorldData {
   name: string;
   description?: string | null;
   tags?: string[] | null;
+  image_url?: string | null; // <-- Add this line for image support
   created_at: string;
   updated_at?: string | null;
 }
@@ -418,28 +419,36 @@ export const getAllMasterWorlds = async (): Promise<MasterWorldData[]> => {
   return response.data;
 };
 
-export const createMasterWorld = async (formData: FormData): Promise<MasterWorldData> => {
-  const response = await fileApi.post<MasterWorldData>(
-    "/master_worlds",
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    }
+export const createMasterWorld = async (
+  data: FormData
+): Promise<MasterWorldData> => {
+  // Do NOT set Content-Type header here! Let the browser/axios set it for FormData.
+  const response = await axios.post<MasterWorldData>(
+    `${import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api"}/master_worlds`,
+    data
   );
   return response.data;
 };
 
 export const updateMasterWorld = async (
   id: string,
-  data: { name?: string; description?: string | null; tags?: string[] | null }
+  data: FormData | { name?: string; description?: string | null; tags?: string[] | null }
 ): Promise<MasterWorldData> => {
-  const response = await apiClient.put<MasterWorldData>(
-    `/master_worlds/${id}`,
-    data
-  );
-  return response.data;
+  if (data instanceof FormData) {
+    // Use fileApi for multipart/form-data requests
+    const response = await fileApi.put<MasterWorldData>(
+      `/master_worlds/${id}`,
+      data
+    );
+    return response.data;
+  } else {
+    // Use apiClient for JSON
+    const response = await apiClient.put<MasterWorldData>(
+      `/master_worlds/${id}`,
+      data
+    );
+    return response.data;
+  }
 };
 
 export const deleteMasterWorld = async (id: string): Promise<void> => {
@@ -456,6 +465,7 @@ export interface LoreEntryData {
   tags?: string[] | null;
   aliases?: string[] | null;
   faction_id?: string | null;
+  image_url?: string | null; // <-- Added for image support
   created_at: string;
   updated_at?: string | null;
 }
@@ -467,7 +477,7 @@ export interface LoreEntryCreateData {
   tags?: string[] | null;
   aliases?: string[] | null;
   faction_id?: string | null;
-  master_world_id: string; // <-- Adicionado para corresponder ao backend
+  master_world_id: string;
 }
 
 export interface LoreEntryUpdateData {
@@ -496,13 +506,21 @@ export const getAllLoreEntriesForMasterWorld = async (
 
 export const createLoreEntryForMasterWorld = async (
   masterWorldId: string,
-  data: LoreEntryCreateData
+  data: LoreEntryCreateData | FormData
 ): Promise<LoreEntryData> => {
-  const response = await apiClient.post<LoreEntryData>(
-    `/master_worlds/${masterWorldId}/lore_entries`,
-    data
-  );
-  return response.data;
+  if (data instanceof FormData) {
+    const response = await fileApi.post<LoreEntryData>(
+      `/master_worlds/${masterWorldId}/lore_entries`,
+      data
+    );
+    return response.data;
+  } else {
+    const response = await apiClient.post<LoreEntryData>(
+      `/master_worlds/${masterWorldId}/lore_entries`,
+      data
+    );
+    return response.data;
+  }
 };
 
 export const getLoreEntryById = async (
@@ -516,13 +534,21 @@ export const getLoreEntryById = async (
 
 export const updateLoreEntry = async (
   entryId: string,
-  data: LoreEntryUpdateData
+  data: LoreEntryUpdateData | FormData
 ): Promise<LoreEntryData> => {
-  const response = await apiClient.put<LoreEntryData>(
-    `/lore_entries/${entryId}`,
-    data
-  );
-  return response.data;
+  if (data instanceof FormData) {
+    const response = await fileApi.put<LoreEntryData>(
+      `/lore_entries/${entryId}`,
+      data
+    );
+    return response.data;
+  } else {
+    const response = await apiClient.put<LoreEntryData>(
+      `/lore_entries/${entryId}`,
+      data
+    );
+    return response.data;
+  }
 };
 
 export const deleteLoreEntry = async (entryId: string): Promise<void> => {

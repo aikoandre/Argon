@@ -1,4 +1,4 @@
-import React, { useState, useEffect, type FormEvent } from "react";
+import React, { useState, useEffect, useRef, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getAllMasterWorlds,
@@ -63,27 +63,19 @@ const MasterWorldsPage: React.FC = () => {
   const [formData, setFormData] =
     useState<MasterWorldFormData>(initialFormData);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null); // Track current image
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+
+  const handleSelectImageClick = () => {
+    fileInputRef.current?.click();
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {};
-      reader.readAsDataURL(file);
     }
-  };
-
-
-  const convertFileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = error => reject(error);
-    });
   };
 
   const fetchMasterWorlds = async () => {
@@ -119,9 +111,13 @@ const MasterWorldsPage: React.FC = () => {
         description: world.description || "",
         tags: world.tags ? [...world.tags] : [],
       });
+      setCurrentImageUrl(world.image_url || null); // Set current image url
+      setImageFile(null); // Reset file input
     } else {
       setEditingWorld(null);
       setFormData(initialFormData);
+      setCurrentImageUrl(null);
+      setImageFile(null);
     }
     setIsModalOpen(true);
     setError(null);
@@ -141,37 +137,48 @@ const MasterWorldsPage: React.FC = () => {
       return;
     }
 
-    const formDataToSend = new FormData();
-    formDataToSend.append('name', formData.name);
-    formDataToSend.append('description', formData.description || '');
-    formDataToSend.append('tags', JSON.stringify(formData.tags.length > 0 ? formData.tags : null));
-    if (imageFile) {
-      formDataToSend.append('image', imageFile);
-    }
-    
-    // Clear image states after submission
-    setImageFile(null);
-
     setIsSubmitting(true);
     setError(null);
     try {
       if (editingWorld) {
-        const updateData = {
-          name: formData.name,
-          description: formData.description,
-          tags: formData.tags,
-          image: imageFile ? await convertFileToBase64(imageFile) : null
-        };
-        await updateMasterWorld(editingWorld.id, updateData);
+        // Always use FormData for update if image might be sent
+        const formDataToSend = new FormData();
+        formDataToSend.append('name', formData.name);
+        formDataToSend.append('description', formData.description || '');
+        if (formData.tags && formData.tags.length > 0) {
+          formDataToSend.append('tags', JSON.stringify(formData.tags));
+        }
+        if (imageFile) {
+          formDataToSend.append('image', imageFile);
+        }
+        await updateMasterWorld(editingWorld.id, formDataToSend);
       } else {
+        // Always use FormData for createMasterWorld
+        const formDataToSend = new FormData();
+        formDataToSend.append('name', formData.name);
+        formDataToSend.append('description', formData.description || '');
+        if (formData.tags && formData.tags.length > 0) {
+          formDataToSend.append('tags', JSON.stringify(formData.tags));
+        }
+        if (imageFile) {
+          formDataToSend.append('image', imageFile);
+        }
         await createMasterWorld(formDataToSend);
       }
+      setImageFile(null);
+      setCurrentImageUrl(null);
       handleCloseModal();
       fetchMasterWorlds();
     } catch (err: any) {
-      const apiError =
-        err.response?.data?.detail ||
-        (editingWorld ? "Failed to update world." : "Failed to create world.");
+      // Robust error handling for FastAPI validation errors
+      let apiError = editingWorld ? "Failed to update world." : "Failed to create world.";
+      if (err.response && err.response.data && err.response.data.detail) {
+        if (Array.isArray(err.response.data.detail)) {
+          apiError = err.response.data.detail.map((e: any) => e.msg || e.detail || JSON.stringify(e)).join(', ');
+        } else {
+          apiError = err.response.data.detail;
+        }
+      }
       setError(apiError);
       console.error(err);
     } finally {
@@ -198,6 +205,13 @@ const MasterWorldsPage: React.FC = () => {
     }
   };
 
+  // Helper function for truncating filenames
+  const truncateFilename = (filename: string | null | undefined, maxLength = 35): string => {
+    if (!filename) return "Select Image";
+    if (filename.length <= maxLength) return filename;
+    return filename.substring(0, maxLength - 3) + '...';
+  };
+
   if (isLoading && masterWorlds.length === 0) {
     return (
       <p className="text-center text-gray-400 p-10">Loading Your Worlds...</p>
@@ -207,7 +221,7 @@ const MasterWorldsPage: React.FC = () => {
   return (
     <div className="container mx-auto p-4 md:p-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-bold text-white">Worlds</h1>
+        <h1 className="text-4xl font-bold font-quintessential text-white">Worlds</h1>
         <button
           onClick={() => handleOpenModal()}
           className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
@@ -229,49 +243,66 @@ const MasterWorldsPage: React.FC = () => {
       )}
 
       <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 justify-items-start w-full">
-        {masterWorlds.map((world) => (
-          <div
-            key={world.id}
-            className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105"
-            onClick={() => navigate(`/world-lore/${world.id}/entries`)}
-          >
-            {/* Top right icons */}
-            <div className="absolute top-2 right-2 flex space-x-2 z-10">
-              <button
-                onClick={e => { e.stopPropagation(); handleOpenModal(world); }}
-                className="text-gray-400 hover:text-app-accent transition-colors"
-                title="Edit World"
-              >
-                <PencilSquare className="h-5 w-5" />
-              </button>
-              <button
-                onClick={e => { e.stopPropagation(); handleDelete(world.id); }}
-                className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full"
-                title="Delete World"
-              >
-                <TrashFill className="h-5 w-5" />
-              </button>
-            </div>
-            {/* Bottom info (footer) */}
-            <div className="absolute bottom-0 left-0 w-full bg-black/30 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
-              <div className="flex w-full items-center justify-between">
-                <h2 className="text-lg font-semibold text-white break-words whitespace-normal mr-2 flex-1 leading-snug" title={world.name}>{world.name}</h2>
+        {masterWorlds.map((world) => {
+          // Helper to get proper image URL for static images
+          const getImageUrl = (url: string | null | undefined) => {
+            if (!url) return undefined;
+            if (url.startsWith('data:')) return url;
+            if (url.startsWith('/api/images/serve/')) return url;
+            // Remove leading /static/ if present
+            const cleanPath = url.replace(/^\/static\//, '');
+            return `/api/images/serve/${cleanPath}`;
+          };
+          const cardBg = world.image_url ? {
+            backgroundImage: `url(${getImageUrl(world.image_url)})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          } : {};
+          return (
+            <div
+              key={world.id}
+              className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105"
+              onClick={() => navigate(`/world-lore/${world.id}/entries`)}
+              style={cardBg}
+            >
+              {/* Top right icons */}
+              <div className="absolute top-2 right-2 flex space-x-2 z-10">
+                <button
+                  onClick={e => { e.stopPropagation(); handleOpenModal(world); }}
+                  className="text-gray-400 hover:text-app-accent transition-colors"
+                  title="Edit World"
+                >
+                  <PencilSquare className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={e => { e.stopPropagation(); handleDelete(world.id); }}
+                  className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full"
+                  title="Delete World"
+                >
+                  <TrashFill className="h-5 w-5" />
+                </button>
               </div>
-              {world.tags && world.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1 mb-1">
-                  {world.tags.slice(0, 4).map((tag) => (
-                    <span key={tag} className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded">
-                      {tag}
-                    </span>
-                  ))}
-                  {world.tags.length > 4 && (
-                    <span className="text-xs text-gray-400">...</span>
-                  )}
+              {/* Bottom info (footer) */}
+              <div className="absolute bottom-0 left-0 w-full bg-black/30 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
+                <div className="flex w-full items-center justify-between">
+                  <h2 className="text-lg font-semibold text-white break-words whitespace-normal mr-2 flex-1 leading-snug" title={world.name}>{world.name}</h2>
                 </div>
-              )}
+                {world.tags && world.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1 mb-1">
+                    {world.tags.slice(0, 4).map((tag) => (
+                      <span key={tag} className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded">
+                        {tag}
+                      </span>
+                    ))}
+                    {world.tags.length > 4 && (
+                      <span className="text-xs text-gray-400">...</span>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <Modal
@@ -292,24 +323,33 @@ const MasterWorldsPage: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Image</label>
             <div className="flex items-center">
-              <button type="button" className="flex-1 bg-app-surface text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11">
+              <button
+                type="button"
+                onClick={handleSelectImageClick}
+                className="flex-1 bg-app-surface text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11 overflow-hidden whitespace-nowrap"
+              >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
                 </svg>
-                <span>Select Image</span>
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  className="hidden" 
-                  onChange={handleImageUpload}
-                />
+                <span>{imageFile ? truncateFilename(imageFile.name) : currentImageUrl ? `Current: ${truncateFilename(currentImageUrl.split('/').pop())}` : "Select Image"}</span>
               </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageUpload}
+              />
               <span className="h-11 w-px bg-app-surface" />
-              <button type="button" className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
+              <button
+                type="button"
+                className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11"
+                onClick={() => { setImageFile(null); setCurrentImageUrl(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                disabled={!imageFile && !currentImageUrl}
+                title="Remove image"
+              >
+                <TrashFill className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -364,13 +404,6 @@ const MasterWorldsPage: React.FC = () => {
             </div>
           </div>
           <div className="flex justify-end space-x-3 pt-2">
-            <button
-              type="button"
-              onClick={handleCloseModal}
-              className="bg-app-surface text-white font-semibold py-2 px-4 rounded-md"
-            >
-              Cancel
-            </button>
             <button
               type="submit"
               disabled={isSubmitting}

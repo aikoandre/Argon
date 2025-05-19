@@ -66,24 +66,24 @@ class ContentTypeMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         try:
             response = await call_next(request)
-            
-            # Only set content-type for API endpoints if not already set and not a 204 response
             path = request.url.path.lower()
-            if (path.startswith("/api/")
+            # Only set content-type for API endpoints if not already set, not a 204 response, and not multipart/form-data
+            content_type = request.headers.get("content-type", "").lower()
+            if (
+                path.startswith("/api/")
                 and "content-type" not in response.headers
                 and not path.startswith("/api/images/serve")
-                and response.status_code != 204):
+                and response.status_code != 204
+                and not content_type.startswith("multipart/form-data")
+            ):
                 response.headers["content-type"] = "application/json"
-                
             # Ensure CORS headers are set
             if request.headers.get("origin") in origins:
                 response.headers["Access-Control-Allow-Origin"] = request.headers["origin"]
                 response.headers["Access-Control-Allow-Credentials"] = "true"
                 response.headers["Access-Control-Allow-Methods"] = "*"
                 response.headers["Access-Control-Allow-Headers"] = "*"
-            
             return response
-            
         except Exception as e:
             print(f"Error in middleware: {str(e)}")
             response = JSONResponse(

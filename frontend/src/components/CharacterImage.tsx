@@ -7,14 +7,12 @@ interface CharacterImageProps {
 
 export const CharacterImage: React.FC<CharacterImageProps> = ({ imageUrl, className = '' }) => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!imageUrl) return;
 
     let mounted = true;
-    setIsLoading(true);
     setError(null);
 
     const loadImage = async () => {
@@ -22,7 +20,6 @@ export const CharacterImage: React.FC<CharacterImageProps> = ({ imageUrl, classN
         // Handle data URLs directly
         if (imageUrl.startsWith('data:')) {
           setImageSrc(imageUrl);
-          setIsLoading(false);
           return;
         }
 
@@ -50,7 +47,6 @@ export const CharacterImage: React.FC<CharacterImageProps> = ({ imageUrl, classN
         }
       } finally {
         if (mounted) {
-          setIsLoading(false);
         }
       }
     };
@@ -65,14 +61,6 @@ export const CharacterImage: React.FC<CharacterImageProps> = ({ imageUrl, classN
       }
     };
   }, [imageUrl]);
-
-  if (isLoading) {
-    return (
-      <div className={`${className} flex items-center justify-center bg-gray-800`}>
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-      </div>
-    );
-  }
 
   if (error || !imageSrc) {
     return (

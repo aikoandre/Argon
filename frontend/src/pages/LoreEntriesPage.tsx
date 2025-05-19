@@ -196,61 +196,77 @@ const LoreEntriesPage: React.FC = () => {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    if (!masterWorldId) { setError("Cannot save: Master World context is missing."); return; }
-    if (!formData.name.trim()) { setError("Name is required."); return; }
-    if (!formData.entry_type) { setError("Entry Type is required."); return; }
+    if (!masterWorldId) { setError("Cannot save: Master World context is missing."); setIsSubmitting(false); return; }
+    if (!formData.name.trim()) { setError("Name is required."); setIsSubmitting(false); return; }
+    if (!formData.entry_type) { setError("Entry Type is required."); setIsSubmitting(false); return; }
 
-    const formDataToSend = new FormData();
-    formDataToSend.append('name', formData.name);
-    formDataToSend.append('entry_type', formData.entry_type);
-    formDataToSend.append('description', formData.description);
-    if (imageFile) {
-      formDataToSend.append('image', imageFile);
+    const isEdit = Boolean(editingEntry);
+    let dataToSend: FormData | LoreEntryCreateData | LoreEntryUpdateData;
+
+    if (imageFile || (isEdit && imagePreview === null && editingEntry?.image_url)) {
+      const formDataToSend = new FormData();
+      formDataToSend.append('name', formData.name);
+      formDataToSend.append('entry_type', formData.entry_type);
+      formDataToSend.append('description', formData.description || '');
+      formDataToSend.append('tags', JSON.stringify(formData.tags.length > 0 ? formData.tags : null));
+      formDataToSend.append('aliases', JSON.stringify(formData.aliases.length > 0 ? formData.aliases : null));
+      if (formData.entry_type === "CHARACTER_LORE") {
+        formDataToSend.append('faction_id', formData.faction_id || '');
+      }
+      if (!isEdit) {
+        formDataToSend.append('master_world_id', masterWorldId);
+      }
+      if (imageFile) {
+        formDataToSend.append('image', imageFile);
+      } else if (isEdit && imagePreview === null && editingEntry?.image_url) {
+        formDataToSend.append('remove_image', 'true');
+      }
+      dataToSend = formDataToSend;
+    } else {
+      if (isEdit) {
+        // Update: do not send master_world_id
+        const updatePayload: LoreEntryUpdateData = {
+          name: formData.name,
+          entry_type: formData.entry_type,
+          description: formData.description,
+          tags: formData.tags.length > 0 ? formData.tags : null,
+          aliases: formData.aliases.length > 0 ? formData.aliases : null,
+        };
+        if (formData.entry_type === "CHARACTER_LORE") {
+          updatePayload.faction_id = formData.faction_id || null;
+        }
+        dataToSend = updatePayload;
+      } else {
+        // Create: must send master_world_id
+        const createPayload: LoreEntryCreateData = {
+          name: formData.name,
+          entry_type: formData.entry_type,
+          description: formData.description,
+          tags: formData.tags.length > 0 ? formData.tags : null,
+          aliases: formData.aliases.length > 0 ? formData.aliases : null,
+          faction_id: formData.entry_type === "CHARACTER_LORE" ? (formData.faction_id || null) : null,
+          master_world_id: masterWorldId,
+        };
+        dataToSend = createPayload;
+      }
     }
-    // Clear image states after submission
-    setImageFile(null);
-    setImagePreview(null);
 
-    const tagsForApi = formData.tags;
-    const aliasesForApi = formData.aliases;
-
-    const payloadForCreate: LoreEntryCreateData = {
-      name: formData.name,
-      entry_type: formData.entry_type,
-      description: formData.description,
-      faction_id: formData.entry_type === "CHARACTER_LORE" ? (formData.faction_id || null) : null,
-      tags: tagsForApi.length > 0 ? tagsForApi : null,
-      aliases: aliasesForApi.length > 0 ? aliasesForApi : null,
-      master_world_id: masterWorldId,
-    };
-    const payloadForUpdate: LoreEntryUpdateData = {
-        name: formData.name,
-        entry_type: formData.entry_type,
-        description: formData.description,
-        faction_id: formData.entry_type === "CHARACTER_LORE" ? (formData.faction_id || null) : null,
-        tags: tagsForApi.length > 0 ? tagsForApi : [],
-        aliases: aliasesForApi.length > 0 ? aliasesForApi : [],
-    };
-
-    setIsSubmitting(true);
     setError(null);
     try {
-      console.log('Payload enviado para API:', editingEntry ? payloadForUpdate : payloadForCreate);
-      if (editingEntry) {
-        await updateLoreEntry(editingEntry.id, payloadForUpdate);
+      if (isEdit) {
+        await updateLoreEntry(editingEntry!.id, dataToSend as FormData | LoreEntryUpdateData);
       } else {
-        await createLoreEntryForMasterWorld(masterWorldId, payloadForCreate);
+        await createLoreEntryForMasterWorld(masterWorldId, dataToSend as FormData | LoreEntryCreateData);
       }
       handleCloseModal();
+      setImageFile(null);
+      setImagePreview(null);
       const entriesData = await getAllLoreEntriesForMasterWorld(masterWorldId);
       setLoreEntries(entriesData);
       const factionsData = await getAllLoreEntriesForMasterWorld(masterWorldId, "FACTION");
       setFactionsOptions(factionsData.map(f => ({ value: f.id, label: f.name })));
     } catch (err: any) {
-      if (err.response?.data) {
-        console.error('Resposta de erro detalhada da API:', err.response.data);
-      }
-      let apiError = editingEntry ? 'Failed to update lore entry.' : 'Failed to create lore entry.';
+      let apiError = isEdit ? 'Failed to update lore entry.' : 'Failed to create lore entry.';
       if (err.response?.data?.detail) {
         if (Array.isArray(err.response.data.detail)) {
           apiError = err.response.data.detail.map((e: any) => e.msg).join(' | ');
@@ -379,8 +395,8 @@ const LoreEntriesPage: React.FC = () => {
             {/* Campo de imagem opcional - agora antes do campo Name, label em cima */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">Image</label>
-              <div className="flex items-center">
-                <button type="button" className="flex-1 bg-app-surface text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11">
+              <div className="flex items-center gap-2">
+                <label className="flex-1 bg-app-surface text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11 cursor-pointer">
                   <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
@@ -392,13 +408,27 @@ const LoreEntriesPage: React.FC = () => {
                     className="hidden" 
                     onChange={handleImageUpload}
                   />
-                </button>
-                <span className="h-11 w-px bg-gray-600" />
-                <button type="button" className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                </button>
+                </label>
+                {imagePreview && (
+                  <div className="relative w-16 h-16 rounded overflow-hidden border border-gray-700 bg-black flex items-center justify-center">
+                    <img src={imagePreview} alt="Preview" className="object-cover w-full h-full" />
+                    <button type="button" onClick={handleRemoveImage} className="absolute top-0 right-0 bg-black bg-opacity-60 text-white rounded-full p-1 hover:bg-red-700">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M6.293 6.293a1 1 0 011.414 0L10 8.586l2.293-2.293a1 1 0 111.414 1.414L11.414 10l2.293 2.293a1 1 0 01-1.414 1.414L10 11.414l-2.293 2.293a1 1 0 01-1.414-1.414L8.586 10 6.293 7.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {!imagePreview && editingEntry?.image_url && (
+                  <div className="relative w-16 h-16 rounded overflow-hidden border border-gray-700 bg-black flex items-center justify-center">
+                    <img src={editingEntry.image_url} alt="Current" className="object-cover w-full h-full" />
+                    <button type="button" onClick={handleRemoveImage} className="absolute top-0 right-0 bg-black bg-opacity-60 text-white rounded-full p-1 hover:bg-red-700">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M6.293 6.293a1 1 0 011.414 0L10 8.586l2.293-2.293a1 1 0 111.414 1.414L11.414 10l2.293 2.293a1 1 0 01-1.414 1.414L10 11.414l-2.293 2.293a1 1 0 01-1.414-1.414L8.586 10 6.293 7.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
             <div>
