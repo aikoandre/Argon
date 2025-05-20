@@ -15,6 +15,7 @@ import {
   type MasterWorldData
 } from '../services/api';
 import { TrashFill } from 'react-bootstrap-icons';
+import { CardImage } from '../components/CardImage';
 
 const VALID_ENTRY_TYPES = ["CHARACTER_LORE", "LOCATION", "FACTION", "ITEM", "CONCEPT"];
 
@@ -99,21 +100,16 @@ const LoreEntriesPage: React.FC = () => {
   const [editingEntry, setEditingEntry] = useState<LoreEntryData | null>(null);
   const [formData, setFormData] = useState<LoreEntryFormData>(initialFormData);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => setImagePreview(reader.result as string);
-      reader.readAsDataURL(file);
     }
   };
 
   const handleRemoveImage = () => {
     setImageFile(null);
-    setImagePreview(null);
   };
 
   const entryTypeOptions: SelectOption[] = VALID_ENTRY_TYPES.map(type => ({
@@ -203,7 +199,7 @@ const LoreEntriesPage: React.FC = () => {
     const isEdit = Boolean(editingEntry);
     let dataToSend: FormData | LoreEntryCreateData | LoreEntryUpdateData;
 
-    if (imageFile || (isEdit && imagePreview === null && editingEntry?.image_url)) {
+    if (imageFile || (isEdit && editingEntry?.image_url)) {
       const formDataToSend = new FormData();
       formDataToSend.append('name', formData.name);
       formDataToSend.append('entry_type', formData.entry_type);
@@ -218,7 +214,7 @@ const LoreEntriesPage: React.FC = () => {
       }
       if (imageFile) {
         formDataToSend.append('image', imageFile);
-      } else if (isEdit && imagePreview === null && editingEntry?.image_url) {
+      } else if (isEdit && editingEntry?.image_url) {
         formDataToSend.append('remove_image', 'true');
       }
       dataToSend = formDataToSend;
@@ -260,7 +256,6 @@ const LoreEntriesPage: React.FC = () => {
       }
       handleCloseModal();
       setImageFile(null);
-      setImagePreview(null);
       const entriesData = await getAllLoreEntriesForMasterWorld(masterWorldId);
       setLoreEntries(entriesData);
       const factionsData = await getAllLoreEntriesForMasterWorld(masterWorldId, "FACTION");
@@ -299,6 +294,13 @@ const LoreEntriesPage: React.FC = () => {
         setIsLoading(false);
       }
     }
+  };
+
+  // Helper function for truncating filenames
+  const truncateFilename = (filename: string | null | undefined, maxLength = 20): string => {
+    if (!filename) return "Select Image";
+    if (filename.length <= maxLength) return filename;
+    return filename.substring(0, maxLength - 3) + '...';
   };
 
   if (isLoading) {
@@ -346,9 +348,11 @@ const LoreEntriesPage: React.FC = () => {
                         className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105"
                         onClick={() => handleOpenModal(entry)}
                       >
-                        {/* Top right icons */}
+                        <CardImage
+                          imageUrl={entry.image_url || null}
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
                         <div className="absolute top-2 right-2 flex space-x-2 z-10">
-                          {/* Removed PencilSquare (edit) button */}
                           <button
                             onClick={e => { e.stopPropagation(); handleDelete(entry.id); }}
                             className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full"
@@ -357,7 +361,6 @@ const LoreEntriesPage: React.FC = () => {
                             <TrashFill className="h-5 w-5" />
                           </button>
                         </div>
-                        {/* Bottom left info */}
                         <div className="absolute bottom-0 left-0 w-full bg-black/30 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
                           <div className="flex w-full items-start">
                             <h2 className="text-lg font-semibold text-white break-words whitespace-normal mr-2 flex-1 leading-snug" title={entry.name}>{entry.name}</h2>
@@ -401,7 +404,9 @@ const LoreEntriesPage: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
                   </svg>
-                  <span>Select Image</span>
+                  <span className="block truncate">
+                    {imageFile?.name || (editingEntry && editingEntry.image_url ? truncateFilename(editingEntry.image_url.split('/').pop() || '', 20) : "Select Image")}
+                  </span>
                   <input 
                     type="file" 
                     accept="image/*" 
@@ -409,25 +414,15 @@ const LoreEntriesPage: React.FC = () => {
                     onChange={handleImageUpload}
                   />
                 </label>
-                {imagePreview && (
-                  <div className="relative w-16 h-16 rounded overflow-hidden border border-gray-700 bg-black flex items-center justify-center">
-                    <img src={imagePreview} alt="Preview" className="object-cover w-full h-full" />
-                    <button type="button" onClick={handleRemoveImage} className="absolute top-0 right-0 bg-black bg-opacity-60 text-white rounded-full p-1 hover:bg-red-700">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M6.293 6.293a1 1 0 011.414 0L10 8.586l2.293-2.293a1 1 0 111.414 1.414L11.414 10l2.293 2.293a1 1 0 01-1.414 1.414L10 11.414l-2.293 2.293a1 1 0 01-1.414-1.414L8.586 10 6.293 7.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                  </div>
-                )}
-                {!imagePreview && editingEntry?.image_url && (
-                  <div className="relative w-16 h-16 rounded overflow-hidden border border-gray-700 bg-black flex items-center justify-center">
-                    <img src={editingEntry.image_url} alt="Current" className="object-cover w-full h-full" />
-                    <button type="button" onClick={handleRemoveImage} className="absolute top-0 right-0 bg-black bg-opacity-60 text-white rounded-full p-1 hover:bg-red-700">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M6.293 6.293a1 1 0 011.414 0L10 8.586l2.293-2.293a1 1 0 111.414 1.414L11.414 10l2.293 2.293a1 1 0 01-1.414 1.414L10 11.414l-2.293 2.293a1 1 0 01-1.414-1.414L8.586 10 6.293 7.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                  </div>
+                {(imageFile || (editingEntry && editingEntry.image_url)) && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-r-md text-xs font-semibold focus:outline-none"
+                    title="Remove image"
+                  >
+                    Remove
+                  </button>
                 )}
               </div>
             </div>

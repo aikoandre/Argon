@@ -98,3 +98,4 @@ const ChatsListPage: React.FC = () => {
 };
 
 export default ChatsListPage;
+// No changes needed for image filename logic here. This page uses the imageUrl provided by the backend, which is now always correct and cache-busted by the card pages. No filename display logic is needed in this file.

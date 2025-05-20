@@ -1,5 +1,5 @@
 # backend/routers/lore_entries.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -20,10 +20,11 @@ master_world_router = APIRouter(
 )
 
 @master_world_router.post("", response_model=LoreEntryInDB, status_code=status.HTTP_201_CREATED)
-def create_lore_entry_for_world(
+async def create_lore_entry_for_world(
     master_world_id: str,
     entry: LoreEntryCreate, # master_world_id não virá mais do payload
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    image: Optional[UploadFile] = File(None)
 ):
     db_master_world = db.query(MasterWorld).filter(MasterWorld.id == master_world_id).first()
     if not db_master_world:
@@ -45,8 +46,12 @@ def create_lore_entry_for_world(
     # Removido attributes do payload, como discutido
     db_entry_data = entry.model_dump()
     db_entry_data.pop('master_world_id', None)  # Corrige erro de argumento duplicado
-    # db_entry_data.pop('attributes', None) # Se 'attributes' ainda estiver no schema Create mas não no modelo
-
+    original_image_name = None
+    if image:
+        from ..file_storage import save_uploaded_file
+        db_entry_data['image_url'] = await save_uploaded_file(image, entity_type="lore", entity_name=entry.name)
+        original_image_name = image.filename
+    db_entry_data['original_image_name'] = original_image_name
     db_entry = LoreEntry(**db_entry_data, master_world_id=master_world_id)
     db.add(db_entry)
     db.commit()
@@ -88,8 +93,8 @@ def get_lore_entry(entry_id: str, db: Session = Depends(get_db)):
     return db_entry
 
 @lore_entry_ops_router.put("/{entry_id}", response_model=LoreEntryInDB)
-def update_lore_entry(
-    entry_id: str, entry_update: LoreEntryUpdate, db: Session = Depends(get_db)
+async def update_lore_entry(
+    entry_id: str, entry_update: LoreEntryUpdate, db: Session = Depends(get_db), image: Optional[UploadFile] = File(None), remove_image: Optional[bool] = False
 ):
     db_entry = db.query(LoreEntry).filter(LoreEntry.id == entry_id).first()
     if db_entry is None:
@@ -119,6 +124,17 @@ def update_lore_entry(
          # para algo que não seja CHARACTER_LORE. Limpar faction_id.
          update_data['faction_id'] = None
 
+    if image:
+        from ..file_storage import save_uploaded_file, delete_image_file
+        if db_entry.image_url:
+            delete_image_file(db_entry.image_url)
+        update_data['image_url'] = await save_uploaded_file(image, entity_type="lore", entity_name=db_entry.name)
+        update_data['original_image_name'] = image.filename
+    elif remove_image and db_entry.image_url:
+        from ..file_storage import delete_image_file
+        delete_image_file(db_entry.image_url)
+        update_data['image_url'] = None
+        update_data['original_image_name'] = None
 
     # Removido attributes do payload, como discutido
     # update_data.pop('attributes', None)
@@ -145,7 +161,12 @@ def delete_lore_entry(entry_id: str, db: Session = Depends(get_db)):
         ).count()
         if referencing_chars > 0:
             raise HTTPException(status_code=409, detail=f"Cannot delete faction '{db_entry.name}'. It is referenced by {referencing_chars} character(s) in this world.")
-    
+
+    # Delete the associated image file if it exists
+    if getattr(db_entry, 'image_url', None):
+        from ..file_storage import delete_image_file
+        delete_image_file(db_entry.image_url)
+
     db.delete(db_entry)
     db.commit()
     return None

@@ -202,7 +202,7 @@ const MasterWorldsPage: React.FC = () => {
   };
 
   // Helper function for truncating filenames
-  const truncateFilename = (filename: string | null | undefined, maxLength = 35): string => {
+  const truncateFilename = (filename: string | null | undefined, maxLength = 20): string => {
     if (!filename) return "Select Image";
     if (filename.length <= maxLength) return filename;
     return filename.substring(0, maxLength - 3) + '...';

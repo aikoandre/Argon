@@ -92,25 +92,41 @@ const ScenariosPage: React.FC = () => {
   // Image states
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageRemoved, setImageRemoved] = useState<boolean>(false);
 
   const triggerFileInput = () => {
     fileInputRef.current?.click();
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  // Helper to handle image change or delete
+  const handleImageChangeOrDelete = (file: File | null) => {
     if (file) {
+      // Replacing: set new file, mark for removal if editing and there was an image
       setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => setImagePreview(reader.result as string);
-      reader.readAsDataURL(file);
+      if (editingScenario && editingScenario.image_url) {
+        setImageRemoved(true); // Mark old image for removal
+      } else {
+        setImageRemoved(false);
+      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } else {
+      // Deleting: clear file, mark for removal if editing and there was an image
+      setImageFile(null);
+      if (editingScenario && editingScenario.image_url) {
+        setImageRemoved(true);
+      } else {
+        setImageRemoved(false);
+      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    handleImageChangeOrDelete(file || null);
+  };
   const handleRemoveImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
+    handleImageChangeOrDelete(null);
   };
 
   // Master World states
@@ -138,22 +154,23 @@ const ScenariosPage: React.FC = () => {
     fetchWorlds();
   }, []);
 
+  // Move fetchScens to a named function so it can be called from handleCloseModal
+  const fetchScenarios = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await getAllScenarioCards();
+      setScenarios(data);
+    } catch (err) {
+      setError("Failed to load scenarios.");
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchScens = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const data = await getAllScenarioCards();
-        console.log("Fetched Scenarios:", data); // ADDED CONSOLE LOG
-        setScenarios(data);
-      } catch (err) {
-        setError("Failed to load scenarios.");
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchScens();
+    fetchScenarios();
   }, []);
 
   const handleStaticInputChange = (
@@ -232,34 +249,32 @@ const ScenariosPage: React.FC = () => {
   const handleOpenModal = (scenario?: ScenarioCardData) => {
     setError(null);
     setEditingScenario(scenario || null);
-    
     if (scenario) {
-      setImagePreview(scenario.image_url || null);
+      setImageFile(null);
+      setImageRemoved(false);
       setFormFields({
         name: scenario.name,
         description: scenario.description || "",
         instructions: scenario.instructions || "",
       });
-      
       setCurrentExampleDialogues(
         scenario.example_dialogues?.length ? [...scenario.example_dialogues] : [""]
       );
       setCurrentBeginningMessages(
         scenario.beginning_message?.length ? [...scenario.beginning_message] : [""]
       );
-      
       const worldOption = masterWorlds.find(w => w.id === scenario.master_world_id);
       setSelectedMasterWorldForForm(
         worldOption ? { value: worldOption.id, label: worldOption.name } : null
       );
     } else {
-      setImagePreview(null);
+      setImageFile(null);
+      setImageRemoved(false);
       setFormFields(initialFormFields);
       setCurrentExampleDialogues([""]);
       setCurrentBeginningMessages([""]);
       setSelectedMasterWorldForForm(null);
     }
-
     setCurrentDialogueIndex(0);
     setCurrentBmgIndex(0);
     setIsModalOpen(true);
@@ -271,6 +286,8 @@ const ScenariosPage: React.FC = () => {
     setFormFields(initialFormFields);
     setSelectedMasterWorldForForm(null);
     setError(null);
+    // Always refresh scenarios after closing modal to ensure UI is up to date
+    fetchScenarios();
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -297,26 +314,23 @@ const ScenariosPage: React.FC = () => {
       example_dialogues: filteredExampleDialogues,
       beginning_message: filteredBeginningMessages,
       master_world_id: selectedMasterWorldForForm?.value || ""
+      // Do NOT include original_image_name or image_url or any image name field
     };
 
     setIsSubmitting(true);
     setError(null);
-
     try {
       // Always use FormData, append scenarioData as JSON string
       const formData = new FormData();
       formData.append('data', JSON.stringify(scenarioData));
-      
-      // Append image if exists
+      // Only append image if exists
       if (imageFile) {
         formData.append('image', imageFile);
       }
-      
-      // Handle remove_image flag for editing
-      if (editingScenario && imagePreview === null && editingScenario.image_url) {
+      // Only append remove_image if editing and imageRemoved
+      if (editingScenario && imageRemoved) {
         formData.append('remove_image', 'true');
       }
-
       // Submit to API
       if (editingScenario) {
         await updateScenarioCard(editingScenario.id, formData);
@@ -391,45 +405,57 @@ const ScenariosPage: React.FC = () => {
       )}
 
       <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 justify-items-center w-full">
-        {scenarios.map((scen) => (
-          <div
-            key={scen.id}
-            className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer group"
-            onClick={() => handleScenarioClick(scen.id)}
-          >
-            {/* Use CardImage for scenario images for consistent backend handling */}
-            <CardImage
-              imageUrl={scen.image_url ? `/api/images/${scen.image_url.replace('static/', '')}` : null}
-              className="absolute inset-0"
-            />
-            {/* Top right icons */}
-            <div className="absolute top-2 right-2 flex space-x-2 z-10">
-              <button
-                onClick={e => { e.stopPropagation(); handleOpenModal(scen); }}
-                className="text-gray-400 hover:text-app-accent transition-colors"
-                title="Edit Scenario"
-              >
-                <PencilSquare className="h-5 w-5" />
-              </button>
-              <button
-                onClick={e => { e.stopPropagation(); handleDelete(scen.id); }}
-                className="text-gray-400 hover:text-red-500 transition-colors"
-                title="Delete Scenario"
-              >
-                <TrashFill className="h-5 w-5" />
-              </button>
-            </div>
-            {/* Bottom info (footer) */}
-            <div className="absolute bottom-0 left-0 w-full">
-              <div className="w-full bg-black/30 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
-                <div className="font-semibold text-lg truncate text-white drop-shadow-md">{scen.name}</div>
-                {scen.description && (
-                  <div className="text-xs text-gray-200 mt-1 line-clamp-2">{scen.description}</div>
-                )}
+        {scenarios.map((scen) => {
+          // Cache-busting: use updated_at if available, else fallback to scenario id and name
+          let cacheBuster = '';
+          if (scen.updated_at) {
+            cacheBuster = `?cb=${encodeURIComponent(scen.updated_at)}`;
+          } else {
+            cacheBuster = `?cb=${scen.id}`;
+          }
+          const imageUrl = scen.image_url
+            ? `/api/images/${scen.image_url.replace('static/', '')}${cacheBuster}`
+            : null;
+          return (
+            <div
+              key={scen.id}
+              className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer group"
+              onClick={() => handleScenarioClick(scen.id)}
+            >
+              {/* Use CardImage for scenario images for consistent backend handling */}
+              <CardImage
+                imageUrl={imageUrl}
+                className="absolute inset-0"
+              />
+              {/* Top right icons */}
+              <div className="absolute top-2 right-2 flex space-x-2 z-10">
+                <button
+                  onClick={e => { e.stopPropagation(); handleOpenModal(scen); }}
+                  className="text-gray-400 hover:text-app-accent transition-colors"
+                  title="Edit Scenario"
+                >
+                  <PencilSquare className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={e => { e.stopPropagation(); handleDelete(scen.id); }}
+                  className="text-gray-400 hover:text-red-500 transition-colors"
+                  title="Delete Scenario"
+                >
+                  <TrashFill className="h-5 w-5" />
+                </button>
+              </div>
+              {/* Bottom info (footer) */}
+              <div className="absolute bottom-0 left-0 w-full">
+                <div className="w-full bg-black/30 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
+                  <div className="font-semibold text-lg truncate text-white drop-shadow-md">{scen.name}</div>
+                  {scen.description && (
+                    <div className="text-xs text-gray-200 mt-1 line-clamp-2">{scen.description}</div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <Modal
@@ -460,7 +486,7 @@ const ScenariosPage: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
                 </svg>
                 <span className="block truncate">
-                  {truncateFilename(imageFile?.name || imagePreview?.split('/').pop())}
+                  {(imageFile && imageFile.name) || (imageRemoved ? "Select Image" : (editingScenario && editingScenario.image_url ? truncateFilename(editingScenario.image_url.split('/').pop() || '', 20) : "Select Image"))}
                 </span>
               </button>
               <input 
@@ -475,6 +501,7 @@ const ScenariosPage: React.FC = () => {
                 type="button" 
                 onClick={handleRemoveImage}
                 className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11"
+                disabled={!(imageFile || (editingScenario && editingScenario.image_url && !imageRemoved))}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />

@@ -1,5 +1,5 @@
 # backend/routers/personas.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -16,8 +16,8 @@ router = APIRouter(
 )
 
 @router.post("", response_model=UserPersonaInDB, status_code=status.HTTP_201_CREATED)
-def create_user_persona(
-    persona: UserPersonaCreate, db: Session = Depends(get_db)
+async def create_user_persona(
+    persona: UserPersonaCreate, db: Session = Depends(get_db), image: Optional[UploadFile] = None
 ):
     """
     Cria uma nova User Persona.
@@ -27,9 +27,14 @@ def create_user_persona(
         world = db.query(MasterWorld).filter(MasterWorld.id == persona.master_world_id).first()
         if not world:
             raise HTTPException(status_code=400, detail="Master World not found")
-    # Remove image_url if present in persona.model_dump()
     persona_data = persona.model_dump()
     persona_data.pop("image_url", None)
+    original_image_name = None
+    if image:
+        from ..file_storage import save_uploaded_file
+        persona_data["image_url"] = await save_uploaded_file(image, entity_type="persona", entity_name=persona.name)
+        original_image_name = image.filename
+    persona_data["original_image_name"] = original_image_name
     db_persona = UserPersona(**persona_data) # Pydantic V2
     # Para Pydantic V1: db_persona = UserPersona(**persona.dict())
     db.add(db_persona)
@@ -56,8 +61,8 @@ def get_user_persona(persona_id: str, db: Session = Depends(get_db)):
     return db_persona
 
 @router.put("/{persona_id}", response_model=UserPersonaInDB)
-def update_user_persona(
-    persona_id: str, persona_update: UserPersonaUpdate, db: Session = Depends(get_db)
+async def update_user_persona(
+    persona_id: str, persona_update: UserPersonaUpdate, db: Session = Depends(get_db), image: Optional[UploadFile] = None, remove_image: Optional[bool] = False
 ):
     """
     Atualiza uma User Persona existente. Permite atualização parcial.
@@ -65,7 +70,6 @@ def update_user_persona(
     db_persona = db.query(UserPersona).filter(UserPersona.id == persona_id).first()
     if db_persona is None:
         raise HTTPException(status_code=404, detail="User Persona not found")
-
     update_data = persona_update.model_dump(exclude_unset=True) # Pydantic V2
     # Para Pydantic V1: update_data = persona_update.dict(exclude_unset=True)
 
@@ -74,6 +78,18 @@ def update_user_persona(
         world = db.query(MasterWorld).filter(MasterWorld.id == update_data["master_world_id"]).first()
         if not world:
             raise HTTPException(status_code=400, detail="Master World not found")
+
+    if image:
+        from ..file_storage import save_uploaded_file, delete_image_file
+        if db_persona.image_url:
+            delete_image_file(db_persona.image_url)
+        update_data["image_url"] = await save_uploaded_file(image, entity_type="persona", entity_name=db_persona.name)
+        update_data["original_image_name"] = image.filename
+    elif remove_image and db_persona.image_url:
+        from ..file_storage import delete_image_file
+        delete_image_file(db_persona.image_url)
+        update_data["image_url"] = None
+        update_data["original_image_name"] = None
 
     for key, value in update_data.items():
         setattr(db_persona, key, value)
@@ -92,6 +108,11 @@ def delete_user_persona(persona_id: str, db: Session = Depends(get_db)):
     if db_persona is None:
         raise HTTPException(status_code=404, detail="User Persona not found")
 
+    # Delete the associated image file if it exists
+    if getattr(db_persona, 'image_url', None):
+        from ..file_storage import delete_image_file
+        delete_image_file(db_persona.image_url)
+
     db.delete(db_persona)
     db.commit()
-    return None # Retorna None para status 204
+    return None

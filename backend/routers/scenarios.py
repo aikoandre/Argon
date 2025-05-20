@@ -56,6 +56,7 @@ async def create_scenario_card(
         if image:
             image_url = await save_uploaded_file(image, entity_name=scenario_data.get('name'), entity_type='scenario')
             create_data['image_url'] = image_url
+            create_data['original_image_name'] = image.filename
 
         db_scenario = ScenarioCard(**create_data)
         print(f"Scenario object created: {db_scenario}")  # Debug log
@@ -143,10 +144,12 @@ async def update_scenario_card(
             # Save new image
             image_url = await save_uploaded_file(image, entity_name=update_data.get('name', db_scenario.name), entity_type='scenario')
             update_dict['image_url'] = image_url
+            update_dict['original_image_name'] = image.filename
         elif remove_image == 'true' and db_scenario.image_url:
             # Remove existing image if requested
             delete_image_file(db_scenario.image_url)
             update_dict['image_url'] = None
+            update_dict['original_image_name'] = None
 
         for key, value in update_dict.items():
             setattr(db_scenario, key, value)
@@ -176,8 +179,10 @@ def delete_scenario_card(scenario_id: str, db: Session = Depends(get_db)):
     if db_scenario is None:
         raise HTTPException(status_code=404, detail="Scenario Card not found")
 
-    # Cuidado: Se ChatSessions estiverem usando este cenário,
-    # pode ser necessário impedir a exclusão ou lidar com as FKs.
+    # Delete associated image file if it exists
+    if db_scenario.image_url:
+        delete_image_file(db_scenario.image_url)
+
     db.delete(db_scenario)
     db.commit()
     return None

@@ -85,7 +85,7 @@ export interface UserPersonaData {
   id: string;
   name: string;
   description?: string | null;
-  image_url?: string | null;
+  image_url?: string | null; // For display only
   created_at: string;
   updated_at?: string | null;
   master_world_id?: string | null;
@@ -95,12 +95,14 @@ export interface UserPersonaCreateData {
   name: string;
   description?: string | null;
   master_world_id?: string | null;
+  // Do NOT include image_url or original_image_name
 }
 
 export interface UserPersonaUpdateData {
   name?: string;
   description?: string | null;
   master_world_id?: string | null;
+  // Do NOT include image_url or original_image_name
 }
 
 const fileApi = axios.create({
@@ -203,7 +205,7 @@ export interface CharacterCardData {
   id: string;
   name: string;
   description?: string | null;
-  image_url?: string | null;
+  image_url?: string | null; // For display only
   instructions?: string | null;
   example_dialogues?: Record<string, any>[] | string[] | null;
   beginning_messages: string[] | null;
@@ -298,7 +300,7 @@ export interface ScenarioCardData {
   name: string;
   description?: string | null;
   instructions?: string | null;
-  image_url?: string | null;
+  image_url?: string | null; // For display only
   beginning_message?: string[] | null;
   example_dialogues?: string[] | null;
   master_world_id?: string | null;
@@ -402,7 +404,7 @@ export interface MasterWorldData {
   name: string;
   description?: string | null;
   tags?: string[] | null;
-  image_url?: string | null; // <-- Add this line for image support
+  image_url?: string | null; // For display only
   created_at: string;
   updated_at?: string | null;
 }
@@ -465,7 +467,7 @@ export interface LoreEntryData {
   tags?: string[] | null;
   aliases?: string[] | null;
   faction_id?: string | null;
-  image_url?: string | null; // <-- Added for image support
+  image_url?: string | null; // For display only
   created_at: string;
   updated_at?: string | null;
 }
@@ -478,6 +480,7 @@ export interface LoreEntryCreateData {
   aliases?: string[] | null;
   faction_id?: string | null;
   master_world_id: string;
+  // Do NOT include image_url or original_image_name
 }
 
 export interface LoreEntryUpdateData {
@@ -487,6 +490,7 @@ export interface LoreEntryUpdateData {
   tags?: string[] | null;
   aliases?: string[] | null;
   faction_id?: string | null;
+  // Do NOT include image_url or original_image_name
 }
 
 export const getAllLoreEntriesForMasterWorld = async (

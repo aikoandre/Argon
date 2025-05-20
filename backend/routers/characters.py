@@ -45,8 +45,10 @@ async def create_character(
 
     # Handle image upload
     image_url = None
+    original_image_name = None
     if image and image.filename:
-        image_url = await save_uploaded_file(image, entity_name=name) # Pass the name
+        image_url = await save_uploaded_file(image, entity_name=name)
+        original_image_name = image.filename
     
     # Parse JSON strings
     example_dialogues_list = json.loads(example_dialogues) if example_dialogues else []
@@ -58,6 +60,7 @@ async def create_character(
         "description": description,
         "instructions": instructions,
         "image_url": image_url,
+        "original_image_name": original_image_name,
         "example_dialogues": example_dialogues_list,
         "beginning_messages": beginning_messages_list,
         "master_world_id": master_world_id,
@@ -108,10 +111,11 @@ async def update_character(
     master_world_id: Optional[str] = Form(None),
     linked_lore_ids: Optional[str] = Form(None),
     image: Optional[UploadFile] = File(None),
+    remove_image: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
     """
-    Updates a character including optional image update.
+    Updates a character including optional image update or removal.
     """
     from ..models.master_world import MasterWorld
 
@@ -119,14 +123,20 @@ async def update_character(
     if not db_character:
         raise HTTPException(status_code=404, detail="Character not found")
 
+    # Handle image removal if requested (and no new image is being uploaded)
+    if remove_image == 'true' and not image and db_character.image_url:
+        delete_image_file(db_character.image_url)
+        db_character.image_url = None
+        db_character.original_image_name = None
+
     # Handle image update
     if image and image.filename:
         # Delete old image if exists
         if db_character.image_url:
             delete_image_file(db_character.image_url)
         # Save new image
-        # Use the potentially updated name when saving the new image
         db_character.image_url = await save_uploaded_file(image, entity_name=name if name is not None else db_character.name)
+        db_character.original_image_name = image.filename
 
     # Parse JSON fields
     if example_dialogues is not None:
@@ -167,12 +177,9 @@ def delete_character_card(character_id: str, db: Session = Depends(get_db)):
     if db_character is None:
         raise HTTPException(status_code=404, detail="Character Card not found")
 
-    # Cuidado: Se houver ChatSessions usando este character, você pode
-    # querer impedir a exclusão ou lidar com isso (ex: definir FK como NULL?).
-    # Por enquanto, apenas deleta.
-    
     # Delete the associated image file if it exists
-    delete_image_file(db_character.image_url)
+    if db_character.image_url:
+        delete_image_file(db_character.image_url)
     db.delete(db_character)
     db.commit()
     return None

@@ -15,8 +15,7 @@ import {
   type UserPersonaUpdateData
 } from "../services/api";
 import { PencilSquare, TrashFill } from 'react-bootstrap-icons';
-// Importe Framer Motion (se já quiser adicionar animações simples)
-// import { motion, AnimatePresence } from 'framer-motion';
+import { CardImage } from '../components/CardImage';
 
 // Define the SelectOption interface here
 interface SelectOption {
@@ -168,6 +167,7 @@ const PersonasPage: React.FC = () => {
       setSelectedMasterWorldForForm(
         worldOption ? { value: worldOption.id, label: worldOption.name } : null
       );
+      // Remove setImagePreview, not used
     } else {
       setEditingPersona(null);
       setFormData({ 
@@ -315,6 +315,13 @@ const PersonasPage: React.FC = () => {
     return `/api/images/serve/${cleanPath}`;
   };
 
+  // Helper function for truncating filenames
+  const truncateFilename = (filename: string | null | undefined, maxLength = 20): string => {
+    if (!filename) return "Select Image";
+    if (filename.length <= maxLength) return filename;
+    return filename.substring(0, maxLength - 3) + '...';
+  };
+
   // Prepare options for the Master World dropdown <-- Added this mapping inside the component
   const masterWorldOptionsForForm: SelectOption[] = masterWorlds.map((w) => ({
     value: w.id,
@@ -362,13 +369,10 @@ const PersonasPage: React.FC = () => {
             onClick={() => handleActivatePersona(persona.id)}
             title={activePersonaId === persona.id ? 'Active' : 'Click to activate'}
           >
-            {persona.image_url && (
-              <img 
-                src={getImageUrl(persona.image_url) || undefined}
-                alt={persona.name}
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-            )}
+            <CardImage
+              imageUrl={persona.image_url || null}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
             <div className="absolute top-2 right-2 flex space-x-2 z-10">
               <button
                 onClick={e => { e.stopPropagation(); handleOpenModal(persona); }}
@@ -434,6 +438,9 @@ const PersonasPage: React.FC = () => {
                 </svg>
               </button>
             </div>
+            <span className="block truncate">
+              {imageFile?.name || (editingPersona && editingPersona.image_url ? truncateFilename(editingPersona.image_url.split('/').pop() || '', 20) : "Select Image")}
+            </span>
           </div>
           <div>
             <label

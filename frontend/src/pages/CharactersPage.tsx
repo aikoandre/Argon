@@ -73,7 +73,7 @@ const CharactersPage: React.FC = () => {
   };
 
   // Helper function for truncating filenames
-  const truncateFilename = (filename: string | null | undefined, maxLength = 35): string => {
+  const truncateFilename = (filename: string | null | undefined, maxLength = 20): string => {
     if (!filename) return "Select Image";
     if (filename.length <= maxLength) return filename;
     return filename.substring(0, maxLength - 3) + '...';
@@ -101,7 +101,6 @@ const CharactersPage: React.FC = () => {
   const [currentBmgIndex, setCurrentBmgIndex] = useState<number>(0);
 
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -240,27 +239,36 @@ const CharactersPage: React.FC = () => {
     setSelectedMasterWorldForForm(selectedOption);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  // Helper to handle image change or delete (unified logic)
+  const [imageRemoved, setImageRemoved] = useState<boolean>(false);
+
+  const handleImageChangeOrDelete = (file: File | null) => {
     if (file) {
       setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      setImageRemoved(false); // New image selected, not removed
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } else {
+      setImageFile(null);
+      if (editingCharacter && editingCharacter.image_url) {
+        setImageRemoved(true); // Mark for removal if editing and there was an image
+      } else {
+        setImageRemoved(false); // Just clear selection if creating new
+      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    handleImageChangeOrDelete(file || null); // No FileReader or setImagePreview
+  };
   const handleRemoveImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
+    handleImageChangeOrDelete(null); // No setImagePreview(null)
   };
 
   console.log("CharactersPage component rendering...");
 
   const handleOpenModal = (character?: CharacterCardData) => {
-    console.log("handleOpenModal called with character:", character);
     setError(null);
     if (character) {
       setEditingCharacter(character);
@@ -269,9 +277,8 @@ const CharactersPage: React.FC = () => {
         description: character.description || "",
         instructions: character.instructions || "",
       });
-      // Only set imageFile and imagePreview to null, do not set imagePreview to character.image_url
       setImageFile(null);
-      setImagePreview(null);
+      setImageRemoved(false); // Reset imageRemoved when editing
 
       // Ensure we have valid arrays for dialogues and messages
       const dialogues = character.example_dialogues?.length
@@ -300,7 +307,7 @@ const CharactersPage: React.FC = () => {
       setCurrentExampleDialogues([""]);
       setCurrentDialogueIndex(0);
       setImageFile(null);
-      setImagePreview(null);
+      setImageRemoved(false); // Reset imageRemoved when creating
       setCurrentBeginningMessages([""]);
       setCurrentBmgIndex(0);
       setSelectedMasterWorldForForm(null);
@@ -353,7 +360,7 @@ const CharactersPage: React.FC = () => {
 
     if (imageFile) {
       characterFormData.append('image', imageFile);
-    } else if (editingCharacter && imagePreview === null) {
+    } else if (editingCharacter && imageRemoved) {
       characterFormData.append('remove_image', 'true');
     }
 
@@ -517,9 +524,13 @@ const CharactersPage: React.FC = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
                     </svg>
                     <span className="block truncate">
-                      {truncateFilename(
-                        imageFile?.name || (editingCharacter && editingCharacter.image_url ? editingCharacter.image_url.split('/').pop() : undefined) || ""
-                      )}
+                      {imageFile
+                        ? truncateFilename(imageFile.name)
+                        : (imageRemoved
+                            ? "Select Image"
+                            : (editingCharacter && editingCharacter.image_url
+                                ? truncateFilename(editingCharacter.image_url.split('/').pop())
+                                : "Select Image"))}
                     </span>
                   </button>
                   <input
@@ -534,6 +545,7 @@ const CharactersPage: React.FC = () => {
                     type="button" 
                     onClick={handleRemoveImage}
                     className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11"
+                    disabled={!(imageFile || (editingCharacter && editingCharacter.image_url && !imageRemoved))}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 10-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
