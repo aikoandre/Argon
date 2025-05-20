@@ -15,7 +15,7 @@ import {
   type ScenarioCardData,
 } from "../services/api";
 import { PencilSquare, TrashFill } from 'react-bootstrap-icons';
-import { CharacterImage } from '../components/CharacterImage';
+import { CardImage } from '../components/CardImage';
 
 interface SelectOption {
   value: string;
@@ -397,8 +397,8 @@ const ScenariosPage: React.FC = () => {
             className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer group"
             onClick={() => handleScenarioClick(scen.id)}
           >
-            {/* Use CharacterImage for scenario images for consistent backend handling */}
-            <CharacterImage
+            {/* Use CardImage for scenario images for consistent backend handling */}
+            <CardImage
               imageUrl={scen.image_url ? `/api/images/${scen.image_url.replace('static/', '')}` : null}
               className="absolute inset-0"
             />

@@ -270,8 +270,7 @@ const PersonasPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (personaId: string) => {
-    if (window.confirm("Are you sure you want to delete this persona?")) {
+  const handleDelete = async (personaId: string) => {{
       setIsLoading(true);
       try {
         await deleteUserPersona(personaId);

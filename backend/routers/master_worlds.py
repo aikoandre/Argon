@@ -115,7 +115,8 @@ def delete_master_world(world_id: str, db: Session = Depends(get_db)):
     db_world = db.query(MasterWorld).filter(MasterWorld.id == world_id).first()
     if db_world is None:
         raise HTTPException(status_code=404, detail="Master World not found")
-    
+    # Delete the associated image file if it exists
+    delete_image_file(db_world.image_url)
     # Cascade delete para LoreEntries é definido no modelo MasterWorld
     db.delete(db_world)
     db.commit()

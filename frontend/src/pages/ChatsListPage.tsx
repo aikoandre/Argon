@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom"; // useNavigate para redirecionar
 import { getAllChatSessions } from "../services/api";
-import { CharacterImage } from "../components/CharacterImage";
+import { CardImage } from "../components/CardImage";
 import type { ChatSessionListedData } from "../services/api";
 
 const ChatsListPage: React.FC = () => {
@@ -55,7 +55,7 @@ const ChatsListPage: React.FC = () => {
       <div className="space-y-4">
         {chatSessions.map((session) => {
           const isCharacter = session.card_type === 'character';
-          const CardImageComponent = CharacterImage;
+          const CardImageComponent = CardImage;
           
           return (
             <div

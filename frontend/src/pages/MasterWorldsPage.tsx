@@ -10,6 +10,7 @@ import {
 import ReactTagInput from "@pathofdev/react-tag-input";
 import "@pathofdev/react-tag-input/build/index.css";
 import { PencilSquare, TrashFill } from 'react-bootstrap-icons';
+import { CardImage } from "../components/CardImage";
 
 interface ModalProps {
   isOpen: boolean;
@@ -186,12 +187,7 @@ const MasterWorldsPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (worldId: string) => {
-    if (
-      window.confirm(
-        "Are you sure you want to delete this world and ALL its lore entries? This action is irreversible."
-      )
-    ) {
+  const handleDelete = async (worldId: string) => {{
       setIsLoading(true);
       try {
         await deleteMasterWorld(worldId);
@@ -244,27 +240,16 @@ const MasterWorldsPage: React.FC = () => {
 
       <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 justify-items-start w-full">
         {masterWorlds.map((world) => {
-          // Helper to get proper image URL for static images
-          const getImageUrl = (url: string | null | undefined) => {
-            if (!url) return undefined;
-            if (url.startsWith('data:')) return url;
-            if (url.startsWith('/api/images/serve/')) return url;
-            // Remove leading /static/ if present
-            const cleanPath = url.replace(/^\/static\//, '');
-            return `/api/images/serve/${cleanPath}`;
-          };
-          const cardBg = world.image_url ? {
-            backgroundImage: `url(${getImageUrl(world.image_url)})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-          } : {};
           return (
             <div
               key={world.id}
               className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105"
               onClick={() => navigate(`/world-lore/${world.id}/entries`)}
-              style={cardBg}
             >
+              <CardImage
+                imageUrl={world.image_url ? `/api/images/${world.image_url.replace(/^\/?static\//, '')}` : null}
+                className="absolute inset-0"
+              />
               {/* Top right icons */}
               <div className="absolute top-2 right-2 flex space-x-2 z-10">
                 <button

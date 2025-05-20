@@ -2,7 +2,7 @@
 import React, { useState, useEffect, type FormEvent, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Select, { type SingleValue } from "react-select";
-import { CharacterImage } from "../components/CharacterImage";
+import { CardImage } from "../components/CardImage";
 import {
   getAllCharacterCards,
   createCharacterCard,
@@ -437,7 +437,7 @@ const CharactersPage: React.FC = () => {
               onClick={() => handleOpenChat(char)}
             >
               {/* Background image with gradient */}
-              <CharacterImage
+              <CardImage
                 imageUrl={char.image_url ? `/api/images/${char.image_url.replace('static/', '')}` : null}
                 className="absolute inset-0"
               />
