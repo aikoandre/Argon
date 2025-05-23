@@ -11,8 +11,41 @@ import {
 import type { ChatMessageData, ChatSessionData } from "../services/api";
 
 // Default avatar images - replace these with your actual avatar URLs
-const DEFAULT_USER_AVATAR = "/user-avatar.png";
-const DEFAULT_BOT_AVATAR = "/bot-avatar.png";
+// Default avatar images - using data URLs to avoid file serving issues for defaults
+const DEFAULT_USER_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'%3E%3C/path%3E%3Ccircle cx='12' cy='7' r='4'%3E%3C/circle%3E%3C/svg%3E";
+const DEFAULT_BOT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'%3E%3C/circle%3E%3Cpath d='M8 9.05v-.1'%3E%3C/path%3E%3Cpath d='M16 9.05v-.1'%3E%3C/path%3E%3Cpath d='M12 13a4 4 0 0 1-4 4'%3E%3C/path%3E%3Cpath d='M12 13a4 4 0 0 0 4 4'%3E%3C/path%3E%3C/svg%3E";
+
+const iconBaseClass = "material-icons-outlined text-2xl flex-shrink-0";
+const SendIcon = ({ className }: { className?: string }) => (
+  <span className={`${iconBaseClass} ${className || ''}`.trim()}>send</span>
+);
+
+// Helper function to get proper image URL for persona images
+const getImageUrl = (imageUrl: string | null) => {
+  if (!imageUrl) return null;
+  if (imageUrl.startsWith('data:')) return imageUrl;
+
+  let cleanedUrl = imageUrl;
+
+  // Remove any existing cache-buster
+  const urlParts = cleanedUrl.split('?');
+  cleanedUrl = urlParts[0];
+
+  // Ensure it starts with /static/
+  if (cleanedUrl.startsWith('/api/images/serve/')) {
+    cleanedUrl = cleanedUrl.replace('/api/images/serve/', '');
+  }
+  if (cleanedUrl.startsWith('images/')) {
+    cleanedUrl = `static/${cleanedUrl}`;
+  } else if (!cleanedUrl.startsWith('static/')) {
+    // If it's just a filename or some other unexpected path, prepend static/images/
+    cleanedUrl = `static/images/personas/${cleanedUrl.split('/').pop()}`;
+  }
+
+  // Add a new cache-busting timestamp
+  const cacheBuster = Date.now();
+  return `/${cleanedUrl}?t=${cacheBuster}`;
+};
 
 const ChatPage: React.FC = () => {
   const { chatId } = useParams<{ chatId: string }>();
@@ -26,6 +59,7 @@ const ChatPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activePersonaId, setActivePersonaId] = useState<string | null>(null);
   const [activePersonaName, setActivePersonaName] = useState<string>("User");
+  const [activePersonaImageUrl, setActivePersonaImageUrl] = useState<string | null>(null);
 
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
   const inputAreaRef = useRef<null | HTMLDivElement>(null);
@@ -71,15 +105,23 @@ const ChatPage: React.FC = () => {
           try {
             const persona = await getUserPersonaById(settings.active_persona_id);
             setActivePersonaName(persona.name || "User");
-          } catch {
+            const imageUrl = getImageUrl(persona.image_url || null);
+            setActivePersonaImageUrl(imageUrl);
+            console.log("Active Persona Image URL:", imageUrl); // Debugging log
+          } catch (err) {
+            console.error("Error fetching active persona or its image:", err); // More specific error log
             setActivePersonaName("User");
+            setActivePersonaImageUrl(null);
           }
         } else {
           setActivePersonaName("User");
+          setActivePersonaImageUrl(null);
         }
       } catch (err) {
+        console.error("Error fetching user settings for active persona:", err); // More specific error log
         setActivePersonaId(null);
         setActivePersonaName("User");
+        setActivePersonaImageUrl(null);
       }
     };
     fetchActivePersona();
@@ -98,8 +140,11 @@ const ChatPage: React.FC = () => {
       sender_type: "USER",
       content: newMessage.trim(),
       timestamp: new Date().toISOString(),
-      // Only include message_metadata if activePersonaId is a non-empty string
+      // Include message_metadata if activePersonaId is a non-empty string
       message_metadata: activePersonaId && activePersonaId !== "" ? { active_persona_id: activePersonaId, active_persona_name: activePersonaName } : undefined,
+      // Store active persona details directly in the message
+      active_persona_name: activePersonaName,
+      active_persona_image_url: activePersonaImageUrl,
     };
 
     setMessages((prevMessages) => [...prevMessages, userMessage]);
@@ -107,11 +152,12 @@ const ChatPage: React.FC = () => {
     setNewMessage("");
 
     try {
-      // Only send message_metadata if activePersonaId is a non-empty string
       const sentMessage = await addMessageToSession(chatId, {
         content: currentMessageContent,
         sender_type: "USER",
         message_metadata: activePersonaId && activePersonaId !== "" ? { active_persona_id: activePersonaId, active_persona_name: activePersonaName } : undefined,
+        active_persona_name: activePersonaName, // Send to backend
+        active_persona_image_url: activePersonaImageUrl, // Send to backend
       });
       setMessages((prevMessages) =>
         prevMessages.map((msg) =>
@@ -198,13 +244,15 @@ const ChatPage: React.FC = () => {
                   {/* Imagem */}
                   <div className="flex-shrink-0 w-16 h-24 mr-3">
                     <img
-                      src={msg.sender_type === "USER" ? DEFAULT_USER_AVATAR : DEFAULT_BOT_AVATAR}
+                      src={msg.sender_type === "USER"
+                        ? (getImageUrl(msg.active_persona_image_url ?? activePersonaImageUrl) || DEFAULT_USER_AVATAR)
+                        : DEFAULT_BOT_AVATAR}
                       alt={msg.sender_type === "USER" ? "User" : "Bot"}
                       className="w-full h-full object-cover rounded-lg bg-gray-700"
                       onError={(e) => {
                         const fallback = msg.sender_type === "USER"
-                          ? "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'%3E%3C/path%3E%3Ccircle cx='12' cy='7' r='4'%3E%3C/circle%3E%3C/svg%3E"
-                          : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'%3E%3C/circle%3E%3Cpath d='M8 9.05v-.1'%3E%3C/path%3E%3Cpath d='M16 9.05v-.1'%3E%3C/path%3E%3Cpath d='M12 13a4 4 0 0 1-4 4'%3E%3C/path%3E%3Cpath d='M12 13a4 4 0 0 0 4 4'%3E%3C/path%3E%3C/svg%3E";
+                          ? DEFAULT_USER_AVATAR // Use the data URL default
+                          : DEFAULT_BOT_AVATAR; // Use the data URL default
                         (e.target as HTMLImageElement).src = fallback;
                       }}
                     />
@@ -214,7 +262,7 @@ const ChatPage: React.FC = () => {
                     <div className="flex items-center mb-1 flex-wrap">
                       <span className="font-medium text-white mr-2">
                         {msg.sender_type === "USER"
-                          ? msg.message_metadata?.active_persona_name || activePersonaName
+                          ? msg.active_persona_name || msg.message_metadata?.active_persona_name || activePersonaName
                           : "Assistant"}
                       </span>
                       <span className="text-xs text-gray-400 mr-2">
@@ -270,19 +318,7 @@ const ChatPage: React.FC = () => {
               {isSending ? (
                 <span className="animate-spin">⟳</span>
               ) : (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="w-5 h-5"
-                >
-                  <line x1="22" y1="2" x2="11" y2="13"></line>
-                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                </svg>
+                <SendIcon className="w-5 h-5" />
               )}
             </button>
           </form>

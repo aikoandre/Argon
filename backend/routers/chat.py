@@ -1,7 +1,7 @@
 # backend/routers/chat.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, select
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 import uuid # Para gerar IDs de sessão se necessário (embora o modelo já faça isso)
@@ -159,12 +159,33 @@ async def list_chat_sessions(
     db: Session = Depends(get_db)
 ):
     try:
-        # Get chat sessions with ordering
-        query = db.query(ChatSession).order_by(ChatSession.last_active_at.desc())
-        sessions = query.offset(skip).limit(limit).all()
+        # Subquery para contar mensagens por sessão
+        message_count_subquery = (
+            select(
+                ChatMessage.chat_session_id,
+                func.count(ChatMessage.id).label("message_count")
+            )
+            .group_by(ChatMessage.chat_session_id)
+            .subquery()
+        )
+
+        # Query principal para sessões de chat, incluindo a contagem de mensagens
+        query = (
+            db.query(
+                ChatSession,
+                message_count_subquery.c.message_count
+            )
+            .outerjoin(
+                message_count_subquery,
+                ChatSession.id == message_count_subquery.c.chat_session_id
+            )
+            .order_by(ChatSession.last_active_at.desc())
+        )
+        
+        sessions_with_counts = query.offset(skip).limit(limit).all()
 
         result = []
-        for session in sessions:
+        for session, message_count in sessions_with_counts:
             try:
                 # Start with basic session data
                 session_data = {
@@ -174,7 +195,8 @@ async def list_chat_sessions(
                     "card_type": session.card_type,
                     "card_id": str(session.card_id) if session.card_id else None,
                     "card_name": None,
-                    "card_image_url": None
+                    "card_image_url": None,
+                    "message_count": message_count if message_count is not None else 0 # Adiciona a contagem de mensagens
                 }
 
                 # Get card details based on card_type
@@ -186,7 +208,7 @@ async def list_chat_sessions(
                 elif session.card_type == "scenario":
                     card = db.query(ScenarioCard).filter(ScenarioCard.id == session.card_id).first()
                     if card:
-                        session_data["card_name"] = card.title
+                        session_data["card_name"] = card.name
                         session_data["card_image_url"] = card.image_url
 
                 result.append(session_data)
@@ -248,7 +270,9 @@ def add_message_to_session(
         chat_session_id=chat_id,
         sender_type=message_create.sender_type,
         content=message_create.content,
-        message_metadata=message_metadata
+        message_metadata=message_metadata,
+        active_persona_name=message_create.active_persona_name, # Pass the name
+        active_persona_image_url=message_create.active_persona_image_url # Pass the image URL
     )
     db.add(db_message)
     

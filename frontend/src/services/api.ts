@@ -570,6 +570,8 @@ export interface ChatMessageData {
   content: string;
   timestamp: string;
   message_metadata?: Record<string, any> | null;
+  active_persona_name?: string | null; // New field
+  active_persona_image_url?: string | null; // New field
 }
 
 export interface ChatSessionBaseData {
@@ -596,6 +598,7 @@ export interface ChatSessionListedData {
   card_id?: string;
   card_name?: string;
   card_image_url?: string;
+  message_count?: number; // Adicionado para contar mensagens
 }
 
 export const createChatSession = async (
@@ -659,6 +662,8 @@ export const addMessageToSession = async (
     content: string;
     sender_type: "USER" | "AI" | "SYSTEM";
     message_metadata?: Record<string, any> | null;
+    active_persona_name?: string | null; // New field
+    active_persona_image_url?: string | null; // New field
   }
 ): Promise<ChatMessageData> => {
   try {

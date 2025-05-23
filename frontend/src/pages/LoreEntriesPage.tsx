@@ -14,8 +14,16 @@ import {
   type LoreEntryUpdateData,
   type MasterWorldData
 } from '../services/api';
-import { TrashFill } from 'react-bootstrap-icons';
+import { useRef } from 'react';
 import { CardImage } from '../components/CardImage';
+
+const iconBaseClass = "material-icons-outlined text-2xl flex-shrink-0";
+const DeleteIcon = ({ className }: { className?: string }) => (
+  <span className={`${iconBaseClass} ${className || ''}`.trim()}>delete</span>
+);
+const ImageIcon = ({ className }: { className?: string }) => (
+  <span className={`${iconBaseClass} ${className || ''}`.trim()}>image</span>
+);
 
 const VALID_ENTRY_TYPES = ["CHARACTER_LORE", "LOCATION", "FACTION", "ITEM", "CONCEPT"];
 
@@ -100,27 +108,24 @@ const LoreEntriesPage: React.FC = () => {
   const [editingEntry, setEditingEntry] = useState<LoreEntryData | null>(null);
   const [formData, setFormData] = useState<LoreEntryFormData>(initialFormData);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imageRemoved, setImageRemoved] = useState(false);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null); // Track current image
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSelectImageClick = () => {
+    fileInputRef.current?.click();
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (!file.type.startsWith('image/')) {
-        setError('Only image files are allowed');
-        return;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        setError('Image must be smaller than 5MB');
-        return;
-      }
       setImageFile(file);
-      setImageRemoved(false);
     }
   };
 
   const handleRemoveImage = () => {
     setImageFile(null);
-    setImageRemoved(true);
+    setCurrentImageUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const entryTypeOptions: SelectOption[] = VALID_ENTRY_TYPES.map(type => ({
@@ -175,7 +180,6 @@ const LoreEntriesPage: React.FC = () => {
   };
 
   const handleOpenModal = (entry?: LoreEntryData) => {
-    setImageRemoved(false);
     setImageFile(null);
     
     if (entry) {
@@ -188,12 +192,11 @@ const LoreEntriesPage: React.FC = () => {
         tags: entry.tags ? [...entry.tags] : [],
         aliases: entry.aliases ? [...entry.aliases] : [],
       });
-      if (entry.image_url) {
-        setImageRemoved(false);
-      }
+      setCurrentImageUrl(entry.image_url || null); // Add this line as per MasterWorldsPage.tsx
     } else {
       setEditingEntry(null);
       setFormData(initialFormData);
+      setCurrentImageUrl(null); // Add this line as per MasterWorldsPage.tsx
     }
     setIsModalOpen(true);
     setError(null);
@@ -229,9 +232,6 @@ const LoreEntriesPage: React.FC = () => {
 
     if (imageFile) {
       formDataToSend.append('image', imageFile);
-    }
-    if (editingEntry && imageRemoved) {
-      formDataToSend.append('remove_image', 'true');
     }
 
     setError(null);
@@ -338,7 +338,7 @@ const LoreEntriesPage: React.FC = () => {
                         onClick={() => handleOpenModal(entry)}
                       >
                         <CardImage
-                            imageUrl={entry.image_url ? `/api/images/${entry.image_url.replace('static/', '')}` : null}
+                            imageUrl={entry.image_url ? `${entry.image_url.replace('static/images/', '')}` : null}
                             className="absolute inset-0"
                         />
                         <div className="absolute top-2 right-2 flex space-x-2 z-10">
@@ -347,7 +347,7 @@ const LoreEntriesPage: React.FC = () => {
                             className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full"
                             title="Delete Lore Entry"
                           >
-                            <TrashFill className="h-5 w-5" />
+                            <DeleteIcon className="h-5 w-5" />
                           </button>
                         </div>
                         <div className="absolute bottom-0 left-0 w-full bg-black/30 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
@@ -386,36 +386,33 @@ const LoreEntriesPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-4 max-h-[80vh] overflow-y-auto p-1 pr-2 custom-scrollbar">
             {/* Campo de imagem opcional - agora antes do campo Name, label em cima */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Image</label>
-              <div className="flex items-center gap-2">
-                <label className="flex-1 bg-app-surface text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11 cursor-pointer">
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
-                  </svg>
-                  <span className="block truncate">
-                    {imageFile?.name || 
-                     (editingEntry && !imageRemoved && editingEntry.image_url ? 
-                      truncateFilename(editingEntry.image_url.split('/').pop() || '', 20) : 
-                      "Select Image")}
-                  </span>
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden" 
-                    onChange={handleImageUpload}
-                  />
-                </label>
-                {(imageFile || (editingEntry && editingEntry.image_url)) && (
-                  <button
-                    type="button"
-                    onClick={handleRemoveImage}
-                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-r-md text-xs font-semibold focus:outline-none"
-                    title="Remove image"
-                  >
-                    Remove
-                  </button>
-                )}
+              <label className="block text-sm font-medium text-gray-300 mb-2">Image</label>
+              <div className="flex items-center">
+                <button
+                  type="button"
+                  onClick={handleSelectImageClick}
+                  className="flex-1 bg-app-surface text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11 overflow-hidden whitespace-nowrap"
+                >
+                  <ImageIcon className="w-5 h-5 mr-2" />
+                  <span>{imageFile ? truncateFilename(imageFile.name) : currentImageUrl ? `Current: ${truncateFilename(currentImageUrl.split('/').pop() as string)}` : "Select Image"}</span>
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageUpload}
+                />
+                <span className="h-11 w-px bg-app-surface" />
+                <button
+                  type="button"
+                  className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11"
+                  onClick={handleRemoveImage}
+                  disabled={!imageFile && !currentImageUrl}
+                  title="Remove image"
+                >
+                  <DeleteIcon className="w-5 h-5" />
+                </button>
               </div>
             </div>
             <div>

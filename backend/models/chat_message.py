@@ -17,5 +17,9 @@ class ChatMessage(Base):
     
     message_metadata = Column(JSON, nullable=True) # Para "pensamentos da IA", dados de RAG, etc.
 
+    # New fields for storing persona details at the time of message creation
+    active_persona_name = Column(String, nullable=True)
+    active_persona_image_url = Column(String, nullable=True)
+
     # Relacionamento de volta para a sessão
     session = relationship("ChatSession", back_populates="messages")

@@ -9,8 +9,18 @@ import {
 } from "../services/api";
 import ReactTagInput from "@pathofdev/react-tag-input";
 import "@pathofdev/react-tag-input/build/index.css";
-import { PencilSquare, TrashFill } from 'react-bootstrap-icons';
 import { CardImage } from "../components/CardImage";
+
+const iconBaseClass = "material-icons-outlined text-2xl flex-shrink-0";
+const EditIcon = ({ className }: { className?: string }) => (
+  <span className={`${iconBaseClass} ${className || ''}`.trim()}>edit</span>
+);
+const DeleteIcon = ({ className }: { className?: string }) => (
+  <span className={`${iconBaseClass} ${className || ''}`.trim()}>delete</span>
+);
+const ImageIcon = ({ className }: { className?: string }) => (
+  <span className={`${iconBaseClass} ${className || ''}`.trim()}>image</span>
+);
 
 interface ModalProps {
   isOpen: boolean;
@@ -247,7 +257,7 @@ const MasterWorldsPage: React.FC = () => {
               onClick={() => navigate(`/world-lore/${world.id}/entries`)}
             >
               <CardImage
-                imageUrl={world.image_url ? `/api/images/${world.image_url.replace('static/', '')}` : null}
+                imageUrl={world.image_url ? `${world.image_url.replace('static/images/', '')}` : null}
                 className="absolute inset-0"
               />
               {/* Top right icons */}
@@ -257,14 +267,14 @@ const MasterWorldsPage: React.FC = () => {
                   className="text-gray-400 hover:text-app-accent transition-colors"
                   title="Edit World"
                 >
-                  <PencilSquare className="h-5 w-5" />
+                  <EditIcon className="h-5 w-5" />
                 </button>
                 <button
                   onClick={e => { e.stopPropagation(); handleDelete(world.id); }}
                   className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full"
                   title="Delete World"
                 >
-                  <TrashFill className="h-5 w-5" />
+                  <DeleteIcon className="h-5 w-5" />
                 </button>
               </div>
               {/* Bottom info (footer) */}
@@ -313,11 +323,8 @@ const MasterWorldsPage: React.FC = () => {
                 onClick={handleSelectImageClick}
                 className="flex-1 bg-app-surface text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11 overflow-hidden whitespace-nowrap"
               >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
-                </svg>
-                <span>{imageFile ? truncateFilename(imageFile.name) : currentImageUrl ? `Current: ${truncateFilename(currentImageUrl.split('/').pop())}` : "Select Image"}</span>
+                <ImageIcon className="w-5 h-5 mr-2" />
+                <span>{imageFile ? truncateFilename(imageFile.name) : currentImageUrl ? `Current: ${truncateFilename(currentImageUrl.split('/').pop() as string)}` : "Select Image"}</span>
               </button>
               <input
                 ref={fileInputRef}
@@ -334,7 +341,7 @@ const MasterWorldsPage: React.FC = () => {
                 disabled={!imageFile && !currentImageUrl}
                 title="Remove image"
               >
-                <TrashFill className="w-5 h-5" />
+                <DeleteIcon className="w-5 h-5" />
               </button>
             </div>
           </div>

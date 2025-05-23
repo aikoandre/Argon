@@ -11,10 +11,9 @@ logger = logging.getLogger(__name__)
 
 # Calculate PROJECT_ROOT based on the location of this file
 # This file is in `backend/file_storage.py`.
-# Path(__file__).resolve().parent gives `backend` directory.
-# .parent again gives the `backend` directory.
-# .parent again gives the `project_root` directory.
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+# Path(__file__).resolve().parent gives `backend` directory
+# .parent again gives the project root directory
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # Base directory where static files are served FROM (e.g., project_root/static)
 BASE_STATIC_DIR = PROJECT_ROOT / "static"
@@ -95,7 +94,7 @@ async def save_uploaded_file(file: UploadFile, entity_name: Optional[str] = None
         logger.error(f"Error saving file {file.filename} to {file_path}: {e}", exc_info=True)
         raise HTTPException(500, f"Error saving file: {str(e)}") # Re-raise as HTTPException
 
-    return f"/api/images/serve/images/{entity_subdir}/{filename}"
+    return f"/api/images/serve/{entity_subdir}/{filename}"
 
 def delete_image_file(image_url: str) -> None:
     if not image_url:

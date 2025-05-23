@@ -3,13 +3,23 @@ import os
 import logging # Import logging early
 
 # Configure basic logging to show DEBUG messages as early as possible
-logging.basicConfig(level=logging.DEBUG, 
+logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     stream=sys.stdout) # Ensure output goes to console
+
+# Explicitly set logger levels to DEBUG
+logging.getLogger().setLevel(logging.DEBUG);
+logging.getLogger('backend').setLevel(logging.DEBUG);
 
 # Add project root to sys.path
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, PROJECT_ROOT)
+
+# Print PROJECT_ROOT and STATIC_DIR for immediate verification
+print(f"DEBUG: PROJECT_ROOT resolved to: {PROJECT_ROOT}");
+import pathlib;
+STATIC_DIR_TEST = pathlib.Path(PROJECT_ROOT) / "static";
+print(f"DEBUG: STATIC_DIR resolved to: {STATIC_DIR_TEST}");
 
 from starlette.responses import FileResponse, JSONResponse # Import FileResponse and JSONResponse
 from fastapi import FastAPI, BackgroundTasks, UploadFile, HTTPException, status
@@ -72,6 +82,7 @@ static_files = StaticFiles(
 
 # Mount static files under /static (This is where /static/images/... will be served)
 # REMOVE THE MOUNT LINE FOR "/api/images"
+# IMPORTANT: Mount static files *before* any middleware or other routes that might interfere.
 app.mount("/static", static_files, name="static")
 
 # Add middleware to set default content types
