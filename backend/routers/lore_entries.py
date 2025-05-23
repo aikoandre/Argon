@@ -1,4 +1,5 @@
 # backend/routers/lore_entries.py
+import json
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -22,37 +23,63 @@ master_world_router = APIRouter(
 @master_world_router.post("", response_model=LoreEntryInDB, status_code=status.HTTP_201_CREATED)
 async def create_lore_entry_for_world(
     master_world_id: str,
-    entry: LoreEntryCreate, # master_world_id não virá mais do payload
+    data: str = Form(...),
     db: Session = Depends(get_db),
     image: Optional[UploadFile] = File(None)
 ):
+    try:
+        entry_data = json.loads(data)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON data")
+
+    # Validate entry_type first
+    if "entry_type" not in entry_data:
+        raise HTTPException(status_code=400, detail="entry_type is required")
+    if entry_data["entry_type"] not in VALID_ENTRY_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid entry_type. Valid types: {VALID_ENTRY_TYPES}"
+        )
+
+    # Validate faction_id
+    faction_id = entry_data.get("faction_id")
+    if faction_id:
+        if entry_data["entry_type"] != "CHARACTER_LORE":
+            raise HTTPException(
+                status_code=400,
+                detail="faction_id can only be set for CHARACTER_LORE type"
+            )
+            
+        faction = db.query(LoreEntry).filter(
+            LoreEntry.id == faction_id,
+            LoreEntry.entry_type == "FACTION",  # Keep this critical check
+            LoreEntry.master_world_id == master_world_id
+        ).first()
+        if not faction:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid faction_id: Must be a FACTION entry in this world"
+            )
+
     db_master_world = db.query(MasterWorld).filter(MasterWorld.id == master_world_id).first()
     if not db_master_world:
         raise HTTPException(status_code=404, detail="Master World not found")
 
-    # Validação para faction_id
-    if entry.faction_id:
-        if entry.entry_type != "CHARACTER_LORE":
-            raise HTTPException(status_code=400, detail="faction_id can only be set for CHARACTER_LORE type")
-        
-        faction = db.query(LoreEntry).filter(
-            LoreEntry.id == entry.faction_id,
-            LoreEntry.entry_type == "FACTION",
-            LoreEntry.master_world_id == master_world_id # Facção deve ser do mesmo mundo
-        ).first()
-        if not faction:
-            raise HTTPException(status_code=400, detail=f"Invalid faction_id: Faction {entry.faction_id} not found in this world or not a FACTION type.")
+    db_entry_data = {
+        **entry_data,
+        "master_world_id": master_world_id,
+        "faction_id": faction_id if entry_data["entry_type"] == "CHARACTER_LORE" else None
+    }
 
-    # Removido attributes do payload, como discutido
-    db_entry_data = entry.model_dump()
-    db_entry_data.pop('master_world_id', None)  # Corrige erro de argumento duplicado
-    original_image_name = None
     if image:
         from ..file_storage import save_uploaded_file
-        db_entry_data['image_url'] = await save_uploaded_file(image, entity_type="lore", entity_name=entry.name)
-        original_image_name = image.filename
-    db_entry_data['original_image_name'] = original_image_name
-    db_entry = LoreEntry(**db_entry_data, master_world_id=master_world_id)
+        db_entry_data['image_url'] = await save_uploaded_file(
+            image, 
+            entity_type="lore", 
+            entity_name=entry_data["name"]
+        )
+
+    db_entry = LoreEntry(**db_entry_data)
     db.add(db_entry)
     db.commit()
     db.refresh(db_entry)
@@ -94,51 +121,66 @@ def get_lore_entry(entry_id: str, db: Session = Depends(get_db)):
 
 @lore_entry_ops_router.put("/{entry_id}", response_model=LoreEntryInDB)
 async def update_lore_entry(
-    entry_id: str, entry_update: LoreEntryUpdate, db: Session = Depends(get_db), image: Optional[UploadFile] = File(None), remove_image: Optional[bool] = False
+    entry_id: str,
+    data: str = Form(None),
+    db: Session = Depends(get_db),
+    image: Optional[UploadFile] = File(None),
+    remove_image: Optional[bool] = False
 ):
     db_entry = db.query(LoreEntry).filter(LoreEntry.id == entry_id).first()
     if db_entry is None:
         raise HTTPException(status_code=404, detail="Lore Entry not found")
 
-    update_data = entry_update.model_dump(exclude_unset=True)
+    # Parse the JSON data from FormData
+    update_data = {}
+    if data:
+        try:
+            update_data = json.loads(data)
+        except json.JSONDecodeError:
+            raise HTTPException(400, "Invalid JSON data")
     
-    # Validação para faction_id se estiver sendo atualizado
-    # (O entry_type não deve ser mudado via PUT, ou se for, revalidar faction_id)
-    new_entry_type = update_data.get('entry_type', db_entry.entry_type) # Se permitir mudar tipo
-    new_faction_id = update_data.get('faction_id', db_entry.faction_id)
-
-    if 'faction_id' in update_data: # Se faction_id está no payload
-        if new_faction_id is not None:
-            if new_entry_type != "CHARACTER_LORE":
-                raise HTTPException(status_code=400, detail="faction_id can only be set for CHARACTER_LORE type")
-            faction = db.query(LoreEntry).filter(
-                LoreEntry.id == new_faction_id,
-                LoreEntry.entry_type == "FACTION",
-                LoreEntry.master_world_id == db_entry.master_world_id # Importante: facção do mesmo mundo
-            ).first()
-            if not faction:
-                raise HTTPException(status_code=400, detail=f"Invalid faction_id: Faction {new_faction_id} not found in this world or not a FACTION type.")
-        # Se new_faction_id for None, está limpando, o que é permitido
-    elif new_faction_id is not None and new_entry_type != "CHARACTER_LORE":
-         # faction_id não está no payload, mas existia e o TIPO está mudando
-         # para algo que não seja CHARACTER_LORE. Limpar faction_id.
-         update_data['faction_id'] = None
-
+    # Handle image separately from the update data
     if image:
         from ..file_storage import save_uploaded_file, delete_image_file
         if db_entry.image_url:
             delete_image_file(db_entry.image_url)
-        update_data['image_url'] = await save_uploaded_file(image, entity_type="lore", entity_name=db_entry.name)
-        update_data['original_image_name'] = image.filename
+        # Set image_url directly on the DB entry
+        db_entry.image_url = await save_uploaded_file(
+            image, 
+            entity_type="lore", 
+            entity_name=db_entry.name
+        )
     elif remove_image and db_entry.image_url:
         from ..file_storage import delete_image_file
         delete_image_file(db_entry.image_url)
-        update_data['image_url'] = None
-        update_data['original_image_name'] = None
+        db_entry.image_url = None
 
-    # Removido attributes do payload, como discutido
-    # update_data.pop('attributes', None)
+    # Handle faction_id validation
+    new_entry_type = update_data.get('entry_type', db_entry.entry_type)
+    new_faction_id = update_data.get('faction_id', db_entry.faction_id)
+    # Handle empty string as None
+    if new_faction_id == "":
+        new_faction_id = None
 
+    if 'faction_id' in update_data:
+        if new_faction_id is not None:
+            if new_entry_type != "CHARACTER_LORE":
+                raise HTTPException(
+                    status_code=400, 
+                    detail="faction_id can only be set for CHARACTER_LORE type"
+                )
+            faction = db.query(LoreEntry).filter(
+                LoreEntry.id == new_faction_id,
+                LoreEntry.entry_type == "FACTION",
+                LoreEntry.master_world_id == db_entry.master_world_id
+            ).first()
+            if not faction:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid faction_id: Faction {new_faction_id} not found in this world"
+                )
+
+    # Update other fields
     for key, value in update_data.items():
         setattr(db_entry, key, value)
     

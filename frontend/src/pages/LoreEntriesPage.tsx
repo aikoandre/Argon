@@ -100,16 +100,27 @@ const LoreEntriesPage: React.FC = () => {
   const [editingEntry, setEditingEntry] = useState<LoreEntryData | null>(null);
   const [formData, setFormData] = useState<LoreEntryFormData>(initialFormData);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageRemoved, setImageRemoved] = useState(false);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (!file.type.startsWith('image/')) {
+        setError('Only image files are allowed');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Image must be smaller than 5MB');
+        return;
+      }
       setImageFile(file);
+      setImageRemoved(false);
     }
   };
 
   const handleRemoveImage = () => {
     setImageFile(null);
+    setImageRemoved(true);
   };
 
   const entryTypeOptions: SelectOption[] = VALID_ENTRY_TYPES.map(type => ({
@@ -164,6 +175,9 @@ const LoreEntriesPage: React.FC = () => {
   };
 
   const handleOpenModal = (entry?: LoreEntryData) => {
+    setImageRemoved(false);
+    setImageFile(null);
+    
     if (entry) {
       setEditingEntry(entry);
       setFormData({
@@ -174,6 +188,9 @@ const LoreEntriesPage: React.FC = () => {
         tags: entry.tags ? [...entry.tags] : [],
         aliases: entry.aliases ? [...entry.aliases] : [],
       });
+      if (entry.image_url) {
+        setImageRemoved(false);
+      }
     } else {
       setEditingEntry(null);
       setFormData(initialFormData);
@@ -197,62 +214,32 @@ const LoreEntriesPage: React.FC = () => {
     if (!formData.entry_type) { setError("Entry Type is required."); setIsSubmitting(false); return; }
 
     const isEdit = Boolean(editingEntry);
-    let dataToSend: FormData | LoreEntryCreateData | LoreEntryUpdateData;
+    const formDataToSend = new FormData();
+    const payload = {
+      name: formData.name,
+      entry_type: formData.entry_type,
+      description: formData.description || '',
+      tags: formData.tags,
+      aliases: formData.aliases,
+      faction_id: formData.entry_type === "CHARACTER_LORE" ? formData.faction_id : null,
+      ...(!isEdit && { master_world_id: masterWorldId })
+    };
 
-    if (imageFile || (isEdit && editingEntry?.image_url)) {
-      const formDataToSend = new FormData();
-      formDataToSend.append('name', formData.name);
-      formDataToSend.append('entry_type', formData.entry_type);
-      formDataToSend.append('description', formData.description || '');
-      formDataToSend.append('tags', JSON.stringify(formData.tags.length > 0 ? formData.tags : null));
-      formDataToSend.append('aliases', JSON.stringify(formData.aliases.length > 0 ? formData.aliases : null));
-      if (formData.entry_type === "CHARACTER_LORE") {
-        formDataToSend.append('faction_id', formData.faction_id || '');
-      }
-      if (!isEdit) {
-        formDataToSend.append('master_world_id', masterWorldId);
-      }
-      if (imageFile) {
-        formDataToSend.append('image', imageFile);
-      } else if (isEdit && editingEntry?.image_url) {
-        formDataToSend.append('remove_image', 'true');
-      }
-      dataToSend = formDataToSend;
-    } else {
-      if (isEdit) {
-        // Update: do not send master_world_id
-        const updatePayload: LoreEntryUpdateData = {
-          name: formData.name,
-          entry_type: formData.entry_type,
-          description: formData.description,
-          tags: formData.tags.length > 0 ? formData.tags : null,
-          aliases: formData.aliases.length > 0 ? formData.aliases : null,
-        };
-        if (formData.entry_type === "CHARACTER_LORE") {
-          updatePayload.faction_id = formData.faction_id || null;
-        }
-        dataToSend = updatePayload;
-      } else {
-        // Create: must send master_world_id
-        const createPayload: LoreEntryCreateData = {
-          name: formData.name,
-          entry_type: formData.entry_type,
-          description: formData.description,
-          tags: formData.tags.length > 0 ? formData.tags : null,
-          aliases: formData.aliases.length > 0 ? formData.aliases : null,
-          faction_id: formData.entry_type === "CHARACTER_LORE" ? (formData.faction_id || null) : null,
-          master_world_id: masterWorldId,
-        };
-        dataToSend = createPayload;
-      }
+    formDataToSend.append('data', JSON.stringify(payload));
+
+    if (imageFile) {
+      formDataToSend.append('image', imageFile);
+    }
+    if (editingEntry && imageRemoved) {
+      formDataToSend.append('remove_image', 'true');
     }
 
     setError(null);
     try {
       if (isEdit) {
-        await updateLoreEntry(editingEntry!.id, dataToSend as FormData | LoreEntryUpdateData);
+        await updateLoreEntry(editingEntry!.id, formDataToSend);
       } else {
-        await createLoreEntryForMasterWorld(masterWorldId, dataToSend as FormData | LoreEntryCreateData);
+        await createLoreEntryForMasterWorld(masterWorldId, formDataToSend);
       }
       handleCloseModal();
       setImageFile(null);
@@ -261,14 +248,16 @@ const LoreEntriesPage: React.FC = () => {
       const factionsData = await getAllLoreEntriesForMasterWorld(masterWorldId, "FACTION");
       setFactionsOptions(factionsData.map(f => ({ value: f.id, label: f.name })));
     } catch (err: any) {
+      console.log('Full error response:', err.response?.data);
       let apiError = isEdit ? 'Failed to update lore entry.' : 'Failed to create lore entry.';
       if (err.response?.data?.detail) {
         if (Array.isArray(err.response.data.detail)) {
-          apiError = err.response.data.detail.map((e: any) => e.msg).join(' | ');
+          apiError = err.response.data.detail.map((e: any) => {
+            const field = e.loc?.join('.') || 'field';
+            return `${field}: ${e.msg}`;
+          }).join(' | ');
         } else if (typeof err.response.data.detail === 'string') {
           apiError = err.response.data.detail;
-        } else if (typeof err.response.data.detail === 'object' && err.response.data.detail.msg) {
-          apiError = err.response.data.detail.msg;
         }
       }
       setError(apiError);
@@ -345,12 +334,12 @@ const LoreEntriesPage: React.FC = () => {
                     {entriesOfType.map(entry => (
                       <div
                         key={entry.id}
-                        className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105"
+                        className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer group"
                         onClick={() => handleOpenModal(entry)}
                       >
                         <CardImage
-                          imageUrl={entry.image_url || null}
-                          className="absolute inset-0 w-full h-full object-cover"
+                            imageUrl={entry.image_url ? `/api/images/${entry.image_url.replace('static/', '')}` : null}
+                            className="absolute inset-0"
                         />
                         <div className="absolute top-2 right-2 flex space-x-2 z-10">
                           <button
@@ -405,7 +394,10 @@ const LoreEntriesPage: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
                   </svg>
                   <span className="block truncate">
-                    {imageFile?.name || (editingEntry && editingEntry.image_url ? truncateFilename(editingEntry.image_url.split('/').pop() || '', 20) : "Select Image")}
+                    {imageFile?.name || 
+                     (editingEntry && !imageRemoved && editingEntry.image_url ? 
+                      truncateFilename(editingEntry.image_url.split('/').pop() || '', 20) : 
+                      "Select Image")}
                   </span>
                   <input 
                     type="file" 

@@ -105,26 +105,16 @@ export interface UserPersonaUpdateData {
   // Do NOT include image_url or original_image_name
 }
 
-const fileApi = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
-  headers: {
-    "Content-Type": "multipart/form-data",
-  },
-});
-
 export const createUserPersona = async (
-  data: FormData | UserPersonaCreateData
+  data: FormData // Expects a fully prepared FormData object from the component
 ): Promise<UserPersonaData> => {
   try {
-    if (data instanceof FormData) {
-      // If FormData (image upload), use fileApi
-      const response = await fileApi.post<UserPersonaData>("/personas", data);
-      return response.data;
-    } else {
-      // If plain JSON, use apiClient
-      const response = await apiClient.post<UserPersonaData>("/personas", data);
-      return response.data;
-    }
+    const response = await apiClient.post<UserPersonaData>("/personas", data, {
+      headers: {
+        'Content-Type': 'multipart/form-data' // Essential for FormData
+      }
+    });
+    return response.data;
   } catch (error) {
     console.error("Error creating user persona:", error);
     throw error;
@@ -155,47 +145,33 @@ export const getUserPersonaById = async (
   }
 };
 
+
 export const updateUserPersona = async (
   personaId: string,
-  personaData: UserPersonaUpdateData
+  formData: FormData // Expects a fully prepared FormData object from the component
 ): Promise<UserPersonaData> => {
   try {
     const response = await apiClient.put<UserPersonaData>(
       `/personas/${personaId}`,
-      personaData
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data' // Essential for FormData
+        }
+      }
     );
     return response.data;
   } catch (error) {
     console.error(`Error updating user persona ${personaId}:`, error);
     throw error;
   }
-};
+}
 
 export const deleteUserPersona = async (personaId: string): Promise<void> => {
   try {
     await apiClient.delete(`/personas/${personaId}`);
   } catch (error) {
     console.error(`Error deleting user persona ${personaId}:`, error);
-    throw error;
-  }
-};
-
-export const uploadPersonaImage = async (personaId: string, file: File): Promise<UserPersonaData> => {
-  const formData = new FormData();
-  formData.append("image", file);
-  const response = await fileApi.post<UserPersonaData>(`/personas/${personaId}/image`, formData);
-  return response.data;
-};
-
-export const updateUserPersonaWithImage = async (
-  personaId: string,
-  formData: FormData
-): Promise<UserPersonaData> => {
-  try {
-    const response = await fileApi.put<UserPersonaData>(`/personas/${personaId}`, formData);
-    return response.data;
-  } catch (error) {
-    console.error(`Error updating user persona ${personaId} with image:`, error);
     throw error;
   }
 };
@@ -372,10 +348,13 @@ export const updateScenarioCard = async (
   scenarioFormData: FormData
 ): Promise<ScenarioCardData> => {
    try {
-       // Use fileApi for multipart/form-data requests
-       const response = await fileApi.put<ScenarioCardData>(
+       // Use apiClient instead of fileApi and add explicit headers
+       const response = await apiClient.put<ScenarioCardData>(
          `/scenarios/${scenarioId}`,
-         scenarioFormData
+         scenarioFormData,
+         {
+           headers: { 'Content-Type': 'multipart/form-data' } // Crucial for FormData
+         }
        );
        return response.data;
    } catch (error: any) {
@@ -437,10 +416,13 @@ export const updateMasterWorld = async (
   data: FormData | { name?: string; description?: string | null; tags?: string[] | null }
 ): Promise<MasterWorldData> => {
   if (data instanceof FormData) {
-    // Use fileApi for multipart/form-data requests
-    const response = await fileApi.put<MasterWorldData>(
+    // Use apiClient instead of fileApi and add explicit headers
+    const response = await apiClient.put<MasterWorldData>(
       `/master_worlds/${id}`,
-      data
+      data,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' } // Crucial for FormData
+      }
     );
     return response.data;
   } else {
@@ -513,15 +495,26 @@ export const createLoreEntryForMasterWorld = async (
   data: LoreEntryCreateData | FormData
 ): Promise<LoreEntryData> => {
   if (data instanceof FormData) {
-    const response = await fileApi.post<LoreEntryData>(
+    const response = await apiClient.post<LoreEntryData>(
       `/master_worlds/${masterWorldId}/lore_entries`,
-      data
+      data,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data' // Added header
+        }
+      }
     );
     return response.data;
   } else {
+    // Fallback for JSON (shouldn't be used but kept for safety)
     const response = await apiClient.post<LoreEntryData>(
       `/master_worlds/${masterWorldId}/lore_entries`,
-      data
+      data,
+      {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
     );
     return response.data;
   }
@@ -541,9 +534,14 @@ export const updateLoreEntry = async (
   data: LoreEntryUpdateData | FormData
 ): Promise<LoreEntryData> => {
   if (data instanceof FormData) {
-    const response = await fileApi.put<LoreEntryData>(
+    const response = await apiClient.put<LoreEntryData>(
       `/lore_entries/${entryId}`,
-      data
+      data,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      }
     );
     return response.data;
   } else {
@@ -621,7 +619,7 @@ export const getAllChatSessions = async (): Promise<
   ChatSessionListedData[]
 > => {
   try {
-    const response = await apiClient.get<ChatSessionListedData[]>("/chats");
+    const response = await apiClient.get<ChatSessionListedData[]>("/chat");
     return response.data;
   } catch (error) {
     console.error("Error fetching chat sessions:", error);

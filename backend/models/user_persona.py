@@ -17,6 +17,7 @@ class UserPersona(Base):
     master_world_id = Column(String, ForeignKey("master_worlds.id", ondelete="SET NULL"), nullable=True, index=True)
     # Optionally, add relationship if you want to access the world from persona
     master_world = relationship("MasterWorld")
+    image_url = Column(String, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

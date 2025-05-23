@@ -17,5 +17,6 @@ class LoreEntry(Base):
     faction_id = Column(String, ForeignKey("lore_entries.id"), nullable=True)
     master_world_id = Column(String, ForeignKey("master_worlds.id"), nullable=False, index=True)
     master_world = relationship("MasterWorld", back_populates="lore_entries")
+    image_url = Column(String, nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), onupdate=func.now())

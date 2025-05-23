@@ -40,16 +40,13 @@ async def create_master_world(
                 detail="Tags must be a JSON stringified list, e.g. ['tag1','tag2']"
             )
     image_url = None
-    original_image_name = None
     if image:
         image_url = await save_uploaded_file(image, entity_type="world", entity_name=name)
-        original_image_name = image.filename
     db_world = MasterWorld(
         name=name,
         description=description,
         tags=tags_list,
-        image_url=image_url,
-        original_image_name=original_image_name
+        image_url=image_url
     )
     db.add(db_world)
     db.commit()
@@ -100,14 +97,12 @@ async def update_master_world(
             except Exception:
                 pass
         update_data["image_url"] = await save_uploaded_file(image, entity_type="world", entity_name=name or db_world.name)
-        update_data["original_image_name"] = image.filename
     elif remove_image and db_world.image_url:
         try:
             delete_image_file(db_world.image_url)
         except Exception:
             pass
         update_data["image_url"] = None
-        update_data["original_image_name"] = None
     for key, value in update_data.items():
         setattr(db_world, key, value)
     db.add(db_world)

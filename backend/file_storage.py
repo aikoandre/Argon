@@ -9,8 +9,15 @@ from typing import Optional # Import Optional
 # Set up logging
 logger = logging.getLogger(__name__)
 
-# Base directory where static files are served FROM relative to project root
-BASE_STATIC_DIR = Path("static")
+# Calculate PROJECT_ROOT based on the location of this file
+# This file is in `backend/file_storage.py`.
+# Path(__file__).resolve().parent gives `backend` directory.
+# .parent again gives the `backend` directory.
+# .parent again gives the `project_root` directory.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+# Base directory where static files are served FROM (e.g., project_root/static)
+BASE_STATIC_DIR = PROJECT_ROOT / "static"
 BASE_IMAGES_DIR = BASE_STATIC_DIR / "images"
 
 # Directory structure for different entity types
@@ -88,28 +95,31 @@ async def save_uploaded_file(file: UploadFile, entity_name: Optional[str] = None
         logger.error(f"Error saving file {file.filename} to {file_path}: {e}", exc_info=True)
         raise HTTPException(500, f"Error saving file: {str(e)}") # Re-raise as HTTPException
 
-    return f"/static/images/{entity_subdir}/{filename}"
+    return f"/api/images/serve/images/{entity_subdir}/{filename}"
 
 def delete_image_file(image_url: str) -> None:
     if not image_url:
         return
 
     # Ensure it's a static file URL we expect
-    if not image_url.startswith("/static/"):
-        logger.warning(f"Attempted to delete non-static URL: {image_url}")
-        return  # Don't attempt to delete non-static paths
-        
+    # Expect the image_url to now start with the /api/images/serve/ prefix
+    expected_prefix = "/api/images/serve/"
+    if not image_url.startswith(expected_prefix):
+        logger.warning(f"Attempted to delete URL not served by API: {image_url}")
+        return
+
+    # Extract the path relative to STATIC_DIR (e.g., "images/personas/A_ebe4120c.jpeg")
+    image_path_relative_to_static_root = image_url[len(expected_prefix):]
+
     # Verify the path is within one of our entity directories
-    is_valid_path = any(f"/static/images/{entity_dir}/" in image_url for entity_dir in ENTITY_DIRS.values())
+    is_valid_path = any(f"images/{entity_dir}/" in image_path_relative_to_static_root for entity_dir in ENTITY_DIRS.values())
     if not is_valid_path:
         logger.warning(f"Attempted to delete file from unauthorized directory: {image_url}")
         return
 
     try:
-        # Construct the actual file system path from the URL
-        relative_path_from_static = image_url.replace("/static/", "") # Removes the /static/ prefix
-        # Joins BASE_STATIC_DIR (root/static) with images/filename.jpg
-        file_path = BASE_STATIC_DIR / relative_path_from_static
+        # Construct the actual file system path from the extracted part
+        file_path = BASE_STATIC_DIR / image_path_relative_to_static_root
 
         logger.info(f"Attempting to delete file: {file_path.resolve()}") # Use logger
             

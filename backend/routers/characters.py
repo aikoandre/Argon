@@ -45,10 +45,8 @@ async def create_character(
 
     # Handle image upload
     image_url = None
-    original_image_name = None
     if image and image.filename:
         image_url = await save_uploaded_file(image, entity_name=name)
-        original_image_name = image.filename
     
     # Parse JSON strings
     example_dialogues_list = json.loads(example_dialogues) if example_dialogues else []
@@ -60,7 +58,6 @@ async def create_character(
         "description": description,
         "instructions": instructions,
         "image_url": image_url,
-        "original_image_name": original_image_name,
         "example_dialogues": example_dialogues_list,
         "beginning_messages": beginning_messages_list,
         "master_world_id": master_world_id,
@@ -127,7 +124,6 @@ async def update_character(
     if remove_image == 'true' and not image and db_character.image_url:
         delete_image_file(db_character.image_url)
         db_character.image_url = None
-        db_character.original_image_name = None
 
     # Handle image update
     if image and image.filename:
@@ -136,7 +132,6 @@ async def update_character(
             delete_image_file(db_character.image_url)
         # Save new image
         db_character.image_url = await save_uploaded_file(image, entity_name=name if name is not None else db_character.name)
-        db_character.original_image_name = image.filename
 
     # Parse JSON fields
     if example_dialogues is not None:

@@ -5,14 +5,12 @@ import {
   getAllUserPersonas,
   createUserPersona,
   updateUserPersona,
-  updateUserPersonaWithImage,
   deleteUserPersona,
   getUserSettings,
   updateUserSettings,
   getAllMasterWorlds,
   type UserPersonaData,
-  type MasterWorldData,
-  type UserPersonaUpdateData
+  type MasterWorldData
 } from "../services/api";
 import { PencilSquare, TrashFill } from 'react-bootstrap-icons';
 import { CardImage } from '../components/CardImage';
@@ -202,57 +200,34 @@ const PersonasPage: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      if (editingPersona) {
-        // For updating an existing persona
-        if (imageFile) {
-          // If there's a new image, use a FormData approach for the update too
-          const updateFormData = new FormData();
-          updateFormData.append("name", formData.name);
-          
-          if (formData.description) {
-            updateFormData.append("description", formData.description);
-          } else {
-            updateFormData.append("description", ""); // Send empty string for null
-          }
-          
-          if (selectedMasterWorldForForm?.value) {
-            updateFormData.append("master_world_id", selectedMasterWorldForForm.value);
-          }
-          
-          updateFormData.append("image", imageFile);
-          
-          // Use a single API call that handles both data update and image upload
-          await updateUserPersonaWithImage(editingPersona.id, updateFormData);
-        } else {
-          // No new image, use the regular JSON update
-          const updatePayload: UserPersonaUpdateData = {
-            name: formData.name,
-            description: formData.description,
-            master_world_id: selectedMasterWorldForForm?.value || null
-          };
-          await updateUserPersona(editingPersona.id, updatePayload);
-        }
+      const personaFormData = new FormData();
+      personaFormData.append('name', formData.name);
+
+      // Append description, ensuring null becomes empty string if backend expects it
+      personaFormData.append('description', formData.description || '');
+
+      // Append master_world_id
+      if (selectedMasterWorldForForm?.value) {
+        personaFormData.append('master_world_id', selectedMasterWorldForForm.value);
       } else {
-        // For creating a new persona, use FormData only if imageFile exists
-        if (imageFile) {
-          const personaFormData = new FormData();
-          personaFormData.append("name", formData.name);
-          if (formData.description) {
-            personaFormData.append("description", formData.description);
-          }
-          if (selectedMasterWorldForForm?.value) {
-            personaFormData.append("master_world_id", selectedMasterWorldForForm.value);
-          }
-          personaFormData.append("image", imageFile);
-          await createUserPersona(personaFormData);
-        } else {
-          // No image: send plain JSON
-          await createUserPersona({
-            name: formData.name,
-            description: formData.description,
-            master_world_id: selectedMasterWorldForForm?.value || null
-          });
-        }
+        personaFormData.append('master_world_id', '');
+      }
+
+      // Append image if a new one is selected
+      if (imageFile) {
+        personaFormData.append('image', imageFile);
+      }
+      // If editing an existing persona AND the image was explicitly removed
+      else if (editingPersona && !imageFile) {
+        personaFormData.append('remove_image', 'true');
+      }
+
+      if (editingPersona) {
+        // Call the unified updateUserPersona function
+        await updateUserPersona(editingPersona.id, personaFormData);
+      } else {
+        // Call createUserPersona
+        await createUserPersona(personaFormData);
       }
       
       // After successful operation, clean up and refresh
@@ -310,9 +285,12 @@ const PersonasPage: React.FC = () => {
   const getImageUrl = (imageUrl: string | null) => {
     if (!imageUrl) return null;
     if (imageUrl.startsWith('data:')) return imageUrl;
-    if (imageUrl.startsWith('/api/images/serve/')) return imageUrl;
-    const cleanPath = imageUrl.replace(/^\/static\//, '');
-    return `/api/images/serve/${cleanPath}`;
+
+    // Extract just the filename, removing any path
+    const filename = imageUrl.split('/').pop();
+
+    // Return the API endpoint for serving persona images
+    return `/api/images/serve/images/personas/${filename}`;
   };
 
   // Helper function for truncating filenames
@@ -365,13 +343,13 @@ const PersonasPage: React.FC = () => {
         {personas.map((persona) => (
           <div
             key={persona.id}
-            className={`bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105 ${activePersonaId === persona.id ? 'ring-2 ring-app-accent' : ''}`}
+            className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer group"
             onClick={() => handleActivatePersona(persona.id)}
             title={activePersonaId === persona.id ? 'Active' : 'Click to activate'}
           >
             <CardImage
-              imageUrl={persona.image_url || null}
-              className="absolute inset-0 w-full h-full object-cover"
+              imageUrl={getImageUrl(persona.image_url ?? null)}
+              className="absolute inset-0"
             />
             <div className="absolute top-2 right-2 flex space-x-2 z-10">
               <button
@@ -414,19 +392,23 @@ const PersonasPage: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Image</label>
             <div className="flex items-center">
-              <button type="button" className="flex-1 bg-app-surface hover:bg-gray-600 text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11">
+              <label
+                htmlFor="image-upload"
+                className="flex-1 bg-app-surface hover:bg-gray-600 text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11 cursor-pointer"
+              >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
                 </svg>
                 <span>Select Image</span>
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  className="hidden" 
-                  onChange={handleImageUpload}
-                />
-              </button>
+              </label>
+              <input
+                id="image-upload"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageUpload}
+              />
               <span className="h-11 w-px bg-gray-600" />
               <button 
                 type="button" 

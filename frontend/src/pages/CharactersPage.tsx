@@ -63,6 +63,14 @@ const initialFormFields: CharacterFormData = {
 const CharactersPage: React.FC = () => {
   const navigate = useNavigate();
 
+  const getImageUrl = (imageUrl: string | null) => {
+    if (!imageUrl) return null;
+    if (imageUrl.startsWith('data:')) return imageUrl;
+    if (imageUrl.startsWith('/api/images/serve/')) return imageUrl;
+    const cleanPath = imageUrl.replace(/^static\//, '');
+    return `/api/images/serve/${cleanPath}`;
+  };
+
   const handleOpenChat = async (character: CharacterCardData) => {
     try {
       const chatId = await createOrGetCardChat('character', character.id);
@@ -445,7 +453,7 @@ const CharactersPage: React.FC = () => {
             >
               {/* Background image with gradient */}
               <CardImage
-                imageUrl={char.image_url ? `/api/images/${char.image_url.replace('static/', '')}` : null}
+                imageUrl={getImageUrl(char.image_url)}
                 className="absolute inset-0"
               />
 

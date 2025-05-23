@@ -243,11 +243,11 @@ const MasterWorldsPage: React.FC = () => {
           return (
             <div
               key={world.id}
-              className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer transform transition-transform duration-200 hover:scale-105"
+              className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer group"
               onClick={() => navigate(`/world-lore/${world.id}/entries`)}
             >
               <CardImage
-                imageUrl={world.image_url ? `/api/images/${world.image_url.replace(/^\/?static\//, '')}` : null}
+                imageUrl={world.image_url ? `/api/images/${world.image_url.replace('static/', '')}` : null}
                 className="absolute inset-0"
               />
               {/* Top right icons */}
@@ -306,7 +306,7 @@ const MasterWorldsPage: React.FC = () => {
           )}
           {/* Campo de imagem opcional - antes do campo Name, label em cima */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Image</label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Image</label>
             <div className="flex items-center">
               <button
                 type="button"
@@ -341,7 +341,7 @@ const MasterWorldsPage: React.FC = () => {
           <div>
             <label
               htmlFor="mw-name"
-              className="block text-sm font-medium text-gray-300 mb-1"
+              className="block text-sm font-medium text-gray-300 mb-2"
             >
               World Name <span className="text-app-accent">*</span>
             </label>
@@ -359,9 +359,9 @@ const MasterWorldsPage: React.FC = () => {
           <div>
             <label
               htmlFor="mw-description"
-              className="block text-sm font-medium text-gray-300 mb-1"
+              className="block text-sm font-medium text-gray-300 mb-2"
             >
-              Overall Description
+              Description
             </label>
             <textarea
               name="description"
@@ -376,7 +376,7 @@ const MasterWorldsPage: React.FC = () => {
           <div>
             <label
               htmlFor="mw-tags"
-              className="block text-sm font-medium text-gray-300 mb-1"
+              className="block text-sm font-medium text-gray-300 mb-2"
             >
               Tags
             </label>

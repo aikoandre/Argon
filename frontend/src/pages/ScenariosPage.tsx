@@ -314,7 +314,6 @@ const ScenariosPage: React.FC = () => {
       example_dialogues: filteredExampleDialogues,
       beginning_message: filteredBeginningMessages,
       master_world_id: selectedMasterWorldForForm?.value || ""
-      // Do NOT include original_image_name or image_url or any image name field
     };
 
     setIsSubmitting(true);
