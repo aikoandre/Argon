@@ -38,12 +38,12 @@ async def create_user_persona(
 
     if image:
         from ..file_storage import save_uploaded_file
-        image_path = await save_uploaded_file(
+        image_url = await save_uploaded_file(
             image,
             entity_type="persona",
             entity_name=persona_create.name
         )
-        persona_data["image_url"] = f"/static/{image_path}"
+        persona_data["image_url"] = image_url
 
     db_persona = UserPersona(**persona_data)
     db.add(db_persona)

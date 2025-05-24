@@ -17,8 +17,9 @@ interface SelectOption {
 const SettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<UserSettingsUpdateData>({
     selected_llm_model: "",
-    openrouter_api_key: "",
+    llm_api_key: "",
   });
+  const [showApiKey, setShowApiKey] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true); // Carregamento inicial de settings e modelos
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false); // Para o botão Save
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +34,7 @@ const SettingsPage: React.FC = () => {
     /* ... como antes ... */
     return availableModels.map((model) => ({
       value: model.id,
-      label: `${model.name || model.id} (${model.id.split("/").pop()})`, // Mostra apenas o nome do modelo após a última /
+      label: model.name || model.id, // Mostra apenas o nome do modelo
     }));
   }, [availableModels]);
 
@@ -59,10 +60,10 @@ const SettingsPage: React.FC = () => {
         if (settingsData) {
           setSettings({
             selected_llm_model: settingsData.selected_llm_model || "",
-            openrouter_api_key: settingsData.openrouter_api_key || "",
+            llm_api_key: settingsData.llm_api_key || "",
           });
         } else {
-          setSettings({ selected_llm_model: "", openrouter_api_key: "" });
+          setSettings({ selected_llm_model: "", llm_api_key: "" });
         }
         setAvailableModels(modelsDataFromApi);
       } catch (err: any) {
@@ -85,7 +86,12 @@ const SettingsPage: React.FC = () => {
   };
 
   const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    /* ... como antes ... */
+    setSettings((prev) => ({
+      ...prev,
+      llm_api_key: e.target.value,
+    }));
+    setSuccessMessage(null);
+    setError(null);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -112,128 +118,131 @@ const SettingsPage: React.FC = () => {
   }
 
   return (
-    // Ajuste max-w- para controlar a largura do conteúdo centralizado
-    <div className="container mx-auto py-12 px-4 flex flex-col items-center min-h-[calc(100vh-var(--nav-height,80px))]">
-      {" "}
-      {/* Ajuste --nav-height */}
-      <div className="w-full max-w-lg bg-gray-800 p-8 rounded-xl shadow-2xl">
-        {" "}
-        {/* Card para o formulário */}
-        <h1 className="text-3xl font-bold mb-8 text-center text-white">
-          Application Settings
-        </h1>
-        {/* Exibe o erro geral do carregamento inicial, se houver */}
-        {!isLoading && error && !modelsError && (
-          <p className="text-red-500 mb-4 text-center">{error}</p>
-        )}
-        {successMessage && (
-          <p className="text-green-500 mb-6 text-center">{successMessage}</p>
-        )}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {" "}
-          {/* Adicionado space-y-6 */}
-          <div>
-            <label
-              htmlFor="selected_llm_model_input"
-              className="block text-sm font-medium text-gray-300 mb-1"
-            >
-              Selected LLM Model:
-            </label>
-            {modelsError && (
-              <p className="text-red-400 text-xs mt-1">
-                Error loading models: {modelsError}
-              </p>
-            )}
-            <Select<SelectOption>
-              inputId="selected_llm_model_input"
-              options={modelOptions}
-              value={selectedModelOption}
-              onChange={handleModelChange}
-              isLoading={isLoading} // isLoading cobre o carregamento de modelos agora
-              isClearable
-              isSearchable
-              placeholder="-- Type or select a Model --"
-              noOptionsMessage={() =>
-                isLoading
-                  ? "Loading models..."
-                  : modelsError
-                  ? "Could not load"
-                  : "No models found"
-              }
-              isDisabled={isLoading || modelsError !== null}
-              className="react-select-container" // Classe para estilização global se necessário
-              classNamePrefix="react-select" // Para estilização interna
-              styles={{
-                // Estilos para tema escuro (ajuste as cores)
-                control: (base, state) => ({
-                  ...base,
-                  backgroundColor: "#1F2937", // bg-gray-800
-                  borderColor: state.isFocused ? "#3B82F6" : "#4B5563", // border-blue-500 (focus), border-gray-600
-                  boxShadow: state.isFocused ? "0 0 0 1px #3B82F6" : "none",
-                  "&:hover": { borderColor: "#6B7280" }, // border-gray-500 (hover)
-                  minHeight: "42px", // Para alinhar com inputs padrão
-                }),
-                singleValue: (base) => ({ ...base, color: "white" }),
-                menu: (base) => ({
-                  ...base,
-                  backgroundColor: "#1F2937",
-                  zIndex: 10,
-                }),
-                option: (base, { isFocused, isSelected }) => ({
-                  ...base,
-                  backgroundColor: isSelected
-                    ? "#3B82F6"
-                    : isFocused
-                    ? "#374151"
-                    : "#1F2937", // bg-blue-600 (selected), bg-gray-700 (focus)
-                  color: "white",
-                  ":active": { backgroundColor: "#2563EB" }, // bg-blue-700 (active)
-                }),
-                placeholder: (base) => ({ ...base, color: "#9CA3AF" }), // text-gray-400
-                input: (base) => ({ ...base, color: "white" }),
-                dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
-                clearIndicator: (base) => ({
-                  ...base,
-                  color: "#9CA3AF",
-                  ":hover": { color: "white" },
-                }),
-                indicatorSeparator: (base) => ({
-                  ...base,
-                  backgroundColor: "#4B5563",
-                }),
-              }}
-            />
-          </div>
-          <div>
-            {" "}
-            {/* Removido mt-4, space-y-6 no form cuida disso */}
-            <label
-              htmlFor="openrouter_api_key"
-              className="block text-sm font-medium text-gray-300 mb-1"
-            >
-              OpenRouter API Key:
-            </label>
-            <input
-              type="password"
-              id="openrouter_api_key"
-              name="openrouter_api_key"
-              autoComplete="current-password" // Sugestão para campos de senha
-              value={settings.openrouter_api_key || ""}
-              onChange={handleApiKeyChange}
-              disabled={isLoading} // Desabilita se estiver carregando settings iniciais
-              placeholder="sk-or-..."
-              className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400" // Ajustei padding para p-2.5
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={isSubmitting || isLoading} // Desabilita também durante carregamento inicial
-            className="w-full mt-2 px-4 py-2.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md font-medium disabled:bg-gray-700 disabled:opacity-70 transition-colors"
+    <div className="container p-4 md:p-8 text-white">
+      <h1 className="text-4xl font-bold text-white font-quintessential mb-8">
+        Application Settings
+      </h1>
+      {error && (
+        <p className="bg-red-700 text-white p-3 rounded-md mb-4 text-center">
+          {error}
+        </p>
+      )}
+      {successMessage && (
+        <p className="bg-green-700 text-white p-3 rounded-md mb-4 text-center">
+          {successMessage}
+        </p>
+      )}
+      <form onSubmit={handleSubmit} className="space-y-6 w-full max-w-lg mx-auto">
+        <div>
+          <label
+            htmlFor="selected_llm_model_input"
+            className="block text-sm font-medium text-app-accent-2 mb-1"
           >
-            {isSubmitting ? "Saving..." : "Save Settings"}
-          </button>
-        </form>
-      </div>
+            Selected LLM Model:
+          </label>
+          {modelsError && (
+            <p className="text-red-400 text-xs mt-1">
+              Error loading models: {modelsError}
+            </p>
+          )}
+          <Select<SelectOption>
+            inputId="selected_llm_model_input"
+            options={modelOptions}
+            value={selectedModelOption}
+            onChange={handleModelChange}
+            isLoading={isLoading}
+            isClearable
+            isSearchable
+            placeholder="-- Type or select a Model --"
+            noOptionsMessage={() =>
+              isLoading
+                ? "Loading models..."
+                : modelsError
+                ? "Could not load"
+                : "No models found"
+            }
+            isDisabled={isLoading || modelsError !== null}
+            className="react-select-container"
+            classNamePrefix="react-select"
+            styles={{
+              control: (base, state) => ({
+                ...base,
+                backgroundColor: "#343a40", // bg-app-surface
+                borderColor: state.isFocused ? "#f8f9fa" : "#343a40", // border-app-accent-2 (focus), bg-app-surface
+                boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
+                "&:hover": { borderColor: "#f8f9fa" },
+                minHeight: "42px",
+              }),
+              singleValue: (base) => ({ ...base, color: "white" }),
+              menu: (base) => ({
+                ...base,
+                backgroundColor: "#495057", // bg-app-surface-2
+                zIndex: 10,
+              }),
+              option: (base, { isFocused, isSelected }) => ({
+                ...base,
+                backgroundColor: isSelected
+                  ? "#adb5bd" // bg-app-accent-2
+                  : isFocused
+                  ? "#dee2e6" // bg-app-accent-3
+                  : "#495057", // bg-app-surface-2
+                color: isSelected || isFocused ? "#212529" : "#fff", // text-app-surface
+                ":active": { backgroundColor: "#f8f9fa", color: "#212529" }, // bg-app-accent
+              }),
+              placeholder: (base) => ({ ...base, color: "#9CA3AF" }),
+              input: (base) => ({ ...base, color: "white" }),
+              dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
+              clearIndicator: (base) => ({
+                ...base,
+                color: "#9CA3AF",
+                ":hover": { color: "white" },
+              }),
+              indicatorSeparator: (base) => ({
+                ...base,
+                backgroundColor: "#343a40", // bg-app-surface
+              }),
+            }}
+          />
+        </div>
+        <div>
+          <label
+            htmlFor="llm_api_key"
+            className="block text-sm font-medium text-app-accent-2 mb-1"
+          >
+            LLM API Key:
+          </label>
+          <div className="relative">
+            <input
+              type={showApiKey ? "text" : "password"}
+              id="llm_api_key"
+              name="llm_api_key"
+              autoComplete="current-password"
+              value={settings.llm_api_key || ""}
+              onChange={handleApiKeyChange}
+              disabled={isLoading}
+              placeholder="sk-or-..."
+              className="w-full p-2.5 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowApiKey(!showApiKey)}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white focus:outline-none"
+              aria-label={showApiKey ? "Hide API Key" : "Show API Key"}
+            >
+              <span className="material-icons">
+                {showApiKey ? "visibility_off" : "visibility"}
+              </span>
+            </button>
+          </div>
+        </div>
+        <button
+          type="submit"
+          disabled={isSubmitting || isLoading}
+          className="w-full mt-2 px-4 py-2.5 text-sm text-app-surface bg-app-accent-2 hover:bg-app-accent-3 rounded-md font-medium disabled:bg-gray-700 disabled:opacity-70 transition-colors"
+        >
+          {isSubmitting ? "Saving..." : "Save Settings"}
+        </button>
+      </form>
     </div>
   );
 };

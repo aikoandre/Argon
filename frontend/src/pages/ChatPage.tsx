@@ -9,6 +9,8 @@ import {
   getUserPersonaById,
 } from "../services/api";
 import type { ChatMessageData, ChatSessionData } from "../services/api";
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 
 // Default avatar images - replace these with your actual avatar URLs
 // Default avatar images - using data URLs to avoid file serving issues for defaults
@@ -25,27 +27,32 @@ const getImageUrl = (imageUrl: string | null) => {
   if (!imageUrl) return null;
   if (imageUrl.startsWith('data:')) return imageUrl;
 
-  let cleanedUrl = imageUrl;
+  // Normalize the URL by removing common incorrect prefixes and ensuring a clean path
+  let cleanedPath = imageUrl
+    .replace(/^(https?:\/\/[^/]+)?\/?/, '') // Remove http(s)://domain:port/
+    .replace(/(api\/images\/serve\/|static\/images\/|static\/)/g, '') // Remove all instances of specific incorrect prefixes
+    .split('?')[0]; // Remove query parameters
 
-  // Remove any existing cache-buster
-  const urlParts = cleanedUrl.split('?');
-  cleanedUrl = urlParts[0];
+  // Decode URI components (e.g., %2F to /)
+  cleanedPath = decodeURIComponent(cleanedPath);
 
-  // Ensure it starts with /static/
-  if (cleanedUrl.startsWith('/api/images/serve/')) {
-    cleanedUrl = cleanedUrl.replace('/api/images/serve/', '');
-  }
-  if (cleanedUrl.startsWith('images/')) {
-    cleanedUrl = `static/${cleanedUrl}`;
-  } else if (!cleanedUrl.startsWith('static/')) {
-    // If it's just a filename or some other unexpected path, prepend static/images/
-    cleanedUrl = `static/images/personas/${cleanedUrl.split('/').pop()}`;
-  }
+  // Ensure no leading/trailing slashes from the cleaning process
+  cleanedPath = cleanedPath.replace(/^\/|\/$/g, '');
 
-  // Add a new cache-busting timestamp
-  const cacheBuster = Date.now();
-  return `/${cleanedUrl}?t=${cacheBuster}`;
+  // Construct the final static URL with the correct base
+  return `/static/images/${cleanedPath}`;
 };
+
+// Helper function to apply custom formatting before Markdown parsing
+const applyCustomFormatting = (content: string) => {
+  let formattedContent = content;
+
+  // Replace "text" with <span class="text-app-chat">text</span> for blue color
+  formattedContent = formattedContent.replace(/"([^"]+)"/g, '<span class="text-app-chat">$1</span>');
+
+  return formattedContent;
+};
+
 
 const ChatPage: React.FC = () => {
   const { chatId } = useParams<{ chatId: string }>();
@@ -105,11 +112,11 @@ const ChatPage: React.FC = () => {
           try {
             const persona = await getUserPersonaById(settings.active_persona_id);
             setActivePersonaName(persona.name || "User");
-            const imageUrl = getImageUrl(persona.image_url || null);
-            setActivePersonaImageUrl(imageUrl);
-            console.log("Active Persona Image URL:", imageUrl); // Debugging log
+            const rawPersonaImageUrl = persona.image_url || null;
+            const processedPersonaImageUrl = getImageUrl(rawPersonaImageUrl);
+            setActivePersonaImageUrl(processedPersonaImageUrl);
           } catch (err) {
-            console.error("Error fetching active persona or its image:", err); // More specific error log
+            console.error("Error fetching active persona or its image:", err);
             setActivePersonaName("User");
             setActivePersonaImageUrl(null);
           }
@@ -152,18 +159,15 @@ const ChatPage: React.FC = () => {
     setNewMessage("");
 
     try {
-      const sentMessage = await addMessageToSession(chatId, {
+      const aiResponseMessage = await addMessageToSession(chatId, {
         content: currentMessageContent,
         sender_type: "USER",
+        user_persona_id: activePersonaId || undefined, // Pass the active persona ID
         message_metadata: activePersonaId && activePersonaId !== "" ? { active_persona_id: activePersonaId, active_persona_name: activePersonaName } : undefined,
-        active_persona_name: activePersonaName, // Send to backend
-        active_persona_image_url: activePersonaImageUrl, // Send to backend
+        active_persona_name: activePersonaName, // Send to backend (for message display)
+        active_persona_image_url: activePersonaImageUrl, // Send to backend (for message display)
       });
-      setMessages((prevMessages) =>
-        prevMessages.map((msg) =>
-          msg.id === tempMessageId ? sentMessage : msg
-        )
-      );
+      setMessages((prevMessages) => [...prevMessages, aiResponseMessage]);
     } catch (err) {
       setError("Failed to send message. Please try again.");
       setMessages((prevMessages) =>
@@ -219,19 +223,20 @@ const ChatPage: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-[870px] overflow-hidden">
+    <div className="flex flex-col h-screen overflow-hidden"> {/* Changed to h-screen */}
 
       {/* Área de mensagens com scroll, alinhada ao final */}
-      <div className="flex-1 flex flex-col justify-end w-full overflow-y-auto max-w-full" style={{ maxHeight: '100vh' }}>
-        <div className="max-w-4xl mx-auto px-4 w-full">
-          {messages.length === 0 && (
-            <div className="flex justify-center my-10">
-              <div className="text-center py-10">
-          <p className="text-xl text-gray-500 mb-4">No messages yet. Send a message!</p>
-        </div>
-            </div>
-          )}
-          {messages.map((msg) => (
+      <div className="flex-grow flex-shrink-1 w-full overflow-y-auto max-w-full min-h-0 flex flex-col justify-end"> {/* Added flex flex-col justify-end */}
+        <div className="max-w-4xl mx-auto px-4 w-full"> {/* New wrapper for centering */}
+          {messages.map((msg) => {
+            const rawAiImageUrl = msg.active_persona_image_url ?? null;
+            const processedAiAvatarSrc = getImageUrl(rawAiImageUrl) || DEFAULT_BOT_AVATAR;
+            const aiName = msg.active_persona_name || "Assistant";
+
+            const userImageSrc = getImageUrl(msg.active_persona_image_url ?? activePersonaImageUrl) || DEFAULT_USER_AVATAR;
+            const finalImageSrc = msg.sender_type === "USER" ? userImageSrc : processedAiAvatarSrc;
+
+            return (
             <div key={msg.id} className="mb-4">
               <div
                 className={`rounded-2xl ${
@@ -244,16 +249,15 @@ const ChatPage: React.FC = () => {
                   {/* Imagem */}
                   <div className="flex-shrink-0 w-16 h-24 mr-3">
                     <img
-                      src={msg.sender_type === "USER"
-                        ? (getImageUrl(msg.active_persona_image_url ?? activePersonaImageUrl) || DEFAULT_USER_AVATAR)
-                        : DEFAULT_BOT_AVATAR}
+                      src={finalImageSrc}
                       alt={msg.sender_type === "USER" ? "User" : "Bot"}
                       className="w-full h-full object-cover rounded-lg bg-gray-700"
                       onError={(e) => {
                         const fallback = msg.sender_type === "USER"
-                          ? DEFAULT_USER_AVATAR // Use the data URL default
-                          : DEFAULT_BOT_AVATAR; // Use the data URL default
+                          ? DEFAULT_USER_AVATAR
+                          : DEFAULT_BOT_AVATAR;
                         (e.target as HTMLImageElement).src = fallback;
+                        console.error(`ERROR: Failed to load image for message ${msg.id}. Fallback used. Original URL: ${finalImageSrc}`);
                       }}
                     />
                   </div>
@@ -263,7 +267,7 @@ const ChatPage: React.FC = () => {
                       <span className="font-medium text-white mr-2">
                         {msg.sender_type === "USER"
                           ? msg.active_persona_name || msg.message_metadata?.active_persona_name || activePersonaName
-                          : "Assistant"}
+                          : aiName}
                       </span>
                       <span className="text-xs text-gray-400 mr-2">
                         {new Date(msg.timestamp).toLocaleDateString()}
@@ -272,20 +276,30 @@ const ChatPage: React.FC = () => {
                         {formatTime(msg.timestamp)}
                       </span>
                     </div>
-                    <p className="whitespace-pre-wrap break-words mt-0.5">{msg.content}</p>
+                    <ReactMarkdown
+                      className="whitespace-pre-wrap break-words mt-0.5"
+                      rehypePlugins={[rehypeRaw]}
+                    >
+                      {applyCustomFormatting(msg.content)}
+                    </ReactMarkdown>
                   </div>
                 </div>
               </div>
             </div>
-          ))}
+          );})}
           <div ref={messagesEndRef} />
+          {messages.length === 0 && (
+            <div className="flex justify-center my-10">
+              <div className="text-center py-10">
+          <p className="text-xl text-gray-500 mb-4">No messages yet. Send a message!</p>
+        </div>
+            </div>
+          )}
         </div>
       </div>
-      {/* Footer/input fixo na base */}
-      <footer className="w-full" style={{ gridArea: 'footer' }}></footer>
       <div
         ref={inputAreaRef}
-        className="flex w-full flex-col-reverse"
+        className="flex w-full flex-col-reverse flex-shrink-0"
       >
         <div className="max-w-4xl mx-auto px-2 sm:px-4 w-full">
           <form onSubmit={handleSendMessage} className="relative">

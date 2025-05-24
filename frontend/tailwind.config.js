@@ -10,6 +10,7 @@ module.exports = {
         'app-accent': 'var(--color-accent)',
         'app-accent-2': 'var(--color-accent-2)',
         'app-accent-3': 'var(--color-accent-3)',
+        'app-chat': 'var(--color-chat)',
       },
       fontFamily: {
         'montserrat': ['Montserrat', 'sans-serif'],

@@ -233,5 +233,5 @@ app.include_router(images_router, prefix="/api/images")
 
 app.include_router(characters_router)
 app.include_router(master_worlds_router)
-app.include_router(settings_router)
+app.include_router(settings_router, prefix="/api")
 app.include_router(llm_providers_router)

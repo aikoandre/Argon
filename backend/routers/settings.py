@@ -1,48 +1,78 @@
-# backend/routers/settings.py
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import Optional
-
-from backend.models.user_settings import UserSettings
-from backend.schemas.user_settings import UserSettingsInDB, UserSettingsUpdate
-from backend.database import get_db
+from backend.database import get_db # Adjust import based on your project structure
+from backend.models.user_settings import UserSettings as UserSettingsModel
+from backend.schemas.user_settings import UserSettingsInDB, UserSettingsUpdate # Adjust import
 
 router = APIRouter(
-    prefix="/api/settings",
-    tags=["settings"],
+    tags=["User Settings"],
+    responses={404: {"description": "Not found"}},
 )
 
-# ID fixo para a única linha de configurações
-SETTINGS_ID = 1
+USER_SETTINGS_ID = 1 # Global ID for the single settings row
 
-@router.get("", response_model=Optional[UserSettingsInDB])
-def get_user_settings(db: Session = Depends(get_db)):
-    settings = db.query(UserSettings).filter(UserSettings.id == SETTINGS_ID).first()
-    if not settings:
-        # Cria configurações padrão se não existirem
-        default_settings = UserSettings(id=SETTINGS_ID)
-        db.add(default_settings)
-        db.commit()
-        db.refresh(default_settings)
-        return default_settings
-    return settings
+@router.get("/settings", response_model=UserSettingsInDB)
+async def read_user_settings(db: Session = Depends(get_db)):
+    """
+    Retrieve user settings.
+    If settings do not exist, they are created with default values.
+    """
+    db_settings = db.query(UserSettingsModel).filter(UserSettingsModel.id == USER_SETTINGS_ID).first()
+    if db_settings is None:
+        # Create settings with default values from the model definition
+        db_settings = UserSettingsModel(
+            id=USER_SETTINGS_ID,
+            llm_provider="OpenRouter",
+            selected_llm_model="gpt-4o",
+            llm_api_key="",
+            generation_prompt_template=(
+                "You are {{ai_instructions.name}}, {{ai_instructions.description}}. "
+                "Your instructions on how to act are: {{ai_instructions.instructions}}.\n"
+                "Examples of how you speak: {{ai_instructions.example_dialogues}}.\n"
+                "Initial message (if applicable): {{ai_instructions.beginning_message}}\n\n"
+                "You are interacting with {{user_persona_details.name}}, who is: {{user_persona_details.description}}.\n\n"
+                "World Context (if applicable): {{world_context_name_and_description}}\n\n"
+                "--- Recent Chat History ---\n"
+                "{{chat_history}}\n"
+                "--- End of History ---\n\n"
+                "{{user_persona_details.name}}: {{user_input}}\n"
+                "{{ai_instructions.name}}:"
+            ),
+            language="English",
+            temperature=0.7,
+            top_p=1.0,
+            max_response_tokens=512,
+            context_size=10,
+            active_persona_id=None
+        )
 
-@router.put("", response_model=UserSettingsInDB)
-def update_user_settings(
-    settings_update: UserSettingsUpdate, db: Session = Depends(get_db)
-):
-    db_settings = db.query(UserSettings).filter(UserSettings.id == SETTINGS_ID).first()
-    if not db_settings:
-        # Cria se não existir ao tentar atualizar
-        db_settings = UserSettings(id=SETTINGS_ID, **settings_update.model_dump(exclude_unset=True)) # Pydantic V2
-        # Para Pydantic V1: **settings_update.dict(exclude_unset=True)
+
         db.add(db_settings)
-    else:
-        update_data = settings_update.model_dump(exclude_unset=True) # Pydantic V2
-        # Para Pydantic V1: update_data = settings_update.dict(exclude_unset=True)
-        for key, value in update_data.items():
-            setattr(db_settings, key, value)
-    
+        db.commit()
+        db.refresh(db_settings)
+    return db_settings
+
+@router.put("/settings", response_model=UserSettingsInDB)
+async def update_user_settings(
+    settings_update: UserSettingsUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    Update user settings.
+    """
+    db_settings = db.query(UserSettingsModel).filter(UserSettingsModel.id == USER_SETTINGS_ID).first()
+    if db_settings is None:
+        # Should ideally be created by a GET request first, or handle creation here too.
+        # For simplicity, let's assume GET is called first or create if not found.
+        db_settings = UserSettingsModel(id=USER_SETTINGS_ID)
+        db.add(db_settings)
+        # If creating new, you might want to apply initial defaults before updating
+
+    update_data = settings_update.model_dump(exclude_unset=True) # Pydantic V2
+
+    for key, value in update_data.items():
+        setattr(db_settings, key, value)
+
     db.commit()
     db.refresh(db_settings)
     return db_settings

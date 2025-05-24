@@ -5,6 +5,7 @@ import logging # Import logging
 from fastapi import UploadFile, HTTPException
 from pathlib import Path
 from typing import Optional # Import Optional
+from PIL import Image # Import Pillow
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -58,41 +59,62 @@ async def save_uploaded_file(file: UploadFile, entity_name: Optional[str] = None
     if entity_type not in ENTITY_DIRS:
         raise HTTPException(400, f"Invalid entity type. Must be one of: {', '.join(ENTITY_DIRS.keys())}")
     
-    file_ext = file.filename.split('.')[-1]
+    # Determine the new file extension (always webp for optimized images)
+    new_file_ext = "webp"
     
     # Generate filename based on entity_name if provided, fall back to UUID
     if entity_name:
         base_name = sanitize_filename(entity_name)
         # Add a short UUID suffix to prevent collisions for identical sanitized names
-        filename = f"{base_name}_{uuid.uuid4().hex[:8]}.{file_ext}"
+        filename_base = f"{base_name}_{uuid.uuid4().hex[:8]}"
     else:
-        filename = f"{uuid.uuid4()}.{file_ext}"
+        filename_base = str(uuid.uuid4())
+    
+    filename = f"{filename_base}.{new_file_ext}"
     
     # Get the correct subdirectory for this entity type
     entity_subdir = ENTITY_DIRS[entity_type]
-    file_path = BASE_IMAGES_DIR / entity_subdir / filename  # Full path where the file should be saved
+    file_path = BASE_IMAGES_DIR / entity_subdir / filename  # Full path where the optimized file should be saved
 
-    # Read the file content in chunks to handle large files
-    bytes_written = 0
+    # Ensure target directory exists
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Create a temporary path for the original upload before processing
+    temp_upload_path = file_path.parent / f"temp_{uuid.uuid4().hex}.{file.filename.split('.')[-1]}"
+
     try:
-        # Ensure target directory exists
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-
-        logger.info(f"Attempting to save file to: {file_path.resolve()}") # Log the save path
+        logger.info(f"Attempting to save temporary file to: {temp_upload_path.resolve()}")
         logger.info(f"Received file: {file.filename}, size: {file.size}")
 
-        with open(file_path, "wb") as buffer:
+        # Save the uploaded file temporarily
+        with open(temp_upload_path, "wb") as buffer:
             while content := await file.read(1024 * 1024): # Read 1MB chunks
                 buffer.write(content)
-                bytes_written += len(content)
+        
+        logger.info(f"Successfully saved temporary file: {temp_upload_path.resolve()}")
 
-        logger.info(f"Successfully saved file: {file_path.resolve()}") # Log successful save
-        logger.info(f"Total bytes written to {file_path.name}: {bytes_written}")
+        # Open, optimize, and save the image
+        with Image.open(temp_upload_path) as img:
+            # Convert to RGB if not already (important for WebP saving from some formats like PNG with alpha)
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+
+            # Resize the image (e.g., max 200x200 for avatars)
+            img.thumbnail((200, 200)) # Resizes in place, maintaining aspect ratio
+
+            # Save the optimized image as WebP
+            img.save(file_path, "webp", quality=80) # quality 80 is a good balance
+
+        logger.info(f"Successfully optimized and saved image to: {file_path.resolve()}")
 
     except Exception as e:
-        # Log the error with traceback
-        logger.error(f"Error saving file {file.filename} to {file_path}: {e}", exc_info=True)
-        raise HTTPException(500, f"Error saving file: {str(e)}") # Re-raise as HTTPException
+        logger.error(f"Error processing or saving file {file.filename} to {file_path}: {e}", exc_info=True)
+        raise HTTPException(500, f"Error processing or saving file: {str(e)}")
+    finally:
+        # Clean up the temporary file
+        if temp_upload_path.exists():
+            os.remove(temp_upload_path)
+            logger.info(f"Cleaned up temporary file: {temp_upload_path.resolve()}")
 
     return f"/api/images/serve/{entity_subdir}/{filename}"
 

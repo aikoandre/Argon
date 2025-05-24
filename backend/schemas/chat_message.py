@@ -1,6 +1,6 @@
 # backend/schemas/chat_message.py
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 import uuid
 
@@ -22,3 +22,10 @@ class ChatMessageInDB(ChatMessageBase):
 
     class Config:
         from_attributes = True
+
+class UserMessageCreate(BaseModel):
+    content: str = Field(..., min_length=1)
+
+class ChatTurnResponse(BaseModel):
+    user_message: ChatMessageInDB
+    ai_message: ChatMessageInDB

@@ -1,13 +1,44 @@
-# backend/models/user_settings.py
-from sqlalchemy import Column, Integer, String, Boolean # Boolean é opcional, só se for usar
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, Text, Float, ForeignKey
 from backend.database import Base
 
 class UserSettings(Base):
     __tablename__ = "user_settings"
 
-    id = Column(Integer, primary_key=True, default=1)
-    selected_llm_model = Column(String, default="GPT-4o")
-    openrouter_api_key = Column(String, nullable=True)
-    active_persona_id = Column(String, nullable=True)  # ID da persona ativa
-    # format_thoughts_italic = Column(Boolean, default=True) # Exemplo de outro campo
+    id = Column(Integer, primary_key=True, default=1) # Assuming a single global settings row
+
+    # LLM Configuration
+    llm_provider = Column(String, nullable=True, default="OpenRouter")
+    selected_llm_model = Column(String, nullable=True, default="gpt-4o") # Or your preferred default
+
+    # API Key - Stored in plaintext as per user decision
+    llm_api_key = Column(String, nullable=True) # Changed from encrypted_llm_api_key, type is String
+
+    # Prompt Configuration
+    generation_prompt_template = Column(Text, nullable=True, default=(
+        "You are {{ai_instructions.name}}, {{ai_instructions.description}}. "
+        "Your instructions on how to act are: {{ai_instructions.instructions}}.\n"
+        "Examples of how you speak: {{ai_instructions.example_dialogues}}.\n"
+        "Initial message (if applicable): {{ai_instructions.beginning_message}}\n\n"
+        "You are interacting with {{user_persona_details.name}}, who is: {{user_persona_details.description}}.\n\n"
+        "World Context (if applicable): {{world_context_name_and_description}}\n\n"
+        "--- Recent Chat History ---\n"
+        "{{chat_history}}\n"
+        "--- End of History ---\n\n"
+        "{{user_persona_details.name}}: {{user_input}}\n"
+        "{{ai_instructions.name}}:"
+    ))
+    language = Column(String, nullable=True, default="English") # Or "English" if you prefer
+
+    # LLM Generation Parameters
+    temperature = Column(Float, nullable=True, default=0.7)
+    top_p = Column(Float, nullable=True, default=1.0)
+    max_response_tokens = Column(Integer, nullable=True, default=512)
+    context_size = Column(Integer, nullable=True, default=10) # Number of history messages or context tokens
+
+    # Active User Persona
+    active_persona_id = Column(String, ForeignKey("user_personas.id", ondelete="SET NULL"), nullable=True)
+    # If you want easy access to the UserPersona object from settings:
+    # active_user_persona = relationship("UserPersona")
+
+    def __repr__(self):
+        return f"<UserSettings(id={self.id}, llm_provider='{self.llm_provider}', model='{self.selected_llm_model}')>"

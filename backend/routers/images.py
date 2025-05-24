@@ -60,3 +60,12 @@ def delete_image(
         return JSONResponse({"detail": "Image deleted successfully"}, media_type="application/json")
     except Exception as e:
         raise HTTPException(500, f"Error deleting image: {str(e)}")
+
+@router.get("/serve/{image_path:path}")
+async def serve_image(image_path: str):
+    # Ensure the path points to the 'images' subdirectory within 'static'
+    file_path = STATIC_DIR / "images" / image_path
+    if not file_path.is_file():
+        logger.warning(f"Image not found: {file_path}")
+        raise HTTPException(status_code=404, detail="Image not found")
+    return FileResponse(file_path)

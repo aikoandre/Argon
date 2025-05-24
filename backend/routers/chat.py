@@ -1,35 +1,49 @@
 # backend/routers/chat.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body, Path
 from sqlalchemy.orm import Session
 from sqlalchemy import func, select
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 import uuid # Para gerar IDs de sessão se necessário (embora o modelo já faça isso)
+from datetime import datetime # For updating last_active_at
+from pydantic import BaseModel, Field
+from fastapi.concurrency import run_in_threadpool
 
 # Importe modelos SQLAlchemy
 from backend.models.chat_session import ChatSession
 from backend.models.chat_message import ChatMessage
-from backend.models.scenario_card import ScenarioCard # Para buscar o nome/descrição do cenário
-from backend.models.character_card import CharacterCard # Para buscar nome do GM
-from backend.models.user_persona import UserPersona # Para buscar nome da persona
+from backend.models.user_settings import UserSettings
+from backend.models.user_persona import UserPersona
+from backend.models.character_card import CharacterCard
+from backend.models.scenario_card import ScenarioCard
+from backend.models.master_world import MasterWorld
 
 # Importe schemas Pydantic
 from backend.schemas.chat_session import ChatSessionCreate, ChatSessionInDB, ChatSessionUpdate, ChatSessionListed
 from backend.schemas.chat_message import ChatMessageCreate, ChatMessageInDB
-from typing import Optional
 
 from backend.database import get_db
 from backend.db.crud import create_chat_session as crud_create_chat_session
 
+# For UserMessageCreate, using a Pydantic model for the body is cleaner
+class UserMessageInput(BaseModel):
+    content: str = Field(..., min_length=1)
+    user_persona_id: Optional[str] = None # Add optional user_persona_id
+
+
 router = APIRouter(
-    tags=["chat_sessions"],
+    tags=["Chat"],
+    responses={404: {"description": "Not found"}},
 )
+
+USER_SETTINGS_ID = 1 # Global ID for the single settings row
 
 # Change card_id type from UUID to str for compatibility with string IDs in the database
 @router.post("/sessions/{card_type}/{card_id}", response_model=ChatSessionInDB, status_code=status.HTTP_201_CREATED)
 def create_or_get_chat_session(
     card_type: str,
     card_id: str,  # Changed from UUID to str
+    user_persona_id: Optional[str] = None, # Add this parameter
     db: Session = Depends(get_db)
 ):
     """Create or get existing chat session for a card"""
@@ -41,7 +55,7 @@ def create_or_get_chat_session(
         )
     
     # Debug logging for troubleshooting
-    print(f"[DEBUG] create_or_get_chat_session called with card_type={card_type}, card_id={card_id}")
+    print(f"[DEBUG] create_or_get_chat_session called with card_type={card_type}, card_id={card_id}, user_persona_id={user_persona_id}")
     # Get card details
     if card_type == "character":
         card = db.query(CharacterCard).filter(CharacterCard.id == str(card_id)).first()
@@ -63,6 +77,7 @@ def create_or_get_chat_session(
     ).order_by(ChatSession.created_at.desc()).first()
     
     if existing:
+        print(f"[DEBUG] Found existing chat session: {existing.id}, user_persona_id: {existing.user_persona_id}")
         return existing
     
     # Create new session
@@ -71,12 +86,14 @@ def create_or_get_chat_session(
     new_chat = ChatSession(
         card_type=card_type,
         card_id=str(card_id),
-        title=title
+        title=title,
+        user_persona_id=user_persona_id # Pass the user_persona_id
     )
     
     db.add(new_chat)
     db.commit()
     db.refresh(new_chat)
+    print(f"[DEBUG] Created new chat session: {new_chat.id}, user_persona_id: {new_chat.user_persona_id}")
     return new_chat
 
 # Keep old endpoint for compatibility during transition
@@ -90,9 +107,10 @@ async def create_chat_session_legacy(
     card_type = "character" if session_create.gm_character_id else "scenario"
     card_id = session_create.gm_character_id or session_create.scenario_id
     
-    return await create_or_get_chat_session(
+    return create_or_get_chat_session( # Changed to direct call, not await
         card_type=card_type,
         card_id=card_id,
+        user_persona_id=session_create.user_persona_id, # Pass user_persona_id from legacy schema
         db=db
     )
 
@@ -250,39 +268,257 @@ def get_chat_session_messages(
     )
     return messages
 
-@router.post("/{chat_id}/messages", response_model=ChatMessageInDB, status_code=status.HTTP_201_CREATED)
-def add_message_to_session(
-    chat_id: str, message_create: ChatMessageCreate, db: Session = Depends(get_db)
+@router.post("/{chat_id}/messages", response_model=ChatMessageInDB) # Simplified response for now
+async def post_chat_message(
+    chat_id: str = Path(..., title="The ID of the chat session"),
+    user_message_input: UserMessageInput = Body(...), # Use the Pydantic model for the body
+    db: Session = Depends(get_db)
 ):
+    print(f"[DEBUG] post_chat_message called for chat_id: {chat_id}")
+    # --- 1. Fetch ChatSession and save User's Message ---
     db_chat_session = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
-    if db_chat_session is None:
+    if not db_chat_session:
+        print(f"[DEBUG] Chat session {chat_id} not found.")
         raise HTTPException(status_code=404, detail="Chat session not found")
 
-    # Se houver active_persona_id no metadata, busca o nome e garante que fique salvo
-    message_metadata = message_create.message_metadata or {}
-    if 'active_persona_id' in message_metadata and not message_metadata.get('active_persona_name'):
-        # Busca o nome da persona se não foi fornecido
-        active_persona = db.query(UserPersona).filter(UserPersona.id == message_metadata['active_persona_id']).first()
-        if active_persona:
-            message_metadata['active_persona_name'] = active_persona.name
-
-    db_message = ChatMessage(
+    print(f"[DEBUG] Chat session {chat_id} found. User persona linked: {db_chat_session.user_persona_id is not None}")
+    # Save user's message
+    db_user_message = ChatMessage(
         chat_session_id=chat_id,
-        sender_type=message_create.sender_type,
-        content=message_create.content,
-        message_metadata=message_metadata,
-        active_persona_name=message_create.active_persona_name, # Pass the name
-        active_persona_image_url=message_create.active_persona_image_url # Pass the image URL
+        sender_type="USER",
+        content=user_message_input.content
+        # active_persona_name and active_persona_image_url could be populated from db_chat_session.user_persona
     )
-    db.add(db_message)
-    
-    # Atualiza last_active_at da sessão
-    db_chat_session.last_active_at = func.now() # type: ignore
-    db.add(db_chat_session)
-
+    if db_chat_session.user_persona: # If a persona is linked to the session
+        db_user_message.active_persona_name = db_chat_session.user_persona.name
+        db_user_message.active_persona_image_url = db_chat_session.user_persona.image_url
+        
+    db.add(db_user_message)
+    db_chat_session.last_active_at = datetime.utcnow() # Update last active time
     db.commit()
-    db.refresh(db_message)
-    return db_message
+    db.refresh(db_user_message)
+    print(f"[DEBUG] User message saved for chat {chat_id}.")
+
+    # --- 2. Fetch Context Data ---
+    # UserSettings
+    db_user_settings = db.query(UserSettings).filter(UserSettings.id == USER_SETTINGS_ID).first()
+    if not db_user_settings:
+        # This should ideally not happen if GET /api/settings/ creates it.
+        # Or, create default settings here if they are absolutely mandatory for a chat to proceed.
+        raise HTTPException(status_code=500, detail="User settings not configured. Please configure settings first.")
+
+    # --- 2. Fetch Context Data ---
+    # UserSettings
+    db_user_settings = db.query(UserSettings).filter(UserSettings.id == USER_SETTINGS_ID).first()
+    if not db_user_settings:
+        raise HTTPException(status_code=500, detail="User settings not configured. Please configure settings first.")
+
+    # Handle dynamic user persona update for the session
+    if user_message_input.user_persona_id and db_chat_session.user_persona_id != user_message_input.user_persona_id:
+        db_chat_session.user_persona_id = user_message_input.user_persona_id
+        db.add(db_chat_session)
+        db.commit()
+        db.refresh(db_chat_session)
+        print(f"[DEBUG] Chat session {chat_id} user persona updated to: {db_chat_session.user_persona_id}")
+
+    # Fetch the user persona (either the existing one or the newly updated one)
+    db_user_persona = db_chat_session.user_persona
+    if not db_user_persona:
+        # If after update, still no persona (e.g., user_persona_id was None and input was None)
+        # This should ideally not happen if frontend enforces persona selection for new chats
+        # and sends it with every message.
+        print(f"[DEBUG] No user persona found for chat session {chat_id} after update attempt.")
+        raise HTTPException(status_code=400, detail="No user persona linked to this chat session. Please select one.")
+
+
+    # AI Persona Card (Character or Scenario)
+    ai_persona_card = None
+    card_name_for_prompt = "AI" # Default name
+    card_description_for_prompt = ""
+    card_instructions_for_prompt = ""
+    card_example_dialogues_for_prompt = ""
+    card_beginning_message_for_prompt = ""
+
+    if db_chat_session.card_type == 'character':
+        ai_persona_card = db.query(CharacterCard).filter(CharacterCard.id == db_chat_session.card_id).first()
+        if ai_persona_card:
+            card_name_for_prompt = ai_persona_card.name
+            card_description_for_prompt = ai_persona_card.description or ""
+            card_instructions_for_prompt = ai_persona_card.instructions or ""
+            card_example_dialogues_for_prompt = str(ai_persona_card.example_dialogues or []) # Convert list to string
+            card_beginning_message_for_prompt = str(ai_persona_card.beginning_messages or []) # Convert list to string
+    elif db_chat_session.card_type == 'scenario':
+        ai_persona_card = db.query(ScenarioCard).filter(ScenarioCard.id == db_chat_session.card_id).first()
+        if ai_persona_card:
+            card_name_for_prompt = ai_persona_card.name
+            card_description_for_prompt = ai_persona_card.description or ""
+            card_instructions_for_prompt = ai_persona_card.instructions or ""
+            card_example_dialogues_for_prompt = str(ai_persona_card.example_dialogues or []) # Convert list to string
+            card_beginning_message_for_prompt = str(ai_persona_card.beginning_message or []) # Convert list to string
+            
+    if not ai_persona_card:
+        raise HTTPException(status_code=404, detail=f"{db_chat_session.card_type.capitalize()} card not found for this session")
+
+    # MasterWorld (if linked to ai_persona_card)
+    db_master_world = None
+    world_context_for_prompt = "No specific world context provided."
+    if ai_persona_card.master_world_id:
+        db_master_world = db.query(MasterWorld).filter(MasterWorld.id == ai_persona_card.master_world_id).first()
+        if db_master_world:
+            world_context_for_prompt = f"World Name: {db_master_world.name}. Description: {db_master_world.description or ''}"
+    
+    # Chat History
+    # context_size from UserSettings determines N
+    history_limit = db_user_settings.context_size if db_user_settings.context_size and db_user_settings.context_size > 0 else 10 # Default to 10
+    
+    recent_messages_db = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.chat_session_id == chat_id)
+        .order_by(ChatMessage.timestamp.desc())
+        .limit(history_limit)
+        .all()
+    )
+    recent_messages_db.reverse() # To get them in chronological order for the prompt
+
+    chat_history_for_prompt = "\n".join(
+        [f"{msg.active_persona_name or msg.sender_type}: {msg.content}" for msg in recent_messages_db]
+    )
+
+    # --- 3. Assemble Prompt ---
+    prompt_template = db_user_settings.generation_prompt_template or \
+        "You are {{ai_instructions.name}}. User: {{user_input}}. {{ai_instructions.name}}:" # Fallback minimal template
+
+    # Prepare ai_instructions object/dict for the template
+    # Note: The example template uses dot notation (ai_instructions.name), so a class or dict that supports it is good.
+    # For simplicity here, we'll use direct f-string replacement or prepare a dict.
+    
+    ai_instructions_data = {
+        "name": card_name_for_prompt,
+        "description": card_description_for_prompt,
+        "instructions": card_instructions_for_prompt,
+        "example_dialogues": card_example_dialogues_for_prompt,
+        "beginning_message": card_beginning_message_for_prompt
+    }
+
+    user_persona_details_data = {
+        "name": db_user_persona.name,
+        "description": db_user_persona.description or ""
+    }
+
+    # Simple replacement for now; a proper templating engine like Jinja2 could be used for more complex logic
+    # This is a basic example. You might need to make your template simpler or use a templating engine.
+    # The example template in UserSettings has nested access (e.g., ai_instructions.name)
+    # For now, let's assume a flat structure or adjust the template string in UserSettings.
+    # Or, build the specific parts of ai_instructions for the template.
+
+    final_prompt = prompt_template \
+        .replace("{{ai_instructions.name}}", card_name_for_prompt) \
+        .replace("{{ai_instructions.description}}", card_description_for_prompt) \
+        .replace("{{ai_instructions.instructions}}", card_instructions_for_prompt) \
+        .replace("{{ai_instructions.example_dialogues}}", card_example_dialogues_for_prompt) \
+        .replace("{{ai_instructions.beginning_message}}", card_beginning_message_for_prompt) \
+        .replace("{{user_persona_details.name}}", db_user_persona.name) \
+        .replace("{{user_persona_details.description}}", db_user_persona.description or "") \
+        .replace("{{world_context_name_and_description}}", world_context_for_prompt) \
+        .replace("{{chat_history}}", chat_history_for_prompt) \
+        .replace("{{user_input}}", user_message_input.content) \
+        .replace("{{language}}", db_user_settings.language or "English") # Use configured language
+
+    # --- 4. Call LLM (Example with litellm) ---
+    # Ensure litellm is installed: pip install litellm
+    try:
+        import litellm
+        # Make sure API key, model, provider are correctly set in UserSettings
+        # For litellm, model string can often include the provider, e.g., "ollama/mistral" or "openrouter/mistralai/mistral-7b-instruct"
+        # If using OpenRouter, litellm needs OPENROUTER_API_KEY environment variable, or pass it directly.
+        
+        # This logic needs to be robust based on how you store provider/model and API keys.
+        # For now, assuming a generic way and that API key for the provider is accessible by litellm.
+        model_for_litellm = db_user_settings.selected_llm_model
+        
+        # Ensure model string is correctly formatted for OpenRouter
+        if db_user_settings.llm_provider and db_user_settings.llm_provider.lower() == "openrouter":
+            # OpenRouter models should be prefixed with "openrouter/"
+            if not model_for_litellm.lower().startswith("openrouter/"):
+                model_for_litellm = f"openrouter/{model_for_litellm}"
+        elif db_user_settings.llm_provider and db_user_settings.llm_provider.lower() not in model_for_litellm.lower() and "/" not in model_for_litellm:
+             # Generic case: prepend provider if not already part of model and no organization prefix
+             model_for_litellm = f"{db_user_settings.llm_provider.lower()}/{model_for_litellm}"
+
+        # Construct messages list for litellm
+        # The 'system' message would be the main assembled prompt, excluding the history and user input if they are part of messages
+        # Or, some models prefer the full context as one system/user prompt.
+        # For simplicity, let's assume the prompt contains everything and we make a single message to the 'user' role for the LLM.
+        # A more standard approach is:
+        # messages_for_llm = [
+        #    {"role": "system", "content": "System instructions extracted from your template..."},
+        #    ... (chat history messages as {"role": "user/assistant", "content": ...})
+        #    {"role": "user", "content": user_message_input.content}
+        # ]
+        # For now, using the fully assembled prompt as a single 'user' message after a system prompt
+        
+        # Simpler approach: Construct a system prompt and then add user message
+        # The system prompt would be your template MINUS the {{user_input}} and the final {{ai_instructions.name}}:
+        system_prompt_part = final_prompt.split(f"\n{db_user_persona.name}: {user_message_input.content}")[0]
+
+        messages_for_llm = [
+            {"role": "system", "content": system_prompt_part.strip()},
+            {"role": "user", "content": user_message_input.content}
+        ]
+        
+        litellm_params = {
+            "model": model_for_litellm, # e.g., "openrouter/mistralai/mistral-7b-instruct"
+            "messages": messages_for_llm,
+            "api_key": db_user_settings.llm_api_key, # Pass the API key if needed for the provider
+            "temperature": db_user_settings.temperature,
+            "top_p": db_user_settings.top_p,
+            "max_tokens": db_user_settings.max_response_tokens
+        }
+
+        # Add base_url for OpenRouter explicitly
+        if db_user_settings.llm_provider and db_user_settings.llm_provider.lower() == "openrouter":
+            litellm_params["base_url"] = "https://openrouter.ai/api/v1"
+            print(f"[DEBUG] Using OpenRouter base_url: {litellm_params['base_url']}")
+            print(f"[DEBUG] OpenRouter model: {litellm_params['model']}")
+
+        response = await run_in_threadpool(litellm.completion, **litellm_params)
+        ai_response_content = response.choices[0].message.content.strip()
+
+    except litellm.exceptions.APIError as e:
+        print(f"LiteLLM API Error: Status Code: {e.status_code}, Message: {e.message}, Response: {e.response}")
+        raise HTTPException(status_code=e.status_code if e.status_code else 500, detail=f"LLM API Error: {e.message}")
+    except litellm.exceptions.AuthenticationError as e:
+        print(f"LiteLLM Authentication Error: Message: {e.message}")
+        raise HTTPException(status_code=401, detail=f"LLM Authentication Error: {e.message}. Please check your API key.")
+    except litellm.exceptions.RateLimitError as e:
+        print(f"LiteLLM Rate Limit Error: Message: {e.message}")
+        raise HTTPException(status_code=429, detail=f"LLM Rate Limit Exceeded: {e.message}. Please try again later.")
+    except litellm.exceptions.BadRequestError as e:
+        print(f"LiteLLM Bad Request Error: Message: {e.message}, Response: {e.response}")
+        raise HTTPException(status_code=400, detail=f"LLM Bad Request: {e.message}. Check model name or request parameters.")
+    except Exception as e:
+        print(f"An unexpected error occurred calling LLM: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred with LLM: {str(e)}")
+
+    # --- 5. Save AI Response ---
+    db_ai_message = ChatMessage(
+        chat_session_id=chat_id,
+        sender_type="AI",
+        content=ai_response_content,
+        message_metadata={"model_used": model_for_litellm} # Example metadata
+        # Populate active_persona_name and image_url for the AI's message using the ai_persona_card details
+    )
+    if ai_persona_card:
+        db_ai_message.active_persona_name = card_name_for_prompt
+        db_ai_message.active_persona_image_url = ai_persona_card.image_url
+
+    db.add(db_ai_message)
+    db_chat_session.last_active_at = datetime.utcnow() # Update last active time again
+    db.commit()
+    db.refresh(db_ai_message)
+
+    # --- 6. Return AI's message (or a ChatTurnResponse) ---
+    return db_ai_message # Returning only AI's message for now
 
 @router.put("/{chat_id}", response_model=ChatSessionInDB)
 def update_chat_session_title(

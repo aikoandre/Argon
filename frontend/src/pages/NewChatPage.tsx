@@ -6,14 +6,13 @@ import {
   getAllScenarioCards,
   getAllCharacterCards,
   getAllUserPersonas,
-  createChatSession,
+  createOrGetCardChat,
 } from "../services/api";
 
 import type {
   ScenarioCardData,
   CharacterCardData,
   UserPersonaData,
-  ChatSessionCreateData,
 } from "../services/api";
 
 interface SelectOption {
@@ -78,28 +77,41 @@ const NewChatPage: React.FC = () => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!selectedScenario || !selectedCharacter || !selectedPersona) {
-      alert("Please select a scenario, a GM character, and a user persona.");
+    if (!selectedScenario && !selectedCharacter) {
+      alert("Please select either a scenario or a GM character.");
       return;
     }
+    if (!selectedPersona) {
+      alert("Please select a user persona.");
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
     try {
-      const newSessionData: ChatSessionCreateData = {
-        // Verifique se este tipo existe em api.ts
-        scenario_id: selectedScenario.value,
-        gm_character_id: selectedCharacter.value,
-        user_persona_id: selectedPersona.value,
-        // title: Opcional, pode ser gerado no backend ou adicionado aqui
-      };
-      const createdSession = await createChatSession(newSessionData);
-      navigate(`/chat/${createdSession.id}`);
+      let sessionId: string;
+      if (selectedScenario) {
+        sessionId = await createOrGetCardChat(
+          "scenario",
+          selectedScenario.value,
+          selectedPersona.value
+        );
+      } else if (selectedCharacter) {
+        sessionId = await createOrGetCardChat(
+          "character",
+          selectedCharacter.value,
+          selectedPersona.value
+        );
+      } else {
+        // This case should ideally not be reached due to the initial check
+        throw new Error("No scenario or character selected.");
+      }
+      navigate(`/chat/${sessionId}`);
     } catch (err) {
       setError("Failed to create chat session.");
       console.error(err);
       setIsSubmitting(false);
     }
-    // Não precisa setIsSubmitting(false) aqui se a navegação ocorrer
   };
 
   if (isLoading) {

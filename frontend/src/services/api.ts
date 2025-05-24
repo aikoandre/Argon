@@ -558,8 +558,20 @@ export const deleteLoreEntry = async (entryId: string): Promise<void> => {
 };
 
 // --- Chat Sessions & Messages ---
-export const createOrGetCardChat = async (cardType: 'character'|'scenario', cardId: string): Promise<string> => {
-  const response = await apiClient.post<{ id: string }>(`/chat/sessions/${cardType}/${cardId}`);
+export const createOrGetCardChat = async (
+  cardType: 'character'|'scenario',
+  cardId: string,
+  userPersonaId: string | null = null // Add optional userPersonaId parameter
+): Promise<string> => {
+  const params: Record<string, string> = {};
+  if (userPersonaId) {
+    params.user_persona_id = userPersonaId;
+  }
+  const response = await apiClient.post<{ id: string }>(
+    `/chat/sessions/${cardType}/${cardId}`,
+    {}, // Empty body for POST with query params
+    { params } // Pass params here
+  );
   return response.data.id;
 };
 
@@ -574,20 +586,16 @@ export interface ChatMessageData {
   active_persona_image_url?: string | null; // New field
 }
 
-export interface ChatSessionBaseData {
-  scenario_id?: string; // now optional
-  gm_character_id?: string; // now optional
-  user_persona_id?: string; // now optional
-  title?: string | null;
-}
-
-export interface ChatSessionCreateData extends ChatSessionBaseData {}
-
-export interface ChatSessionData extends ChatSessionBaseData {
+export interface ChatSessionData {
   id: string;
   created_at: string;
   last_active_at: string;
-  // Adicione outros campos que seu schema ChatSessionInDB retorna
+  scenario_id?: string;
+  gm_character_id?: string;
+  user_persona_id?: string;
+  title?: string | null;
+  card_type?: string;
+  card_id?: string;
 }
 
 export interface ChatSessionListedData {
@@ -598,25 +606,8 @@ export interface ChatSessionListedData {
   card_id?: string;
   card_name?: string;
   card_image_url?: string;
-  message_count?: number; // Adicionado para contar mensagens
+  message_count?: number;
 }
-
-export const createChatSession = async (
-  data: ChatSessionCreateData
-): Promise<ChatSessionData> => {
-  // Remove empty string fields before sending
-  const cleanData: Record<string, any> = { ...data };
-  if (cleanData.scenario_id === "") delete cleanData.scenario_id;
-  if (cleanData.gm_character_id === "") delete cleanData.gm_character_id;
-  if (cleanData.user_persona_id === "") delete cleanData.user_persona_id;
-  try {
-    const response = await apiClient.post<ChatSessionData>('/chat/', cleanData);
-    return response.data;
-  } catch (error) {
-    console.error('Error creating chat session:', error);
-    throw error;
-  }
-};
 
 export const getAllChatSessions = async (): Promise<
   ChatSessionListedData[]
@@ -661,15 +652,19 @@ export const addMessageToSession = async (
   messageData: {
     content: string;
     sender_type: "USER" | "AI" | "SYSTEM";
+    user_persona_id?: string | null; // Add this field
     message_metadata?: Record<string, any> | null;
     active_persona_name?: string | null; // New field
     active_persona_image_url?: string | null; // New field
   }
 ): Promise<ChatMessageData> => {
   try {
+    if (!messageData.content || messageData.content.trim().length === 0) {
+      throw new Error("Message content cannot be empty.");
+    }
     const response = await apiClient.post<ChatMessageData>(
       `/chat/${chatId}/messages`,
-      messageData
+      messageData // Send the entire messageData object
     );
     return response.data;
   } catch (error) {
