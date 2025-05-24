@@ -6,3 +6,4 @@ node_modules/
 .electron/
 __pycache__/
 are_database.db
+static/
