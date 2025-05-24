@@ -36,13 +36,14 @@ async def read_user_settings(db: Session = Depends(get_db)):
                 "{{chat_history}}\n"
                 "--- End of History ---\n\n"
                 "{{user_persona_details.name}}: {{user_input}}\n"
-                "{{ai_instructions.name}}:"
+                "{{ai_instructions.name}}: "
+                "**IMPORTANT**: Always complete your response and strictly adhere to your character's instructions and speaking style."
             ),
             language="English",
-            temperature=0.7,
+            temperature=1.0, # Ensure float consistency
             top_p=1.0,
-            max_response_tokens=512,
-            context_size=10,
+            max_response_tokens=2048,
+            context_size=164000,
             active_persona_id=None
         )
 

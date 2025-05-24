@@ -35,12 +35,12 @@ const SendIcon = ({ className }: { className?: string }) => (
 );
 
 
-const ArrowBackIcon = ({ className, onClick }: { className?: string; onClick: () => void }) => (
-  <span className={`${iconBaseClass} ${className || ''} cursor-pointer`} onClick={onClick}>arrow_back_ios</span>
+const ArrowBackIcon = ({ className, onClick, disabled }: { className?: string; onClick: () => void; disabled?: boolean }) => (
+  <span className={`${iconBaseClass} ${className || ''} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`} onClick={disabled ? undefined : onClick}>arrow_back_ios</span>
 );
 
-const ArrowForwardIcon = ({ className, onClick }: { className?: string; onClick: () => void }) => (
-  <span className={`${iconBaseClass} ${className || ''} cursor-pointer`} onClick={onClick}>arrow_forward_ios</span>
+const ArrowForwardIcon = ({ className, onClick, disabled }: { className?: string; onClick: () => void; disabled?: boolean }) => (
+  <span className={`${iconBaseClass} ${className || ''} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`} onClick={disabled ? undefined : onClick}>arrow_forward_ios</span>
 );
 
 // Helper function to get proper image URL for persona images
@@ -82,6 +82,8 @@ const ChatPage: React.FC = () => {
     null
   );
   const [newMessage, setNewMessage] = useState("");
+  const [allBeginningMessages, setAllBeginningMessages] = useState<string[]>([]);
+  const [currentBeginningMessageIndex, setCurrentBeginningMessageIndex] = useState<number>(0);
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,51 +134,46 @@ const ChatPage: React.FC = () => {
         }));
         setSessionDetails(details);
 
-        // Logic to send beginning message if chat is new
+        // Logic to handle beginning messages if chat is new
         if (msgs.length === 0 && details && !hasSentBeginningMessageRef.current) {
-          let beginningMessageContent: string | null = null;
+          let fetchedBeginningMessages: string[] = [];
           let senderName: string | null = null;
           let senderImageUrl: string | null = null;
 
           if (details.card_type === "character" && details.card_id) {
             const character = await getCharacterCardById(details.card_id);
             if (character.beginning_messages && character.beginning_messages.length > 0) {
-              beginningMessageContent = character.beginning_messages[0];
+              fetchedBeginningMessages = character.beginning_messages;
               senderName = character.name;
-              senderImageUrl = character.image_url ?? null; // Ensure it's string | null
+              senderImageUrl = character.image_url ?? null;
             }
           } else if (details.card_type === "scenario" && details.card_id) {
             const scenario = await getScenarioCardById(details.card_id);
             if (scenario.beginning_message && scenario.beginning_message.length > 0) {
-              beginningMessageContent = scenario.beginning_message[0];
+              fetchedBeginningMessages = scenario.beginning_message;
               senderName = scenario.name;
-              senderImageUrl = scenario.image_url ?? null; // Ensure it's string | null
+              senderImageUrl = scenario.image_url ?? null;
             }
           }
 
-          if (beginningMessageContent) {
-            try {
-              const aiBeginningMessage = await addMessageToSession(chatId, {
-                content: beginningMessageContent,
-                sender_type: "AI",
-                message_metadata: { is_beginning_message: true }, // Mark as beginning message
-                active_persona_name: senderName, // Now senderName is string | null
-                active_persona_image_url: senderImageUrl, // Now senderImageUrl is string | null
-              });
+          if (fetchedBeginningMessages.length > 0) {
+            setAllBeginningMessages(fetchedBeginningMessages);
+            setCurrentBeginningMessageIndex(0); // Start with the first beginning message
 
-              setMessages((prev) => [
-                ...prev,
-                {
-                  ...aiBeginningMessage,
-                  ai_responses: [{ content: aiBeginningMessage.content, timestamp: aiBeginningMessage.timestamp }],
-                  current_response_index: 0,
-                },
-              ]);
-              hasSentBeginningMessageRef.current = true; // Mark that the message has been sent
-            } catch (sendError) {
-              console.error("Failed to send beginning message:", sendError);
-              setError("Failed to send beginning message.");
-            }
+            // Construct the initial message for the frontend state
+            const initialBeginningMessage: ChatMessageData = {
+              id: `beginning-message-${Date.now()}`, // Unique ID for this frontend-only message
+              chat_session_id: chatId!,
+              sender_type: "AI",
+              content: fetchedBeginningMessages[0], // Display the first message
+              timestamp: new Date().toISOString(),
+              is_beginning_message: true, // Mark as beginning message
+              active_persona_name: senderName,
+              active_persona_image_url: senderImageUrl,
+              // No ai_responses needed here, as navigation is handled by currentBeginningMessageIndex
+            };
+            setMessages([initialBeginningMessage]);
+            hasSentBeginningMessageRef.current = true; // Mark that the initial message has been set
           }
         }
       } catch (err) {
@@ -271,6 +268,9 @@ const ChatPage: React.FC = () => {
     setNewMessage(""); // Clear input only if it's a new message
 
     try {
+      // Determine if this is the first user message after a beginning message
+      const isFirstUserMessageAfterBeginning = messages.length === 1 && messages[0].is_beginning_message;
+
       const aiResponseMessage = await addMessageToSession(chatId!, {
         content: userMessageContent, // Always send the user's message content
         sender_type: "USER",
@@ -278,6 +278,8 @@ const ChatPage: React.FC = () => {
         message_metadata: activePersonaId && activePersonaId !== "" ? { active_persona_id: activePersonaId, active_persona_name: activePersonaName } : undefined,
         active_persona_name: activePersonaName,
         active_persona_image_url: activePersonaImageUrl,
+        // Pass current_beginning_message_index only if it's the first user message after a beginning message
+        current_beginning_message_index: isFirstUserMessageAfterBeginning ? currentBeginningMessageIndex : undefined,
       });
 
       setMessages((prevMessages) => {
@@ -344,9 +346,37 @@ const ChatPage: React.FC = () => {
     }
   };
 
+  const handleNavigateBeginningMessage = (direction: 'prev' | 'next') => {
+    setMessages(prevMessages => {
+      // Find the beginning message in the current messages array
+      const beginningMessageIndexInChat = prevMessages.findIndex(msg => msg.is_beginning_message);
+      if (beginningMessageIndexInChat === -1) return prevMessages; // No beginning message found
+
+      let newIndex = currentBeginningMessageIndex;
+      if (direction === 'prev') {
+        newIndex = Math.max(0, newIndex - 1);
+      } else {
+        newIndex = Math.min(allBeginningMessages.length - 1, newIndex + 1);
+      }
+
+      setCurrentBeginningMessageIndex(newIndex); // Update the index state
+
+      // Update the content of the existing beginning message in the chat
+      const updatedMessages = [...prevMessages];
+      updatedMessages[beginningMessageIndexInChat] = {
+        ...updatedMessages[beginningMessageIndexInChat],
+        content: allBeginningMessages[newIndex],
+        timestamp: new Date().toISOString(), // Update timestamp to reflect change
+      } as ChatMessageData; // Cast to ChatMessageData to ensure type safety
+
+      return updatedMessages;
+    });
+  };
+
   const handleNavigateResponse = (aiMessageId: string, direction: 'prev' | 'next') => {
     setMessages(prevMessages => prevMessages.map(msg => {
-      if (msg.id === aiMessageId && msg.sender_type === "AI" && msg.ai_responses && msg.ai_responses.length > 1) {
+      // This function is now specifically for regular AI responses (not beginning messages)
+      if (msg.id === aiMessageId && msg.sender_type === "AI" && !msg.is_beginning_message && msg.ai_responses && msg.ai_responses.length > 1) {
         let newIndex = msg.current_response_index !== undefined ? msg.current_response_index : msg.ai_responses.length - 1;
         if (direction === 'prev') {
           newIndex = (newIndex - 1 + msg.ai_responses.length) % msg.ai_responses.length;
@@ -469,13 +499,34 @@ const ChatPage: React.FC = () => {
                   </div>
                 </div>
                 {msg.sender_type === "AI" && msg.ai_responses && msg.ai_responses.length > 0 && (
-                  <div className="absolute top-2 right-2 flex items-center space-x-1 text-gray-400 text-sm">
-                    <>
+                  // Conditional rendering for navigation arrows based on message type
+                  msg.is_beginning_message ? (
+                    // For beginning messages: show arrows only if more than one beginning message exists
+                    allBeginningMessages.length > 1 && (
+                      <div className="absolute top-2 right-2 flex items-center space-x-1 text-gray-400 text-sm">
+                        <ArrowBackIcon
+                          className="!text-lg"
+                          onClick={() => handleNavigateBeginningMessage('prev')}
+                          // Disable if at the first beginning message
+                          disabled={currentBeginningMessageIndex === 0}
+                        />
+                        <span>{`${currentBeginningMessageIndex + 1}/${allBeginningMessages.length}`}</span>
+                        <ArrowForwardIcon
+                          className="!text-lg"
+                          onClick={() => handleNavigateBeginningMessage('next')}
+                          // Disable if at the last beginning message (no regeneration)
+                          disabled={currentBeginningMessageIndex === allBeginningMessages.length - 1}
+                        />
+                      </div>
+                    )
+                  ) : (
+                    // For regular AI messages: show arrows if more than one response, allow regeneration
+                    <div className="absolute top-2 right-2 flex items-center space-x-1 text-gray-400 text-sm">
                       {/* Show left arrow only if not the first response */}
                       {msg.current_response_index !== 0 && (
                         <ArrowBackIcon className="!text-lg" onClick={() => handleNavigateResponse(msg.id, 'prev')} />
                       )}
-                      <span>{`${(msg.current_response_index || 0) + 1}/${msg.ai_responses.length}`}</span>
+                      <span>{`${(msg.current_response_index || 0) + 1}/${msg.ai_responses!.length}`}</span>
                       {/* Right arrow always shown, but its action depends on current index */}
                       <ArrowForwardIcon
                         className="!text-lg"
@@ -487,8 +538,8 @@ const ChatPage: React.FC = () => {
                           }
                         }}
                       />
-                    </>
-                  </div>
+                    </div>
+                  )
                 )}
               </div>
             </div>

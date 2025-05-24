@@ -20,7 +20,6 @@ class UserSettings(Base):
         "Examples of how you speak: {{ai_instructions.example_dialogues}}."
         "Initial message (if applicable): {{ai_instructions.beginning_message}}"
         "You are interacting with {{user_persona_details.name}}, who is: {{user_persona_details.description}}."
-        "Always answer using actions and speech together."
         "World Context (if applicable): {{world_context_name_and_description}}"
         "--- Recent Chat History ---"
         "{{chat_history}}"
@@ -30,10 +29,10 @@ class UserSettings(Base):
     language = Column(String, nullable=True, default="English") # Or "English" if you prefer
 
     # LLM Generation Parameters
-    temperature = Column(Float, nullable=True, default=0.7)
+    temperature = Column(Float, nullable=True, default=1.0)
     top_p = Column(Float, nullable=True, default=1.0)
-    max_response_tokens = Column(Integer, nullable=True, default=512)
-    context_size = Column(Integer, nullable=True, default=10) # Number of history messages or context tokens
+    max_response_tokens = Column(Integer, nullable=True, default=2048)
+    context_size = Column(Integer, nullable=True, default=164000) # Number of history messages or context tokens
 
     # Active User Persona
     active_persona_id = Column(String, ForeignKey("user_personas.id", ondelete="SET NULL"), nullable=True)

@@ -28,7 +28,8 @@ from backend.db.crud import create_chat_session as crud_create_chat_session
 # For UserMessageCreate, using a Pydantic model for the body is cleaner
 class UserMessageInput(BaseModel):
     content: str = Field(..., min_length=1)
-    user_persona_id: Optional[str] = None # Add optional user_persona_id
+    user_persona_id: Optional[str] = None
+    current_beginning_message_index: Optional[int] = None # New field
 
 
 router = APIRouter(
@@ -475,26 +476,64 @@ async def post_chat_message(
         if db_master_world:
             world_context_for_prompt = f"World Name: {db_master_world.name}. Description: {db_master_world.description or ''}"
     
-    # Chat History
-    # context_size from UserSettings determines N
-    history_limit = db_user_settings.context_size if db_user_settings.context_size and db_user_settings.context_size > 0 else 10 # Default to 10
-    
-    recent_messages_db = (
-        db.query(ChatMessage)
-        .filter(ChatMessage.chat_session_id == chat_id)
-        .order_by(ChatMessage.timestamp.desc())
-        .limit(history_limit)
-        .all()
-    )
-    recent_messages_db.reverse() # To get them in chronological order for the prompt
+    # Chat History for LLM Context
+    messages_for_llm_context: List[ChatMessage] = []
+
+    # If current_beginning_message_index is provided, it means this is the first user message
+    # after a beginning message was displayed in the frontend.
+    # In this case, we only include the *selected* beginning message in the context.
+    if user_message_input.current_beginning_message_index is not None:
+        all_beginning_messages_from_card = []
+        if db_chat_session.card_type == 'character' and hasattr(ai_persona_card, 'beginning_messages') and ai_persona_card.beginning_messages:
+            all_beginning_messages_from_card = ai_persona_card.beginning_messages
+        elif db_chat_session.card_type == 'scenario' and hasattr(ai_persona_card, 'beginning_message') and ai_persona_card.beginning_message:
+            all_beginning_messages_from_card = ai_persona_card.beginning_message
+
+        if 0 <= user_message_input.current_beginning_message_index < len(all_beginning_messages_from_card):
+            selected_beginning_message_content = all_beginning_messages_from_card[user_message_input.current_beginning_message_index]
+            # Create a temporary ChatMessage object for the context
+            temp_beginning_msg = ChatMessage(
+                chat_session_id=chat_id,
+                sender_type="AI", # Beginning messages are from AI
+                content=selected_beginning_message_content,
+                timestamp=datetime.utcnow(), # Use current time for context
+                active_persona_name=card_name_for_prompt,
+                active_persona_image_url=ai_persona_card.image_url
+            )
+            messages_for_llm_context.append(temp_beginning_msg)
+        else:
+            print(f"[WARNING] Invalid current_beginning_message_index: {user_message_input.current_beginning_message_index}. Falling back to regular history.")
+            # Fallback to regular history if index is invalid
+            history_limit = db_user_settings.context_size if db_user_settings.context_size and db_user_settings.context_size > 0 else 10
+            recent_messages_db = (
+                db.query(ChatMessage)
+                .filter(ChatMessage.chat_session_id == chat_id)
+                .order_by(ChatMessage.timestamp.desc())
+                .limit(history_limit)
+                .all()
+            )
+            recent_messages_db.reverse()
+            messages_for_llm_context.extend(recent_messages_db)
+    else:
+        # If no current_beginning_message_index, fetch regular chat history from DB
+        history_limit = db_user_settings.context_size if db_user_settings.context_size and db_user_settings.context_size > 0 else 10
+        recent_messages_db = (
+            db.query(ChatMessage)
+            .filter(ChatMessage.chat_session_id == chat_id)
+            .order_by(ChatMessage.timestamp.desc())
+            .limit(history_limit)
+            .all()
+        )
+        recent_messages_db.reverse()
+        messages_for_llm_context.extend(recent_messages_db)
 
     chat_history_for_prompt = "\n".join(
-        [f"{msg.active_persona_name or msg.sender_type}: {msg.content}" for msg in recent_messages_db]
+        [f"{msg.active_persona_name or msg.sender_type}: {msg.content}" for msg in messages_for_llm_context]
     )
 
     # --- 3. Assemble Prompt ---
     prompt_template = db_user_settings.generation_prompt_template or \
-        "You are {{ai_instructions.name}}. User: {{user_input}}. {{ai_instructions.name}}:" # Fallback minimal template
+        "You are {{ai_instructions.name}}. User: {{user_input}}. {{ai_instructions.name}}:"
 
     # Prepare ai_instructions object/dict for the template
     # Note: The example template uses dot notation (ai_instructions.name), so a class or dict that supports it is good.

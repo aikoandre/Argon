@@ -657,6 +657,7 @@ export const addMessageToSession = async (
     message_metadata?: Record<string, any> | null;
     active_persona_name?: string | null; // New field
     active_persona_image_url?: string | null; // New field
+    current_beginning_message_index?: number; // New field for beginning message navigation
   }
 ): Promise<ChatMessageData> => {
   try {
