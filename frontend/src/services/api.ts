@@ -584,6 +584,7 @@ export interface ChatMessageData {
   message_metadata?: Record<string, any> | null;
   active_persona_name?: string | null; // New field
   active_persona_image_url?: string | null; // New field
+  is_beginning_message?: boolean; // To identify initial messages from character/scenario cards
 }
 
 export interface ChatSessionData {
@@ -606,7 +607,7 @@ export interface ChatSessionListedData {
   card_id?: string;
   card_name?: string;
   card_image_url?: string;
-  message_count?: number;
+  user_message_count?: number; // Changed to count only user messages
 }
 
 export const getAllChatSessions = async (): Promise<

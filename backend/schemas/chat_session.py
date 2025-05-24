@@ -38,7 +38,8 @@ class ChatSessionListed(BaseModel):
     card_id: Optional[str] = None
     card_name: Optional[str] = None
     card_image_url: Optional[str] = None
-    message_count: int = 0 # Adicionado para contar mensagens
+    user_message_count: int = 0 # Changed to count only user messages
+
 
     class Config:
         from_attributes = True

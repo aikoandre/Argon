@@ -16,16 +16,16 @@ class UserSettings(Base):
     # Prompt Configuration
     generation_prompt_template = Column(Text, nullable=True, default=(
         "You are {{ai_instructions.name}}, {{ai_instructions.description}}. "
-        "Your instructions on how to act are: {{ai_instructions.instructions}}.\n"
-        "Examples of how you speak: {{ai_instructions.example_dialogues}}.\n"
-        "Initial message (if applicable): {{ai_instructions.beginning_message}}\n\n"
-        "You are interacting with {{user_persona_details.name}}, who is: {{user_persona_details.description}}.\n\n"
-        "World Context (if applicable): {{world_context_name_and_description}}\n\n"
-        "--- Recent Chat History ---\n"
-        "{{chat_history}}\n"
-        "--- End of History ---\n\n"
-        "{{user_persona_details.name}}: {{user_input}}\n"
-        "{{ai_instructions.name}}:"
+        "Your instructions on how to act are: {{ai_instructions.instructions}}."
+        "Examples of how you speak: {{ai_instructions.example_dialogues}}."
+        "Initial message (if applicable): {{ai_instructions.beginning_message}}"
+        "You are interacting with {{user_persona_details.name}}, who is: {{user_persona_details.description}}."
+        "Always answer using actions and speech together."
+        "World Context (if applicable): {{world_context_name_and_description}}"
+        "--- Recent Chat History ---"
+        "{{chat_history}}"
+        "--- End of History ---"
+        "{{user_persona_details.name}}: {{user_input}}{{ai_instructions.name}}:"
     ))
     language = Column(String, nullable=True, default="English") # Or "English" if you prefer
 

@@ -135,11 +135,11 @@ async def update_character(
 
     # Parse JSON fields
     if example_dialogues is not None:
-        db_character.example_dialogues = json.loads(example_dialogues)
+        db_character.example_dialogues = json.loads(example_dialogues) if example_dialogues else []
     if beginning_messages is not None:
-        db_character.beginning_messages = json.loads(beginning_messages)
+        db_character.beginning_messages = json.loads(beginning_messages) if beginning_messages else []
     if linked_lore_ids is not None:
-        db_character.linked_lore_ids = json.loads(linked_lore_ids)
+        db_character.linked_lore_ids = json.loads(linked_lore_ids) if linked_lore_ids else []
 
     # Update other fields
     if name is not None:

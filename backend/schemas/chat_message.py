@@ -19,6 +19,7 @@ class ChatMessageInDB(ChatMessageBase):
     id: str # Ou uuid.UUID
     chat_session_id: str # Ou uuid.UUID
     timestamp: datetime
+    is_beginning_message: Optional[bool] = False
 
     class Config:
         from_attributes = True

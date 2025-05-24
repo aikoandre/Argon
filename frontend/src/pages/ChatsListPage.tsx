@@ -78,7 +78,7 @@ const ChatsListPage: React.FC = () => {
 
       <div className="space-y-4">
         {chatSessions
-          .filter(session => (session.message_count && session.message_count > 0)) // Filter sessions with messages
+          .filter(session => (session.user_message_count && session.user_message_count > 0)) // Filter sessions with user messages
           .map((session) => {
             const isCharacter = session.card_type === 'character';
             const CardImageComponent = CardImage;

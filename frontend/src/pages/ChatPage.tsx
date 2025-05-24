@@ -7,12 +7,24 @@ import {
   getChatSessionDetails,
   getUserSettings,
   getUserPersonaById,
+  getCharacterCardById, // Import for character card details
+  getScenarioCardById, // Import for scenario card details
 } from "../services/api";
-import type { ChatMessageData, ChatSessionData } from "../services/api";
+import {
+  type ChatMessageData as ApiChatMessageData,
+  type ChatSessionData,
+} from "../services/api";
 import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
+import rehypeRaw from 'rehype-raw'; // eslint-disable-line @typescript-eslint/ban-ts-comment
 
-// Default avatar images - replace these with your actual avatar URLs
+// Extend ChatMessageData for frontend use to include multiple AI responses and navigation state
+interface ChatMessageData extends ApiChatMessageData {
+  ai_responses?: { content: string; timestamp: string }[];
+  current_response_index?: number;
+  user_message_id?: string; // To link AI responses back to the user message that prompted them
+  is_beginning_message?: boolean; // To identify initial messages from character/scenario cards
+}
+
 // Default avatar images - using data URLs to avoid file serving issues for defaults
 const DEFAULT_USER_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'%3E%3C/path%3E%3Ccircle cx='12' cy='7' r='4'%3E%3C/circle%3E%3C/svg%3E";
 const DEFAULT_BOT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'%3E%3C/circle%3E%3Cpath d='M8 9.05v-.1'%3E%3C/path%3E%3Cpath d='M16 9.05v-.1'%3E%3C/path%3E%3Cpath d='M12 13a4 4 0 0 1-4 4'%3E%3C/path%3E%3Cpath d='M12 13a4 4 0 0 0 4 4'%3E%3C/path%3E%3C/svg%3E";
@@ -20,6 +32,15 @@ const DEFAULT_BOT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2
 const iconBaseClass = "material-icons-outlined text-2xl flex-shrink-0";
 const SendIcon = ({ className }: { className?: string }) => (
   <span className={`${iconBaseClass} ${className || ''}`.trim()}>send</span>
+);
+
+
+const ArrowBackIcon = ({ className, onClick }: { className?: string; onClick: () => void }) => (
+  <span className={`${iconBaseClass} ${className || ''} cursor-pointer`} onClick={onClick}>arrow_back_ios</span>
+);
+
+const ArrowForwardIcon = ({ className, onClick }: { className?: string; onClick: () => void }) => (
+  <span className={`${iconBaseClass} ${className || ''} cursor-pointer`} onClick={onClick}>arrow_forward_ios</span>
 );
 
 // Helper function to get proper image URL for persona images
@@ -77,7 +98,12 @@ const ChatPage: React.FC = () => {
 
   useEffect(scrollToBottom, [messages]);
 
+  const hasSentBeginningMessageRef = useRef(false); // Ref to track if beginning message has been sent for the current chat
+
   useEffect(() => {
+    // Reset the ref when chatId changes
+    hasSentBeginningMessageRef.current = false;
+
     if (!chatId) {
       setError("Chat ID is missing.");
       setIsLoadingMessages(false);
@@ -92,8 +118,67 @@ const ChatPage: React.FC = () => {
           getChatSessionMessages(chatId),
           getChatSessionDetails(chatId),
         ]);
-        setMessages(msgs);
+
+        setMessages(msgs.map(msg => {
+          if (msg.sender_type === "AI") {
+            // For regular AI messages, initialize with current content as the first response
+            return {
+              ...msg,
+              ai_responses: [{ content: msg.content, timestamp: msg.timestamp }],
+              current_response_index: 0,
+            };
+          }
+          return msg;
+        }));
         setSessionDetails(details);
+
+        // Logic to send beginning message if chat is new
+        if (msgs.length === 0 && details && !hasSentBeginningMessageRef.current) {
+          let beginningMessageContent: string | null = null;
+          let senderName: string | null = null;
+          let senderImageUrl: string | null = null;
+
+          if (details.card_type === "character" && details.card_id) {
+            const character = await getCharacterCardById(details.card_id);
+            if (character.beginning_messages && character.beginning_messages.length > 0) {
+              beginningMessageContent = character.beginning_messages[0];
+              senderName = character.name;
+              senderImageUrl = character.image_url ?? null; // Ensure it's string | null
+            }
+          } else if (details.card_type === "scenario" && details.card_id) {
+            const scenario = await getScenarioCardById(details.card_id);
+            if (scenario.beginning_message && scenario.beginning_message.length > 0) {
+              beginningMessageContent = scenario.beginning_message[0];
+              senderName = scenario.name;
+              senderImageUrl = scenario.image_url ?? null; // Ensure it's string | null
+            }
+          }
+
+          if (beginningMessageContent) {
+            try {
+              const aiBeginningMessage = await addMessageToSession(chatId, {
+                content: beginningMessageContent,
+                sender_type: "AI",
+                message_metadata: { is_beginning_message: true }, // Mark as beginning message
+                active_persona_name: senderName, // Now senderName is string | null
+                active_persona_image_url: senderImageUrl, // Now senderImageUrl is string | null
+              });
+
+              setMessages((prev) => [
+                ...prev,
+                {
+                  ...aiBeginningMessage,
+                  ai_responses: [{ content: aiBeginningMessage.content, timestamp: aiBeginningMessage.timestamp }],
+                  current_response_index: 0,
+                },
+              ]);
+              hasSentBeginningMessageRef.current = true; // Mark that the message has been sent
+            } catch (sendError) {
+              console.error("Failed to send beginning message:", sendError);
+              setError("Failed to send beginning message.");
+            }
+          }
+        }
       } catch (err) {
         setError("Failed to load chat messages or session details.");
         console.error(err);
@@ -134,49 +219,149 @@ const ChatPage: React.FC = () => {
     fetchActivePersona();
   }, [chatId]);
 
-  const handleSendMessage = async (e: FormEvent) => {
+  const handleSendMessage = async (e: FormEvent, regenerateMessageId?: string) => {
     e.preventDefault();
-    if (!newMessage.trim() || !chatId) return;
+    if (!newMessage.trim() && !regenerateMessageId) return; // Ensure there's content or it's a regeneration request
 
     setIsSending(true);
     setError(null);
-    const tempMessageId = `temp-${Date.now()}`;
-    const userMessage: ChatMessageData = {
-      id: tempMessageId,
-      chat_session_id: chatId,
-      sender_type: "USER",
-      content: newMessage.trim(),
-      timestamp: new Date().toISOString(),
-      // Include message_metadata if activePersonaId is a non-empty string
-      message_metadata: activePersonaId && activePersonaId !== "" ? { active_persona_id: activePersonaId, active_persona_name: activePersonaName } : undefined,
-      // Store active persona details directly in the message
-      active_persona_name: activePersonaName,
-      active_persona_image_url: activePersonaImageUrl,
-    };
 
-    setMessages((prevMessages) => [...prevMessages, userMessage]);
+    let userMessageContent = newMessage.trim();
+    let userMessageToRegenerate: ChatMessageData | undefined;
+
+    if (regenerateMessageId) {
+      // Find the user message associated with the AI message to regenerate
+      const aiMessageIndex = messages.findIndex(msg => msg.id === regenerateMessageId);
+      if (aiMessageIndex > -1) {
+        // Assuming the user message is the one immediately preceding the AI message
+        // This logic might need refinement if messages can be reordered or if there are system messages in between
+        const potentialUserMessage = messages[aiMessageIndex - 1];
+        if (potentialUserMessage && potentialUserMessage.sender_type === "USER") {
+          userMessageToRegenerate = potentialUserMessage;
+          userMessageContent = potentialUserMessage.content; // Use the content of the original user message
+        } else {
+          setError("Could not find the original user message to regenerate from.");
+          setIsSending(false);
+          return;
+        }
+      } else {
+        setError("AI message to regenerate not found.");
+        setIsSending(false);
+        return;
+      }
+    }
+
+    const tempMessageId = `temp-${Date.now()}`;
+    if (!regenerateMessageId) {
+      // Only add a new user message if it's not a regeneration
+      const userMessage: ChatMessageData = {
+        id: tempMessageId,
+        chat_session_id: chatId!,
+        sender_type: "USER",
+        content: userMessageContent,
+        timestamp: new Date().toISOString(),
+        message_metadata: activePersonaId && activePersonaId !== "" ? { active_persona_id: activePersonaId, active_persona_name: activePersonaName } : undefined,
+        active_persona_name: activePersonaName,
+        active_persona_image_url: activePersonaImageUrl,
+      };
+      setMessages((prevMessages) => [...prevMessages, userMessage]);
+    }
+
     const currentMessageContent = newMessage.trim();
-    setNewMessage("");
+    setNewMessage(""); // Clear input only if it's a new message
 
     try {
-      const aiResponseMessage = await addMessageToSession(chatId, {
-        content: currentMessageContent,
+      const aiResponseMessage = await addMessageToSession(chatId!, {
+        content: userMessageContent, // Always send the user's message content
         sender_type: "USER",
-        user_persona_id: activePersonaId || undefined, // Pass the active persona ID
+        user_persona_id: activePersonaId || undefined,
         message_metadata: activePersonaId && activePersonaId !== "" ? { active_persona_id: activePersonaId, active_persona_name: activePersonaName } : undefined,
-        active_persona_name: activePersonaName, // Send to backend (for message display)
-        active_persona_image_url: activePersonaImageUrl, // Send to backend (for message display)
+        active_persona_name: activePersonaName,
+        active_persona_image_url: activePersonaImageUrl,
       });
-      setMessages((prevMessages) => [...prevMessages, aiResponseMessage]);
+
+      setMessages((prevMessages) => {
+        if (regenerateMessageId) {
+          // Find the AI message to update
+          return prevMessages.map((msg) => {
+            if (msg.id === regenerateMessageId && msg.sender_type === "AI") {
+              const updatedResponses = [...(msg.ai_responses || [{ content: msg.content, timestamp: msg.timestamp }]), { content: aiResponseMessage.content, timestamp: aiResponseMessage.timestamp }];
+              return {
+                ...msg,
+                content: aiResponseMessage.content, // Update current content
+                timestamp: aiResponseMessage.timestamp, // Update timestamp to latest
+                ai_responses: updatedResponses,
+                current_response_index: updatedResponses.length - 1, // Show the new response
+              };
+            }
+            return msg;
+          });
+        } else {
+          // Add new AI message, linking it to the user message that just sent
+          const updatedAiMessage: ChatMessageData = {
+            ...aiResponseMessage,
+            ai_responses: [{ content: aiResponseMessage.content, timestamp: aiResponseMessage.timestamp }],
+            current_response_index: 0,
+            user_message_id: tempMessageId, // Link to the user message
+          };
+          return [...prevMessages, updatedAiMessage];
+        }
+      });
     } catch (err) {
       setError("Failed to send message. Please try again.");
-      setMessages((prevMessages) =>
-        prevMessages.filter((msg) => msg.id !== tempMessageId)
-      );
-      setNewMessage(currentMessageContent);
+      if (!regenerateMessageId) {
+        setMessages((prevMessages) =>
+          prevMessages.filter((msg) => msg.id !== tempMessageId)
+        );
+        setNewMessage(currentMessageContent);
+      }
     } finally {
       setIsSending(false);
     }
+  };
+
+  const handleRegenerate = (aiMessageId: string) => {
+    const aiMessage = messages.find(msg => msg.id === aiMessageId);
+    // Prevent regeneration if it's a beginning message
+    if (aiMessage?.message_metadata?.is_beginning_message) {
+      setError("Cannot regenerate a beginning message.");
+      return;
+    }
+
+    if (aiMessage && aiMessage.sender_type === "AI") {
+      const aiMessageIndex = messages.findIndex(msg => msg.id === aiMessageId);
+      if (aiMessageIndex > 0) {
+        const userMessage = messages[aiMessageIndex - 1];
+        if (userMessage && userMessage.sender_type === "USER") {
+          setNewMessage(userMessage.content);
+          handleSendMessage({ preventDefault: () => {} } as FormEvent, aiMessageId);
+        } else {
+          setError("Could not find the preceding user message to regenerate from.");
+        }
+      } else {
+        setError("Cannot regenerate the first message in the chat.");
+      }
+    }
+  };
+
+  const handleNavigateResponse = (aiMessageId: string, direction: 'prev' | 'next') => {
+    setMessages(prevMessages => prevMessages.map(msg => {
+      if (msg.id === aiMessageId && msg.sender_type === "AI" && msg.ai_responses && msg.ai_responses.length > 1) {
+        let newIndex = msg.current_response_index !== undefined ? msg.current_response_index : msg.ai_responses.length - 1;
+        if (direction === 'prev') {
+          newIndex = (newIndex - 1 + msg.ai_responses.length) % msg.ai_responses.length;
+        } else {
+          newIndex = (newIndex + 1) % msg.ai_responses.length;
+        }
+        return {
+          ...msg,
+          content: msg.ai_responses[newIndex].content,
+          timestamp: msg.ai_responses[newIndex].timestamp,
+          current_response_index: newIndex,
+        };
+      }
+      return msg;
+    }));
   };
 
   // Function to format timestamp
@@ -243,10 +428,9 @@ const ChatPage: React.FC = () => {
                   msg.sender_type === "USER"
                     ? "bg-app-surface text-white"
                     : "bg-app-surface text-gray-100"
-                }`}
+                } relative`}
               >
                 <div className="p-3 flex">
-                  {/* Imagem */}
                   <div className="flex-shrink-0 w-16 h-24 mr-3">
                     <img
                       src={finalImageSrc}
@@ -278,12 +462,34 @@ const ChatPage: React.FC = () => {
                     </div>
                     <ReactMarkdown
                       className="whitespace-pre-wrap break-words mt-0.5"
-                      rehypePlugins={[rehypeRaw]}
+                      rehypePlugins={[rehypeRaw as any]}
                     >
                       {applyCustomFormatting(msg.content)}
                     </ReactMarkdown>
                   </div>
                 </div>
+                {msg.sender_type === "AI" && msg.ai_responses && msg.ai_responses.length > 0 && (
+                  <div className="absolute top-2 right-2 flex items-center space-x-1 text-gray-400 text-sm">
+                    <>
+                      {/* Show left arrow only if not the first response */}
+                      {msg.current_response_index !== 0 && (
+                        <ArrowBackIcon className="!text-lg" onClick={() => handleNavigateResponse(msg.id, 'prev')} />
+                      )}
+                      <span>{`${(msg.current_response_index || 0) + 1}/${msg.ai_responses.length}`}</span>
+                      {/* Right arrow always shown, but its action depends on current index */}
+                      <ArrowForwardIcon
+                        className="!text-lg"
+                        onClick={() => {
+                          if ((msg.current_response_index || 0) === msg.ai_responses!.length - 1) {
+                            handleRegenerate(msg.id); // Generate new response if at the last one
+                          } else {
+                            handleNavigateResponse(msg.id, 'next'); // Navigate to next existing response
+                          }
+                        }}
+                      />
+                    </>
+                  </div>
+                )}
               </div>
             </div>
           );})}

@@ -60,9 +60,11 @@ def create_or_get_chat_session(
     if card_type == "character":
         card = db.query(CharacterCard).filter(CharacterCard.id == str(card_id)).first()
         print(f"[DEBUG] CharacterCard query result: {card}")
+        print(f"[DEBUG] CharacterCard beginning_messages: {card.beginning_messages if card else 'Card not found'}") # New debug line
     else:
         card = db.query(ScenarioCard).filter(ScenarioCard.id == str(card_id)).first()
         print(f"[DEBUG] ScenarioCard query result: {card}")
+        print(f"[DEBUG] ScenarioCard beginning_message: {card.beginning_message if card else 'Card not found'}") # New debug line
     
     if not card:
         raise HTTPException(
@@ -70,14 +72,21 @@ def create_or_get_chat_session(
             detail=f"{card_type.capitalize()} with id {card_id} not found"
         )
     
-    # Find existing session
-    existing = db.query(ChatSession).filter(
+    # Find existing session based on card and user persona
+    query = db.query(ChatSession).filter(
         ChatSession.card_type == card_type,
         ChatSession.card_id == str(card_id)
-    ).order_by(ChatSession.created_at.desc()).first()
+    )
+    
+    if user_persona_id is not None:
+        query = query.filter(ChatSession.user_persona_id == user_persona_id)
+    else:
+        query = query.filter(ChatSession.user_persona_id.is_(None))
+
+    existing = query.order_by(ChatSession.created_at.desc()).first()
     
     if existing:
-        print(f"[DEBUG] Found existing chat session: {existing.id}, user_persona_id: {existing.user_persona_id}")
+        print(f"[DEBUG] Found existing chat session: {existing.id}, user_persona_id: {existing.user_persona_id}. Returning existing session.")
         return existing
     
     # Create new session
@@ -94,6 +103,39 @@ def create_or_get_chat_session(
     db.commit()
     db.refresh(new_chat)
     print(f"[DEBUG] Created new chat session: {new_chat.id}, user_persona_id: {new_chat.user_persona_id}")
+
+    # Add initial AI message if beginning_messages exist
+    beginning_messages = []
+    if card_type == "character" and hasattr(card, 'beginning_messages') and card.beginning_messages:
+        beginning_messages = card.beginning_messages
+    elif card_type == "scenario" and hasattr(card, 'beginning_message') and card.beginning_message:
+        beginning_messages = card.beginning_message
+
+    if beginning_messages:
+        # Create the first AI message from the beginning_messages
+        initial_ai_message_content = beginning_messages[0]
+        
+        # Prepare all beginning messages for ai_responses
+        all_ai_responses = [
+            {"content": msg, "timestamp": datetime.utcnow().isoformat()}
+            for msg in beginning_messages
+        ]
+
+        initial_ai_message = ChatMessage(
+            chat_session_id=new_chat.id,
+            sender_type="AI",
+            content=initial_ai_message_content,
+            is_beginning_message=True,
+            # Store all beginning messages in message_metadata for frontend navigation
+            message_metadata={"ai_responses": all_ai_responses, "current_response_index": 0},
+            active_persona_name=card.name, # Use card's name as AI persona name
+            active_persona_image_url=card.image_url # Use card's image as AI persona image
+        )
+        db.add(initial_ai_message)
+        db.commit()
+        db.refresh(initial_ai_message)
+        print(f"[DEBUG] Added initial AI message for chat {new_chat.id}.")
+
     return new_chat
 
 # Keep old endpoint for compatibility during transition
@@ -177,25 +219,26 @@ async def list_chat_sessions(
     db: Session = Depends(get_db)
 ):
     try:
-        # Subquery para contar mensagens por sessão
-        message_count_subquery = (
+        # Subquery para contar mensagens do usuário por sessão
+        user_message_count_subquery = (
             select(
                 ChatMessage.chat_session_id,
-                func.count(ChatMessage.id).label("message_count")
+                func.count(ChatMessage.id).label("user_message_count")
             )
+            .filter(ChatMessage.sender_type == "USER") # Only count user messages
             .group_by(ChatMessage.chat_session_id)
             .subquery()
         )
 
-        # Query principal para sessões de chat, incluindo a contagem de mensagens
+        # Query principal para sessões de chat, incluindo a contagem de mensagens do usuário
         query = (
             db.query(
                 ChatSession,
-                message_count_subquery.c.message_count
+                user_message_count_subquery.c.user_message_count
             )
             .outerjoin(
-                message_count_subquery,
-                ChatSession.id == message_count_subquery.c.chat_session_id
+                user_message_count_subquery,
+                ChatSession.id == user_message_count_subquery.c.chat_session_id
             )
             .order_by(ChatSession.last_active_at.desc())
         )
@@ -203,7 +246,7 @@ async def list_chat_sessions(
         sessions_with_counts = query.offset(skip).limit(limit).all()
 
         result = []
-        for session, message_count in sessions_with_counts:
+        for session, user_message_count in sessions_with_counts:
             try:
                 # Start with basic session data
                 session_data = {
@@ -214,7 +257,7 @@ async def list_chat_sessions(
                     "card_id": str(session.card_id) if session.card_id else None,
                     "card_name": None,
                     "card_image_url": None,
-                    "message_count": message_count if message_count is not None else 0 # Adiciona a contagem de mensagens
+                    "user_message_count": user_message_count if user_message_count is not None else 0 # Adiciona a contagem de mensagens do usuário
                 }
 
                 # Get card details based on card_type
@@ -252,20 +295,85 @@ def get_chat_session_details(chat_id: str, db: Session = Depends(get_db)):
 
 @router.get("/{chat_id}/messages", response_model=List[ChatMessageInDB])
 def get_chat_session_messages(
-    chat_id: str, skip: int = 0, limit: int = 1000, db: Session = Depends(get_db) # Limite maior para mensagens
+    chat_id: str, skip: int = 0, limit: int = 1000, db: Session = Depends(get_db)
 ):
     db_chat_session = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
     if db_chat_session is None:
         raise HTTPException(status_code=404, detail="Chat session not found")
-    
+
+    # Fetch the associated card to get beginning messages
+    card = None
+    if db_chat_session.card_type == "character":
+        card = db.query(CharacterCard).filter(CharacterCard.id == db_chat_session.card_id).first()
+    elif db_chat_session.card_type == "scenario":
+        card = db.query(ScenarioCard).filter(ScenarioCard.id == db_chat_session.card_id).first()
+
+    expected_beginning_messages = []
+    if card:
+        if db_chat_session.card_type == "character" and hasattr(card, 'beginning_messages') and card.beginning_messages:
+            expected_beginning_messages = card.beginning_messages
+        elif db_chat_session.card_type == "scenario" and hasattr(card, 'beginning_message') and card.beginning_message:
+            # Ensure beginning_message is treated as a list for consistency
+            expected_beginning_messages = [card.beginning_message] if isinstance(card.beginning_message, str) else card.beginning_message
+
     messages = (
         db.query(ChatMessage)
         .filter(ChatMessage.chat_session_id == chat_id)
-        .order_by(ChatMessage.timestamp.asc()) # Ou .desc() se quiser as mais recentes primeiro
+        .order_by(ChatMessage.timestamp.asc())
         .offset(skip)
         .limit(limit)
         .all()
     )
+
+    # Check if the first message is the expected beginning message. If not, add it.
+    if expected_beginning_messages and not messages:
+        # If no messages exist, and there are beginning messages, add the first one
+        initial_ai_message_content = expected_beginning_messages[0]
+        all_ai_responses = [
+            {"content": msg, "timestamp": datetime.utcnow().isoformat()}
+            for msg in expected_beginning_messages
+        ]
+        
+        initial_ai_message = ChatMessage(
+            chat_session_id=db_chat_session.id,
+            sender_type="AI",
+            content=initial_ai_message_content,
+            is_beginning_message=True,
+            message_metadata={"ai_responses": all_ai_responses, "current_response_index": 0},
+            active_persona_name=card.name if card else "Assistant",
+            active_persona_image_url=card.image_url if card else None
+        )
+        db.add(initial_ai_message)
+        db.commit()
+        db.refresh(initial_ai_message)
+        messages.insert(0, initial_ai_message) # Prepend to the list for immediate return
+
+    elif expected_beginning_messages and messages and not (
+        messages[0].sender_type == "AI" and
+        messages[0].is_beginning_message and
+        messages[0].content == expected_beginning_messages[0]
+    ):
+        # If messages exist, but the first one is not the expected beginning message, prepend it
+        initial_ai_message_content = expected_beginning_messages[0]
+        all_ai_responses = [
+            {"content": msg, "timestamp": datetime.utcnow().isoformat()}
+            for msg in expected_beginning_messages
+        ]
+
+        initial_ai_message = ChatMessage(
+            chat_session_id=db_chat_session.id,
+            sender_type="AI",
+            content=initial_ai_message_content,
+            is_beginning_message=True,
+            message_metadata={"ai_responses": all_ai_responses, "current_response_index": 0},
+            active_persona_name=card.name if card else "Assistant",
+            active_persona_image_url=card.image_url if card else None
+        )
+        db.add(initial_ai_message)
+        db.commit()
+        db.refresh(initial_ai_message)
+        messages.insert(0, initial_ai_message) # Prepend to the list for immediate return
+
     return messages
 
 @router.post("/{chat_id}/messages", response_model=ChatMessageInDB) # Simplified response for now
