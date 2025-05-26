@@ -59,7 +59,7 @@ const ChatsListPage: React.FC = () => {
   }
 
   return (
-    <div className="container p-4 md:p-8"> {/* Removed mx-auto */}
+    <div className="container p-4 md:p-8 max-h-screen overflow-y-auto custom-scrollbar"> {/* Removed mx-auto */}
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold text-white font-quintessential">My Chats</h1>
       </div>

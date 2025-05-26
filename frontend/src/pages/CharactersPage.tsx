@@ -70,14 +70,6 @@ const initialFormFields: CharacterFormData = {
 const CharactersPage: React.FC = () => {
   const navigate = useNavigate();
 
-  const getImageUrl = (imageUrl: string | null) => {
-    if (!imageUrl) return null;
-    if (imageUrl.startsWith('data:')) return imageUrl;
-    if (imageUrl.startsWith('/api/images/serve/')) return imageUrl;
-    const cleanPath = imageUrl.replace(/^static\//, '');
-    return `/api/images/serve/${cleanPath}`;
-  };
-
   const handleOpenChat = async (character: CharacterCardData) => {
     try {
       const chatId = await createOrGetCardChat('character', character.id);
@@ -425,7 +417,7 @@ const CharactersPage: React.FC = () => {
 
   console.log("CharactersPage component returning JSX...");
   return (
-    <div className="container mx-auto p-4 md:p-8 text-white">
+    <div className="container mx-auto p-4 md:p-8 text-white max-h-screen overflow-y-auto custom-scrollbar">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <h1 className="text-4xl font-bold text-white font-quintessential">Characters</h1>
           <button
@@ -451,7 +443,7 @@ const CharactersPage: React.FC = () => {
       )}
 
       {!isLoading && !error && characters.length > 0 && (
-        <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 justify-items-center w-full">
+        <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 justify-items-start w-full">
           {characters.map((char) => (
             <div
               key={char.id}
@@ -460,7 +452,7 @@ const CharactersPage: React.FC = () => {
             >
               {/* Background image with gradient */}
               <CardImage
-                imageUrl={getImageUrl(char.image_url)}
+                imageUrl={char.image_url}
                 className="absolute inset-0"
               />
 

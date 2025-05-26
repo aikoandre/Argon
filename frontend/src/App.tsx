@@ -42,75 +42,73 @@ function AppWrapper() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row p-6 bg-app-bg text-white">
-      {/* Sidebar Container */}
-      <div
-        className="relative flex-shrink-0 w-[250px]"
-        style={{ maxHeight: 'calc(100vh - 2rem)' }}
-      >
-        {/* Sidebar Content */}
-        <div className="bg-app-surface shadow-lg rounded-2xl backdrop-blur-sm h-full overflow-y-auto p-6">
-          <nav className="flex flex-col h-full">
-            <div className="flex flex-col w-full gap-y-3 pt-6">
-              <div className="text-3xl px-3 font-bold mb-3 text-center font-quintessential">
-                Argon
-              </div>
-          <Link
-            to="/"
-            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center ml-6"
-          >
-            <HomeIcon className="mr-3" />
-            <span>Home</span>
-          </Link>
-          <Link
-            to="/chats"
-            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center ml-6"
-          >
-            <ChatsIcon className="mr-3" />
-            <span>Chats</span>
-          </Link>
-          <Link
-            to="/personas"
-            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center ml-6"
-          >
-            <PersonasIcon className="mr-3" />
-            <span>Personas</span>
-          </Link>
-          <Link
-            to="/characters"
-            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center ml-6"
-          >
-            <CharactersIcon className="mr-3" />
-            <span>Characters</span>
-          </Link>
-          <Link
-            to="/scenarios"
-            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center ml-6"
-          >
-            <ScenariosIcon className="mr-3" />
-            <span>Scenarios</span>
-          </Link>
-          <Link
-            to="/world-lore"
-            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center ml-6"
-          >
-            <WorldsIcon className="mr-3" />
-            <span>Worlds</span>
-          </Link>
-          <Link
-            to="/settings"
-            className="text-xl font-montserrat block py-2 px-3 rounded transition-colors hover:bg-app-surface/50 flex items-center ml-6"
-          >
-            <SettingsIcon className="mr-3" />
-            <span>Settings</span>
-          </Link>
-            </div>
-          </nav>
+    <div className="min-h-screen flex flex-col bg-app-bg text-white">
+      {/* Combined Fixed Header */}
+      <header className="fixed top-0 left-0 right-0 bg-app-bg p-4 flex justify-center items-center z-50">
+        {/* Navigation Header */}
+        <div className="bg-app-surface shadow-lg rounded-3xl p-3 flex items-center gap-x-4">
+        <Link
+          to="/"
+          className={`px-2 rounded-full transition-colors ${
+            location.pathname === "/" ? "text-app-accent" : "text-app-flat"
+          } hover:bg-app-surface/50`}
+        >
+          <HomeIcon />
+        </Link>
+        <Link
+          to="/chats"
+          className={`px-2 rounded-full transition-colors ${
+            location.pathname.startsWith("/chat") ? "text-app-accent" : "text-app-flat"
+          } hover:bg-app-surface/50`}
+        >
+          <ChatsIcon />
+        </Link>
+        <Link
+          to="/characters"
+          className={`px-2 rounded-full transition-colors ${
+            location.pathname === "/characters" ? "text-app-accent" : "text-app-flat"
+          } hover:bg-app-surface/50`}
+        >
+          <CharactersIcon />
+        </Link>
+        <Link
+          to="/scenarios"
+          className={`px-2 rounded-full transition-colors ${
+            location.pathname === "/scenarios" ? "text-app-accent" : "text-app-flat"
+          } hover:bg-app-surface/50`}
+        >
+          <ScenariosIcon />
+        </Link>
+        <Link
+          to="/world-lore"
+          className={`px-2 rounded-full transition-colors ${
+            location.pathname.startsWith("/world-lore") ? "text-app-accent" : "text-app-flat"
+          } hover:bg-app-surface/50`}
+        >
+          <WorldsIcon />
+        </Link>
+        <Link
+          to="/personas"
+          className={`px-2 rounded-full transition-colors ${
+            location.pathname === "/personas" ? "text-app-accent" : "text-app-flat"
+          } hover:bg-app-surface/50`}
+        >
+          <PersonasIcon />
+        </Link>
+        <Link
+          to="/settings"
+          className={`px-2 rounded-full transition-colors ${
+            location.pathname === "/settings" ? "text-app-accent" : "text-app-flat"
+          } hover:bg-app-surface/50`}
+        >
+          <SettingsIcon />
+        </Link>
         </div>
-
-      </div>
+      </header>
+      {/* Spacer to push content below fixed header */}
+      <div className="h-[40px]"></div> {/* h-40 is 160px, slightly more than 156px header height */}
       {/* Main Content Area */}
-      <main className={`flex-grow overflow-hidden transition-all duration-300 ease-in-out md:ml-4 ${location.pathname.startsWith('/chat/') ? '' : 'p-4 md:p-6'}`}>
+      <main className={`flex-grow overflow-hidden transition-all duration-300 ease-in-out ${location.pathname.startsWith('/chat/') ? '' : 'p-4 md:p-6'}`}>
         <div className="container mx-auto">
           <Routes>
             <Route path="/" element={<HomePage />} />

@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 import uuid
+from backend.schemas.ai_plan import AIPlan, PanelData # New import
 
 class ChatMessageBase(BaseModel):
     sender_type: str = Field(..., pattern="^(USER|AI|SYSTEM)$") # Valida os tipos de remetente
@@ -30,3 +31,5 @@ class UserMessageCreate(BaseModel):
 class ChatTurnResponse(BaseModel):
     user_message: ChatMessageInDB
     ai_message: ChatMessageInDB
+    ai_plan: Optional[AIPlan] = None # Include the AI plan in the response
+    panel_data_update: Optional[PanelData] = None # Include panel data update in the response

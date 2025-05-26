@@ -386,7 +386,7 @@ const ScenariosPage: React.FC = () => {
   }));
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
+    <div className="container mx-auto p-4 md:p-8 max-h-screen overflow-y-auto custom-scrollbar">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <h1 className="text-4xl font-bold text-white font-quintessential">Scenarios</h1>
         <div className="flex items-center gap-2 w-full md:w-auto">
@@ -413,7 +413,7 @@ const ScenariosPage: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 justify-items-center w-full">
+      <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 justify-items-start w-full">
         {scenarios.map((scen) => {
           // Cache-busting: use updated_at if available, else fallback to scenario id and name
           let cacheBuster = '';
@@ -423,7 +423,7 @@ const ScenariosPage: React.FC = () => {
             cacheBuster = `?cb=${scen.id}`;
           }
           const imageUrl = scen.image_url
-            ? `${scen.image_url.replace('static/images/', '')}${cacheBuster}`
+            ? `${scen.image_url}${cacheBuster}`
             : null;
           return (
             <div
@@ -621,6 +621,56 @@ const ScenariosPage: React.FC = () => {
             />
           </div>
 
+          {/* Example Dialogues Section */}
+          <div className="space-y-2 mb-2">
+            <div className="flex justify-between items-center">
+              <label className="block text-sm font-medium text-gray-300">
+                Example Dialogues ({currentDialogueIndex + 1}/{currentExampleDialogues.length})
+              </label>
+              <div className="flex space-x-2">
+                <button
+                  type="button"
+                  onClick={addDialogueField}
+                  className="text-xs bg-app-accent-3 hover:bg-app-accent text-black font-semibold py-1 px-2 rounded-md"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  onClick={removeCurrentDialogueField}
+                  className="text-xs bg-app-accent-3 hover:bg-app-accent text-black font-semibold py-1 px-2 rounded-md disabled:opacity-50"
+                  disabled={currentExampleDialogues.length === 1 && currentExampleDialogues[0].trim() === ""}
+                >
+                  -
+                </button>
+              </div>
+            </div>
+            <textarea
+              rows={3}
+              value={currentExampleDialogues[currentDialogueIndex] || ""}
+              onChange={(e) => handleCurrentDialogueChange(e.target.value)}
+              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+            />
+            <div className="flex justify-start space-x-2 mt-2">
+              <button
+                type="button"
+                onClick={() => navigateDialogues("prev")}
+                disabled={currentDialogueIndex === 0}
+                className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => navigateDialogues("next")}
+                disabled={currentDialogueIndex === currentExampleDialogues.length - 1}
+                className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+
           <div className="space-y-2 mt-2">
             <div className="flex justify-between items-center">
               <label className="block text-sm font-medium text-gray-300">
@@ -666,56 +716,6 @@ const ScenariosPage: React.FC = () => {
                 type="button"
                 onClick={() => navigateBmg("next")}
                 disabled={currentBmgIndex === currentBeginningMessages.length - 1}
-                className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-
-          {/* Example Dialogues Section */}
-          <div className="space-y-2 mb-2">
-            <div className="flex justify-between items-center">
-              <label className="block text-sm font-medium text-gray-300">
-                Example Dialogues ({currentDialogueIndex + 1}/{currentExampleDialogues.length})
-              </label>
-              <div className="flex space-x-2">
-                <button
-                  type="button"
-                  onClick={addDialogueField}
-                  className="text-xs bg-app-accent-3 hover:bg-app-accent text-black font-semibold py-1 px-2 rounded-md"
-                >
-                  +
-                </button>
-                <button
-                  type="button"
-                  onClick={removeCurrentDialogueField}
-                  className="text-xs bg-app-accent-3 hover:bg-app-accent text-black font-semibold py-1 px-2 rounded-md disabled:opacity-50"
-                  disabled={currentExampleDialogues.length === 1 && currentExampleDialogues[0].trim() === ""}
-                >
-                  -
-                </button>
-              </div>
-            </div>
-            <textarea
-              rows={3}
-              value={currentExampleDialogues[currentDialogueIndex] || ""}
-              onChange={(e) => handleCurrentDialogueChange(e.target.value)}
-              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
-            />
-            <div className="flex justify-start space-x-2 mt-2">
-              <button
-                type="button"
-                onClick={() => navigateDialogues("prev")}
-                disabled={currentDialogueIndex === 0}
-                className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                onClick={() => navigateDialogues("next")}
-                disabled={currentDialogueIndex === currentExampleDialogues.length - 1}
                 className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
               >
                 Next

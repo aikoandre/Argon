@@ -54,7 +54,6 @@ class LoreEntryBase(BaseModel):
     aliases: Optional[List[str]] = None
     faction_id: Optional[str] = None
     master_world_id: str
-    image_url: Optional[str] = None
 
     @validator('entry_type')
     def entry_type_must_be_valid(cls, value):
@@ -83,6 +82,7 @@ class LoreEntryInDB(LoreEntryBase):
     id: str
     created_at: datetime
     updated_at: Optional[datetime] = None
+    image_url: Optional[str] = None
 
     class Config:
         from_attributes = True

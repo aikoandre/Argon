@@ -1,29 +1,29 @@
 // frontend/src/pages/ChatPage.tsx
 import React, { useState, useEffect, type FormEvent, useRef } from "react";
 import { useParams } from "react-router-dom";
+import axios from "axios"; // Import axios
 import {
   getChatSessionMessages,
   addMessageToSession,
   getChatSessionDetails,
   getUserSettings,
   getUserPersonaById,
+  updateUserSettings, // Added for clearing active persona on 404
   getCharacterCardById, // Import for character card details
   getScenarioCardById, // Import for scenario card details
 } from "../services/api";
 import {
-  type ChatMessageData as ApiChatMessageData,
+  type ChatMessageData as ApiChatMessageData, // Re-introduce ApiChatMessageData alias
   type ChatSessionData,
 } from "../services/api";
+import {
+  type ChatMessageData,
+  type AIPlan,
+  type PanelData,
+  type ChatTurnResponse,
+} from "../types/chat";
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw'; // eslint-disable-line @typescript-eslint/ban-ts-comment
-
-// Extend ChatMessageData for frontend use to include multiple AI responses and navigation state
-interface ChatMessageData extends ApiChatMessageData {
-  ai_responses?: { content: string; timestamp: string }[];
-  current_response_index?: number;
-  user_message_id?: string; // To link AI responses back to the user message that prompted them
-  is_beginning_message?: boolean; // To identify initial messages from character/scenario cards
-}
 
 // Default avatar images - using data URLs to avoid file serving issues for defaults
 const DEFAULT_USER_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'%3E%3C/path%3E%3Ccircle cx='12' cy='7' r='4'%3E%3C/circle%3E%3C/svg%3E";
@@ -90,6 +90,8 @@ const ChatPage: React.FC = () => {
   const [activePersonaId, setActivePersonaId] = useState<string | null>(null);
   const [activePersonaName, setActivePersonaName] = useState<string>("User");
   const [activePersonaImageUrl, setActivePersonaImageUrl] = useState<string | null>(null);
+  const [currentPanelData, setCurrentPanelData] = useState<PanelData | null>(null); // New state for panel data
+  const [lastAIPlan, setLastAIPlan] = useState<AIPlan | null>(null); // New state for AI Plan
 
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
   const inputAreaRef = useRef<null | HTMLDivElement>(null);
@@ -103,6 +105,7 @@ const ChatPage: React.FC = () => {
   const hasSentBeginningMessageRef = useRef(false); // Ref to track if beginning message has been sent for the current chat
 
   useEffect(() => {
+
     // Reset the ref when chatId changes
     hasSentBeginningMessageRef.current = false;
 
@@ -121,59 +124,41 @@ const ChatPage: React.FC = () => {
           getChatSessionDetails(chatId),
         ]);
 
-        setMessages(msgs.map(msg => {
-          if (msg.sender_type === "AI") {
+        setMessages(msgs.map((msg: ApiChatMessageData) => {
+          // Cast msg to ChatMessageData to access extended properties
+          const chatMsg = msg as ChatMessageData;
+          if (chatMsg.sender_type === "AI") {
             // For regular AI messages, initialize with current content as the first response
             return {
-              ...msg,
-              ai_responses: [{ content: msg.content, timestamp: msg.timestamp }],
-              current_response_index: 0,
+              ...chatMsg,
+              ai_responses: chatMsg.ai_responses || [{ content: chatMsg.content, timestamp: chatMsg.timestamp }],
+              current_response_index: chatMsg.current_response_index !== undefined ? chatMsg.current_response_index : (chatMsg.ai_responses?.length || 1) - 1,
             };
           }
-          return msg;
+          return chatMsg;
         }));
         setSessionDetails(details);
 
-        // Logic to handle beginning messages if chat is new
-        if (msgs.length === 0 && details && !hasSentBeginningMessageRef.current) {
+        // Populate allBeginningMessages from card details regardless of existing messages
+        if (details) {
           let fetchedBeginningMessages: string[] = [];
-          let senderName: string | null = null;
-          let senderImageUrl: string | null = null;
-
           if (details.card_type === "character" && details.card_id) {
             const character = await getCharacterCardById(details.card_id);
             if (character.beginning_messages && character.beginning_messages.length > 0) {
               fetchedBeginningMessages = character.beginning_messages;
-              senderName = character.name;
-              senderImageUrl = character.image_url ?? null;
             }
           } else if (details.card_type === "scenario" && details.card_id) {
             const scenario = await getScenarioCardById(details.card_id);
             if (scenario.beginning_message && scenario.beginning_message.length > 0) {
               fetchedBeginningMessages = scenario.beginning_message;
-              senderName = scenario.name;
-              senderImageUrl = scenario.image_url ?? null;
             }
           }
-
-          if (fetchedBeginningMessages.length > 0) {
-            setAllBeginningMessages(fetchedBeginningMessages);
-            setCurrentBeginningMessageIndex(0); // Start with the first beginning message
-
-            // Construct the initial message for the frontend state
-            const initialBeginningMessage: ChatMessageData = {
-              id: `beginning-message-${Date.now()}`, // Unique ID for this frontend-only message
-              chat_session_id: chatId!,
-              sender_type: "AI",
-              content: fetchedBeginningMessages[0], // Display the first message
-              timestamp: new Date().toISOString(),
-              is_beginning_message: true, // Mark as beginning message
-              active_persona_name: senderName,
-              active_persona_image_url: senderImageUrl,
-              // No ai_responses needed here, as navigation is handled by currentBeginningMessageIndex
-            };
-            setMessages([initialBeginningMessage]);
-            hasSentBeginningMessageRef.current = true; // Mark that the initial message has been set
+          setAllBeginningMessages(fetchedBeginningMessages);
+          // If the first message is a beginning message, set its index
+          if (msgs.length > 0 && msgs[0].is_beginning_message && msgs[0].message_metadata?.current_response_index !== undefined) {
+            setCurrentBeginningMessageIndex(msgs[0].message_metadata.current_response_index);
+          } else {
+            setCurrentBeginningMessageIndex(0); // Default to first if not found or not a beginning message
           }
         }
       } catch (err) {
@@ -197,8 +182,15 @@ const ChatPage: React.FC = () => {
             const rawPersonaImageUrl = persona.image_url || null;
             const processedPersonaImageUrl = getImageUrl(rawPersonaImageUrl);
             setActivePersonaImageUrl(processedPersonaImageUrl);
-          } catch (err) {
+          } catch (err: unknown) { // Explicitly type err as unknown
             console.error("Error fetching active persona or its image:", err);
+            if (axios.isAxiosError(err) && err.response?.status === 404) {
+              console.warn("Active persona not found (404). Clearing active_persona_id in settings.");
+              await updateUserSettings({ active_persona_id: null }); // Clear the invalid persona ID
+              // Re-fetch settings immediately to reflect the cleared persona ID
+              const updatedSettings = await getUserSettings();
+              setActivePersonaId(updatedSettings?.active_persona_id || null);
+            }
             setActivePersonaName("User");
             setActivePersonaImageUrl(null);
           }
@@ -271,7 +263,7 @@ const ChatPage: React.FC = () => {
       // Determine if this is the first user message after a beginning message
       const isFirstUserMessageAfterBeginning = messages.length === 1 && messages[0].is_beginning_message;
 
-      const aiResponseMessage = await addMessageToSession(chatId!, {
+      const chatTurnResponse: ChatTurnResponse = await addMessageToSession(chatId!, {
         content: userMessageContent, // Always send the user's message content
         sender_type: "USER",
         user_persona_id: activePersonaId || undefined,
@@ -282,16 +274,26 @@ const ChatPage: React.FC = () => {
         current_beginning_message_index: isFirstUserMessageAfterBeginning ? currentBeginningMessageIndex : undefined,
       });
 
+      // Update panel data if provided in the response
+      if (chatTurnResponse.panel_data_update) {
+        setCurrentPanelData(chatTurnResponse.panel_data_update);
+      }
+
+      // Store the AI plan for potential display/debugging
+      if (chatTurnResponse.ai_plan) {
+        setLastAIPlan(chatTurnResponse.ai_plan);
+      }
+
       setMessages((prevMessages) => {
         if (regenerateMessageId) {
           // Find the AI message to update
           return prevMessages.map((msg) => {
             if (msg.id === regenerateMessageId && msg.sender_type === "AI") {
-              const updatedResponses = [...(msg.ai_responses || [{ content: msg.content, timestamp: msg.timestamp }]), { content: aiResponseMessage.content, timestamp: aiResponseMessage.timestamp }];
+              const updatedResponses = [...(msg.ai_responses || [{ content: msg.content, timestamp: msg.timestamp }]), { content: chatTurnResponse.ai_message.content, timestamp: chatTurnResponse.ai_message.timestamp }];
               return {
                 ...msg,
-                content: aiResponseMessage.content, // Update current content
-                timestamp: aiResponseMessage.timestamp, // Update timestamp to latest
+                content: chatTurnResponse.ai_message.content, // Update current content
+                timestamp: chatTurnResponse.ai_message.timestamp, // Update timestamp to latest
                 ai_responses: updatedResponses,
                 current_response_index: updatedResponses.length - 1, // Show the new response
               };
@@ -301,8 +303,8 @@ const ChatPage: React.FC = () => {
         } else {
           // Add new AI message, linking it to the user message that just sent
           const updatedAiMessage: ChatMessageData = {
-            ...aiResponseMessage,
-            ai_responses: [{ content: aiResponseMessage.content, timestamp: aiResponseMessage.timestamp }],
+            ...chatTurnResponse.ai_message,
+            ai_responses: [{ content: chatTurnResponse.ai_message.content, timestamp: chatTurnResponse.ai_message.timestamp }],
             current_response_index: 0,
             user_message_id: tempMessageId, // Link to the user message
           };
@@ -438,20 +440,51 @@ const ChatPage: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden"> {/* Changed to h-screen */}
+    <div className="flex flex-col h-screen overflow-hidden">
+      {/* Panel de Informações */}
+      <div className="bg-app-surface-2 text-white p-2 text-xs flex justify-between items-center flex-wrap">
+        <span className="mr-4">
+          Time:{" "}
+          <span className="text-app-accent-2">
+            {currentPanelData?.current_time || "N/A"}
+          </span>
+        </span>
+        <span className="mr-4">
+          Date:{" "}
+          <span className="text-app-accent-2">
+            {currentPanelData?.current_date || "N/A"}
+          </span>
+        </span>
+        <span>
+          Location:{" "}
+          <span className="text-app-accent-2">
+            {currentPanelData?.current_location || "N/A"}
+          </span>
+        </span>
+        {lastAIPlan && (
+          <span className="ml-auto text-gray-400">
+            AI Goal: {lastAIPlan.response_goal}
+            {lastAIPlan.emotional_tone && ` | Tone: ${lastAIPlan.emotional_tone}`}
+            {lastAIPlan.suggested_action && ` | Action: ${lastAIPlan.suggested_action}`}
+          </span>
+        )}
+      </div>
 
       {/* Área de mensagens com scroll, alinhada ao final */}
-      <div className="flex-grow flex-shrink-1 w-full overflow-y-auto max-w-full min-h-0 flex flex-col justify-end"> {/* Added flex flex-col justify-end */}
-        <div className="max-w-4xl mx-auto px-4 w-full"> {/* New wrapper for centering */}
-          {messages.map((msg) => {
-            const rawAiImageUrl = msg.active_persona_image_url ?? null;
-            const processedAiAvatarSrc = getImageUrl(rawAiImageUrl) || DEFAULT_BOT_AVATAR;
-            const aiName = msg.active_persona_name || "Assistant";
+      <div className="flex-grow flex-shrink-1 w-full overflow-y-auto min-h-0 flex flex-col justify-end max-w-4xl mx-auto px-4">
+        {messages.map((msg) => {
+          const rawAiImageUrl = msg.active_persona_image_url ?? null;
+          const processedAiAvatarSrc =
+            getImageUrl(rawAiImageUrl) || DEFAULT_BOT_AVATAR;
+          const aiName = msg.active_persona_name || "Assistant";
 
-            const userImageSrc = getImageUrl(msg.active_persona_image_url ?? activePersonaImageUrl) || DEFAULT_USER_AVATAR;
-            const finalImageSrc = msg.sender_type === "USER" ? userImageSrc : processedAiAvatarSrc;
+          const userImageSrc =
+            getImageUrl(msg.active_persona_image_url ?? activePersonaImageUrl) ||
+            DEFAULT_USER_AVATAR;
+          const finalImageSrc =
+            msg.sender_type === "USER" ? userImageSrc : processedAiAvatarSrc;
 
-            return (
+          return (
             <div key={msg.id} className="mb-4">
               <div
                 className={`rounded-2xl ${
@@ -467,11 +500,14 @@ const ChatPage: React.FC = () => {
                       alt={msg.sender_type === "USER" ? "User" : "Bot"}
                       className="w-full h-full object-cover rounded-lg bg-gray-700"
                       onError={(e) => {
-                        const fallback = msg.sender_type === "USER"
-                          ? DEFAULT_USER_AVATAR
-                          : DEFAULT_BOT_AVATAR;
+                        const fallback =
+                          msg.sender_type === "USER"
+                            ? DEFAULT_USER_AVATAR
+                            : DEFAULT_BOT_AVATAR;
                         (e.target as HTMLImageElement).src = fallback;
-                        console.error(`ERROR: Failed to load image for message ${msg.id}. Fallback used. Original URL: ${finalImageSrc}`);
+                        console.error(
+                          `ERROR: Failed to load image for message ${msg.id}. Fallback used. Original URL: ${finalImageSrc}`
+                        );
                       }}
                     />
                   </div>
@@ -480,7 +516,9 @@ const ChatPage: React.FC = () => {
                     <div className="flex items-center mb-1 flex-wrap">
                       <span className="font-medium text-white mr-2">
                         {msg.sender_type === "USER"
-                          ? msg.active_persona_name || msg.message_metadata?.active_persona_name || activePersonaName
+                          ? msg.active_persona_name ||
+                            msg.message_metadata?.active_persona_name ||
+                            activePersonaName
                           : aiName}
                       </span>
                       <span className="text-xs text-gray-400 mr-2">
@@ -498,15 +536,16 @@ const ChatPage: React.FC = () => {
                     </ReactMarkdown>
                   </div>
                 </div>
-                {msg.sender_type === "AI" && msg.ai_responses && msg.ai_responses.length > 0 && (
-                  // Conditional rendering for navigation arrows based on message type
-                  msg.is_beginning_message ? (
+                {msg.sender_type === "AI" &&
+                  msg.ai_responses &&
+                  msg.ai_responses.length > 0 &&
+                  (msg.is_beginning_message ? (
                     // For beginning messages: show arrows only if more than one beginning message exists
                     allBeginningMessages.length > 1 && (
                       <div className="absolute top-2 right-2 flex items-center space-x-1 text-gray-400 text-sm">
                         <ArrowBackIcon
                           className="!text-lg"
-                          onClick={() => handleNavigateBeginningMessage('prev')}
+                          onClick={() => handleNavigateBeginningMessage("prev")}
                           // Disable if at the first beginning message
                           disabled={currentBeginningMessageIndex === 0}
                         />
@@ -552,7 +591,6 @@ const ChatPage: React.FC = () => {
         </div>
             </div>
           )}
-        </div>
       </div>
       <div
         ref={inputAreaRef}

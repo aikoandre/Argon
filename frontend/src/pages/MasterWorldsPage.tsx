@@ -225,7 +225,7 @@ const MasterWorldsPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
+    <div className="container mx-auto p-4 md:p-8 max-h-screen overflow-y-auto custom-scrollbar">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold font-quintessential text-white">Worlds</h1>
         <button
@@ -257,7 +257,7 @@ const MasterWorldsPage: React.FC = () => {
               onClick={() => navigate(`/world-lore/${world.id}/entries`)}
             >
               <CardImage
-                imageUrl={world.image_url ? `${world.image_url.replace('static/images/', '')}` : null}
+                imageUrl={world.image_url}
                 className="absolute inset-0"
               />
               {/* Top right icons */}

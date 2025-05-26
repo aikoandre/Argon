@@ -3,23 +3,31 @@ import os
 import logging # Import logging early
 
 # Configure basic logging to show DEBUG messages as early as possible
-logging.basicConfig(level=logging.DEBUG,
+logging.basicConfig(level=logging.INFO, # Changed to INFO
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     stream=sys.stdout) # Ensure output goes to console
 
-# Explicitly set logger levels to DEBUG
-logging.getLogger().setLevel(logging.DEBUG);
-logging.getLogger('backend').setLevel(logging.DEBUG);
+# Custom filter to allow only specific httpx INFO messages
+class HTTPXFilter(logging.Filter):
+    def filter(self, record):
+        if record.name == 'httpx' and record.levelname == 'INFO':
+            # Allow only HTTP Request POST messages
+            return "HTTP Request: POST" in record.getMessage()
+        return True # Allow all other messages
+
+# Add the custom filter to the root logger
+for handler in logging.getLogger().handlers:
+    handler.addFilter(HTTPXFilter())
 
 # Add project root to sys.path
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, PROJECT_ROOT)
 
 # Print PROJECT_ROOT and STATIC_DIR for immediate verification
-print(f"DEBUG: PROJECT_ROOT resolved to: {PROJECT_ROOT}");
+print(f"PROJECT_ROOT resolved to: {PROJECT_ROOT}");
 import pathlib;
 STATIC_DIR_TEST = pathlib.Path(PROJECT_ROOT) / "static";
-print(f"DEBUG: STATIC_DIR resolved to: {STATIC_DIR_TEST}");
+print(f"STATIC_DIR resolved to: {STATIC_DIR_TEST}");
 
 from starlette.responses import FileResponse, JSONResponse # Import FileResponse and JSONResponse
 from fastapi import FastAPI, BackgroundTasks, UploadFile, HTTPException, status
@@ -29,18 +37,19 @@ import uvicorn
 import asyncio
 from backend.services import mistral_client
 from backend.background_tasks import embedding_worker
-from backend.services.mistral_client import embedding_queue, initialize_mistral_client
-from backend.routers.lore_entries import lore_entry_ops_router, master_world_router as master_world_lore_router
+from backend.services.mistral_client import embedding_queue # Removed initialize_mistral_client
+from backend.routers.lore_entries import router as lore_entries_router
 from backend.routers.chat import router as chat_router
 from backend.routers.scenarios import router as scenarios_router
 from backend.routers.personas import router as personas_router
 from backend.routers.images import router as images_router
-from backend.routers import images
 from backend.routers.characters import router as characters_router
 from backend.routers.master_worlds import router as master_worlds_router
 from backend.routers.settings import router as settings_router
 from backend.routers.llm_providers import router as llm_providers_router
 from backend import database
+from sqlalchemy.orm import Session # Import Session
+from backend.database import get_db # Import get_db
 
 # Import all models to register them with the SQLAlchemy engine
 from backend.models.user_persona import UserPersona
@@ -155,11 +164,13 @@ async def startup_event():
     Base.metadata.create_all(bind=engine)
     print("Database tables created successfully.")
 
-    # 1. Inicializa o cliente Mistral (carrega API Key, etc.)
-    from backend.services import mistral_client as local_mistral_client
-    local_mistral_client.initialize_mistral_client()
+    # 1. Ensure default user persona exists
+    print("Ensuring default user persona exists...")
+    with next(get_db()) as db: # Use get_db to get a session
+        create_default_user_persona(db)
+    print("Default user persona check complete.")
 
-    # 2. Inicia o worker de embedding em uma tarefa de background
+    # 3. Inicia o worker de embedding em uma tarefa de background
     #    A fila é acessada diretamente pelo worker no módulo background_tasks
     print("Iniciando worker de embedding...")
     loop = asyncio.get_running_loop()
@@ -191,17 +202,6 @@ async def shutdown_event():
 async def read_root():
     return {"message": "Olá do Backend ARE! Cliente Mistral e Worker configurados."}
 
-# Rota de teste para obter embedding de query diretamente
-@app.get("/test-get-query-embedding")
-async def test_get_query(text: str):
-    """
-    Rota de teste para simular a obtenção de embedding para uma query RAG.
-    """
-    embedding = await mistral_client.get_embedding_for_query(text)
-    if embedding:
-        return {"text": text, "embedding_preview": embedding[:5], "embedding_dim": len(embedding)}
-    else:
-        return {"error": "Falha ao obter embedding para a query."}
 
 # --- Health Check Endpoint ---
 @app.get("/api/health")
@@ -223,15 +223,34 @@ async def test_serve_image():
     return FileResponse(image_path)
 
 # Include other routers
-app.include_router(lore_entry_ops_router)
-app.include_router(master_world_lore_router)
+app.include_router(lore_entries_router)
 app.include_router(chat_router, prefix="/api/chat")
 app.include_router(scenarios_router)
 app.include_router(personas_router)
-# The images_router now handles all /api/images/* routes, including /api/images/serve/
-app.include_router(images_router, prefix="/api/images")
 
 app.include_router(characters_router)
 app.include_router(master_worlds_router)
 app.include_router(settings_router, prefix="/api")
 app.include_router(llm_providers_router)
+
+def create_default_user_persona(db: Session):
+    """
+    Ensures a default 'User' persona exists in the database.
+    If it doesn't exist, it creates one.
+    """
+    default_persona_name = "User"
+    default_persona = db.query(UserPersona).filter(UserPersona.name == default_persona_name).first()
+
+    if not default_persona:
+        print(f"Creating default user persona: {default_persona_name}")
+        new_persona = UserPersona(
+            name=default_persona_name,
+            description="A default persona representing the user.",
+            image_url=None # Or a path to a default user image if available
+        )
+        db.add(new_persona)
+        db.commit()
+        db.refresh(new_persona)
+        print(f"Default user persona '{default_persona_name}' created with ID: {new_persona.id}")
+    else:
+        print(f"Default user persona '{default_persona_name}' already exists with ID: {default_persona.id}")

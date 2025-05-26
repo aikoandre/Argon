@@ -100,7 +100,9 @@ const PersonasPage: React.FC = () => {
     setError(null);
     try {
       const data = await getAllUserPersonas();
-      setPersonas(data);
+      // Filter out the default "User" persona
+      const filteredData = data.filter(persona => persona.name !== "User");
+      setPersonas(filteredData);
     } catch (err) {
       setError("Failed to load personas.");
       console.error(err);
@@ -302,17 +304,6 @@ const PersonasPage: React.FC = () => {
     }
   };
 
-  // Helper function to get proper image URL for persona images
-  const getImageUrl = (imageUrl: string | null) => {
-    if (!imageUrl) return null;
-    if (imageUrl.startsWith('data:')) return imageUrl;
-
-    // Extract just the filename, removing any path
-    const filename = imageUrl.split('/').pop();
-
-    // Return the API endpoint for serving persona images
-    return `/api/images/serve/images/personas/${filename}`;
-  };
 
   // Helper function for truncating filenames
   const truncateFilename = (filename: string | null | undefined, maxLength = 20): string => {
@@ -369,7 +360,7 @@ const PersonasPage: React.FC = () => {
             title={activePersonaId === persona.id ? 'Active' : 'Click to activate'}
           >
             <CardImage
-              imageUrl={getImageUrl(persona.image_url ?? null)}
+              imageUrl={persona.image_url ?? null}
               className="absolute inset-0"
             />
             <div className="absolute top-2 right-2 flex space-x-2 z-10">

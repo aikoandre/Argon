@@ -68,6 +68,7 @@ export const updateUserSettings = async (
 export interface LLMModelData {
   id: string;
   name?: string;
+  provider?: string;
 }
 
 export const getLLMModels = async (): Promise<LLMModelData[]> => {
@@ -530,12 +531,13 @@ export const getLoreEntryById = async (
 };
 
 export const updateLoreEntry = async (
+  masterWorldId: string,
   entryId: string,
   data: LoreEntryUpdateData | FormData
 ): Promise<LoreEntryData> => {
   if (data instanceof FormData) {
     const response = await apiClient.put<LoreEntryData>(
-      `/lore_entries/${entryId}`,
+      `/master_worlds/${masterWorldId}/lore_entries/${entryId}`,
       data,
       {
         headers: {
@@ -546,7 +548,7 @@ export const updateLoreEntry = async (
     return response.data;
   } else {
     const response = await apiClient.put<LoreEntryData>(
-      `/lore_entries/${entryId}`,
+      `/master_worlds/${masterWorldId}/lore_entries/${entryId}`,
       data
     );
     return response.data;
@@ -573,6 +575,19 @@ export const createOrGetCardChat = async (
     { params } // Pass params here
   );
   return response.data.id;
+};
+
+export const searchLoreEntries = async (masterWorldId: string, queryText: string): Promise<LoreEntryData[]> => {
+  try {
+    const response = await apiClient.post<LoreEntryData[]>(
+      `/master_worlds/${masterWorldId}/lore_entries/search`,
+      { query: { query_text: queryText } }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error searching lore entries:", error);
+    throw error;
+  }
 };
 
 export interface ChatMessageData {
@@ -648,6 +663,8 @@ export const getChatSessionMessages = async (
   }
 };
 
+import { type ChatTurnResponse, type ChatMessageData } from "../types/chat"; // Corrected import for ChatTurnResponse and ChatMessageData
+
 export const addMessageToSession = async (
   chatId: string,
   messageData: {
@@ -659,12 +676,12 @@ export const addMessageToSession = async (
     active_persona_image_url?: string | null; // New field
     current_beginning_message_index?: number; // New field for beginning message navigation
   }
-): Promise<ChatMessageData> => {
+): Promise<ChatTurnResponse> => { // Changed return type to ChatTurnResponse
   try {
     if (!messageData.content || messageData.content.trim().length === 0) {
       throw new Error("Message content cannot be empty.");
     }
-    const response = await apiClient.post<ChatMessageData>(
+    const response = await apiClient.post<ChatTurnResponse>( // Changed generic type to ChatTurnResponse
       `/chat/${chatId}/messages`,
       messageData // Send the entire messageData object
     );

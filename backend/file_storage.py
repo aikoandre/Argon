@@ -99,11 +99,11 @@ async def save_uploaded_file(file: UploadFile, entity_name: Optional[str] = None
             if img.mode in ("RGBA", "P"):
                 img = img.convert("RGB")
 
-            # Resize the image (e.g., max 200x200 for avatars)
-            img.thumbnail((200, 200)) # Resizes in place, maintaining aspect ratio
+            # Resize the image (e.g., max 400x400 for better quality)
+            img.thumbnail((1200, 1200)) # Resizes in place, maintaining aspect ratio
 
-            # Save the optimized image as WebP
-            img.save(file_path, "webp", quality=80) # quality 80 is a good balance
+            # Save the optimized image as WebP with higher quality
+            img.save(file_path, "webp", quality=90) # Increased quality to 90
 
         logger.info(f"Successfully optimized and saved image to: {file_path.resolve()}")
 
@@ -116,26 +116,28 @@ async def save_uploaded_file(file: UploadFile, entity_name: Optional[str] = None
             os.remove(temp_upload_path)
             logger.info(f"Cleaned up temporary file: {temp_upload_path.resolve()}")
 
-    return f"/api/images/serve/{entity_subdir}/{filename}"
+    return f"/static/images/{entity_subdir}/{filename}"
 
 def delete_image_file(image_url: str) -> None:
     if not image_url:
         return
 
     # Ensure it's a static file URL we expect
-    # Expect the image_url to now start with the /api/images/serve/ prefix
-    expected_prefix = "/api/images/serve/"
+    # Expect the image_url to now start with the /static/ prefix
+    expected_prefix = "/static/"
     if not image_url.startswith(expected_prefix):
-        logger.warning(f"Attempted to delete URL not served by API: {image_url}")
+        logger.warning(f"Attempted to delete URL not served by static files: {image_url}")
         return
 
-    # Extract the path relative to STATIC_DIR (e.g., "images/personas/A_ebe4120c.jpeg")
+    # Extract the path relative to BASE_STATIC_DIR (e.g., "images/personas/A_ebe4120c.webp")
     image_path_relative_to_static_root = image_url[len(expected_prefix):]
 
-    # Verify the path is within one of our entity directories
-    is_valid_path = any(f"images/{entity_dir}/" in image_path_relative_to_static_root for entity_dir in ENTITY_DIRS.values())
+    # Verify the path is within the 'images' subdirectory and one of our entity directories
+    # This check is now more robust, ensuring it's within 'images/' and then a valid entity_dir
+    is_valid_path = image_path_relative_to_static_root.startswith("images/") and \
+                    any(image_path_relative_to_static_root.startswith(f"images/{entity_dir}/") for entity_dir in ENTITY_DIRS.values())
     if not is_valid_path:
-        logger.warning(f"Attempted to delete file from unauthorized directory: {image_url}")
+        logger.warning(f"Attempted to delete file from unauthorized or invalid static directory: {image_url}")
         return
 
     try:

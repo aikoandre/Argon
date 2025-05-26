@@ -24,7 +24,14 @@ async def read_user_settings(db: Session = Depends(get_db)):
             id=USER_SETTINGS_ID,
             llm_provider="OpenRouter",
             selected_llm_model="gpt-4o",
-            llm_api_key="",
+            primary_llm_api_key="",
+            planning_llm_api_key="",
+            extraction_llm_api_key="",
+            analysis_llm_api_key="",
+            mistral_api_key="",
+            extraction_llm_model="mistral/mistral-large-latest",
+            planning_llm_model="deepseek-ai/deepseek-coder-v2-instruct",
+            analysis_llm_model="mistral/mistral-large-latest",
             generation_prompt_template=(
                 "You are {{ai_instructions.name}}, {{ai_instructions.description}}. "
                 "Your instructions on how to act are: {{ai_instructions.instructions}}.\n"
@@ -40,7 +47,7 @@ async def read_user_settings(db: Session = Depends(get_db)):
                 "**IMPORTANT**: Always complete your response and strictly adhere to your character's instructions and speaking style."
             ),
             language="English",
-            temperature=1.0, # Ensure float consistency
+            temperature=1.0,
             top_p=1.0,
             max_response_tokens=2048,
             context_size=164000,

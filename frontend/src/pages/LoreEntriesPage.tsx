@@ -9,13 +9,16 @@ import {
   updateLoreEntry,
   deleteLoreEntry,
   getMasterWorldById,
+  searchLoreEntries, // Import the new search function
   type LoreEntryData,
   type LoreEntryCreateData,
   type LoreEntryUpdateData,
   type MasterWorldData
 } from '../services/api';
+
 import { useRef } from 'react';
 import { CardImage } from '../components/CardImage';
+import useDebounce from '../hooks/useDebounce';
 
 const iconBaseClass = "material-icons-outlined text-2xl flex-shrink-0";
 const DeleteIcon = ({ className }: { className?: string }) => (
@@ -102,8 +105,12 @@ const LoreEntriesPage: React.FC = () => {
   const [factionsOptions, setFactionsOptions] = useState<SelectOption[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
 
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>(''); // New state for search query
+  const [isSearching, setIsSearching] = useState<boolean>(false); // New state for search loading
+  const debouncedSearchQuery = useDebounce(searchQuery, 500); // 500ms debounce
+ 
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingEntry, setEditingEntry] = useState<LoreEntryData | null>(null);
   const [formData, setFormData] = useState<LoreEntryFormData>(initialFormData);
@@ -162,8 +169,29 @@ const LoreEntriesPage: React.FC = () => {
         setIsLoading(false);
       }
     };
-    fetchPageData();
-  }, [masterWorldId, navigate]);
+ 
+    const performSearch = async () => {
+      setIsSearching(true);
+      setError(null);
+      if (debouncedSearchQuery.trim() !== '') { // Only search if query is not empty
+        try {
+          const results = await searchLoreEntries(masterWorldId, debouncedSearchQuery);
+          setLoreEntries(results);
+        } catch (err) {
+          setError('Failed to search lore entries.');
+          console.error(err);
+        } finally {
+          setIsSearching(false);
+        }
+      }
+    };
+ 
+    if (debouncedSearchQuery.trim() === '') {
+      fetchPageData();
+    } else {
+      performSearch();
+    }
+  }, [masterWorldId, navigate, debouncedSearchQuery]); // Add debouncedSearchQuery to dependencies
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -237,7 +265,7 @@ const LoreEntriesPage: React.FC = () => {
     setError(null);
     try {
       if (isEdit) {
-        await updateLoreEntry(editingEntry!.id, formDataToSend);
+        await updateLoreEntry(masterWorldId, editingEntry!.id, formDataToSend);
       } else {
         await createLoreEntryForMasterWorld(masterWorldId, formDataToSend);
       }
@@ -292,13 +320,13 @@ const LoreEntriesPage: React.FC = () => {
     return filename.substring(0, maxLength - 3) + '...';
   };
 
-  if (isLoading) {
-    return <p className="text-center text-gray-400 p-10">Loading lore entries...</p>;
+  if (isLoading || isSearching) {
+    return <p className="text-center text-gray-400 p-10">{isLoading ? 'Loading lore entries...' : 'Searching lore entries...'}</p>;
   }
 
   return (
     <>
-      <div className="container mx-auto p-4 md:p-8">
+      <div className="container mx-auto p-4 md:p-8 max-h-screen overflow-y-auto custom-scrollbar">
         <div className="mb-8">
           <div className="flex justify-between items-center">
             <h1 className="text-4xl font-bold text-white font-quintessential">
@@ -312,6 +340,18 @@ const LoreEntriesPage: React.FC = () => {
             </button>
           </div>
           <p className="text-gray-400">{currentMasterWorld?.description}</p>
+        </div>
+
+        {/* Search Input */}
+        <div className="mb-6">
+          <input
+            type="text"
+            placeholder="Search lore entries by name, description, tags, or aliases..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full p-3 bg-app-surface border border-gray-600 rounded-md text-white placeholder-gray-500 focus:outline-none focus:border-app-accent"
+            autoComplete="off"
+          />
         </div>
 
         {error && <p className="bg-red-700 text-white p-3 rounded-md mb-4 text-center">{error}</p>}
@@ -338,7 +378,7 @@ const LoreEntriesPage: React.FC = () => {
                         onClick={() => handleOpenModal(entry)}
                       >
                         <CardImage
-                            imageUrl={entry.image_url ? `${entry.image_url.replace('static/images/', '')}` : null}
+                            imageUrl={entry.image_url || null}
                             className="absolute inset-0"
                         />
                         <div className="absolute top-2 right-2 flex space-x-2 z-10">
