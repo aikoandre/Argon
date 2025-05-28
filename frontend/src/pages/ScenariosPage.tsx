@@ -456,10 +456,7 @@ const ScenariosPage: React.FC = () => {
               {/* Bottom info (footer) */}
               <div className="absolute bottom-0 left-0 w-full">
                 <div className="w-full bg-black/30 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
-                  <div className="font-semibold text-lg truncate text-white drop-shadow-md">{scen.name}</div>
-                  {scen.description && (
-                    <div className="text-xs text-gray-200 mt-1 line-clamp-2">{scen.description}</div>
-                  )}
+                  <div className="font-semibold text-lg text-white drop-shadow-md break-words">{scen.name}</div>
                 </div>
               </div>
             </div>

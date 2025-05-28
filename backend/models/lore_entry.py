@@ -9,7 +9,7 @@ class LoreEntry(Base):
     __tablename__ = "lore_entries"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    entry_type = Column(String, nullable=False, index=True)  # "CHARACTER_LORE", "LOCATION", "FACTION", "ITEM", "CONCEPT"
+    entry_type = Column(String, nullable=False, index=True)  # "CHARACTER_LORE", "LOCATION", "FACTION", "ITEM", "CONCEPT", "FIXED_EVENT"
     name = Column(String, nullable=False, index=True)
     description = Column(Text, nullable=True)
     tags = Column(JSON, nullable=True)
@@ -19,5 +19,6 @@ class LoreEntry(Base):
     master_world = relationship("MasterWorld", back_populates="lore_entries")
     image_url = Column(String, nullable=True)
     embedding_vector = Column(JSON, nullable=True) # New column for Mistral embeddings
+    event_data = Column(JSON, nullable=True) # New column for fixed event data
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), onupdate=func.now())

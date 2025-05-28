@@ -35,14 +35,22 @@ html {
   scrollbar-color: rgba(248, 249, 250, 0.4) rgba(222, 226, 230, 0.1); /* thumb and track color */
 }
 
-/* Optional: Hide scrollbar completely for specific elements if needed */
-/* .hide-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+/* Thin, transparent scrollbar for chat area */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  background: transparent;
 }
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
-} */
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(248, 249, 250, 0.4);
+  border-radius: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(248, 249, 250, 0.4) transparent;
+}
 
 @keyframes modalShow {
   from {
@@ -58,3 +66,4 @@ html {
 .animate-modalShow {
   animation: modalShow 0.3s ease-out forwards;
 }
+

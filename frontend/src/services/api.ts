@@ -4,9 +4,11 @@ import type {
   UserSettingsData,
   UserSettingsUpdateData,
 } from "../types/settings";
+import type { PanelData, AIPlan } from "../types/chat";
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api",
+  timeout: 120000, // Increased timeout to 120 seconds (2 minutes) for long LLM calls
   headers: {
     "Content-Type": "application/json",
   },
@@ -555,8 +557,8 @@ export const updateLoreEntry = async (
   }
 };
 
-export const deleteLoreEntry = async (entryId: string): Promise<void> => {
-  await apiClient.delete(`/lore_entries/${entryId}`);
+export const deleteLoreEntry = async (masterWorldId: string, entryId: string): Promise<void> => {
+  await apiClient.delete(`/master_worlds/${masterWorldId}/lore_entries/${entryId}`);
 };
 
 // --- Chat Sessions & Messages ---
@@ -590,17 +592,6 @@ export const searchLoreEntries = async (masterWorldId: string, queryText: string
   }
 };
 
-export interface ChatMessageData {
-  id: string;
-  chat_session_id: string;
-  sender_type: "USER" | "AI" | "SYSTEM";
-  content: string;
-  timestamp: string;
-  message_metadata?: Record<string, any> | null;
-  active_persona_name?: string | null; // New field
-  active_persona_image_url?: string | null; // New field
-  is_beginning_message?: boolean; // To identify initial messages from character/scenario cards
-}
 
 export interface ChatSessionData {
   id: string;
@@ -612,6 +603,8 @@ export interface ChatSessionData {
   title?: string | null;
   card_type?: string;
   card_id?: string;
+  panel_data?: PanelData | null;
+  ai_plan?: AIPlan | null;
 }
 
 export interface ChatSessionListedData {
@@ -624,6 +617,9 @@ export interface ChatSessionListedData {
   card_image_url?: string;
   user_message_count?: number; // Changed to count only user messages
 }
+
+// --- Chat Messages ---
+// ChatMessageData is now defined in types/chat.ts, do not redefine or re-import it here.
 
 export const getAllChatSessions = async (): Promise<
   ChatSessionListedData[]

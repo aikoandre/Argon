@@ -4,6 +4,8 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 import uuid
 from backend.schemas.ai_plan import AIPlan, PanelData # New import
+from backend.schemas.character_card import CharacterCardBase # New import
+from backend.schemas.scenario_card import ScenarioCardBase # New import
 
 class ChatMessageBase(BaseModel):
     sender_type: str = Field(..., pattern="^(USER|AI|SYSTEM)$") # Valida os tipos de remetente
@@ -25,11 +27,34 @@ class ChatMessageInDB(ChatMessageBase):
     class Config:
         from_attributes = True
 
-class UserMessageCreate(BaseModel):
+class UserMessageInput(BaseModel):
     content: str = Field(..., min_length=1)
+    user_persona_id: Optional[str] = None
+    current_beginning_message_index: Optional[int] = None # New field
+
+class AIPersonaCardInfo(BaseModel):
+    id: str
+    name: str
+    image_url: Optional[str] = None
+    description: Optional[str] = None
+    instructions: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class UserPersonaInfo(BaseModel):
+    name: str
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 class ChatTurnResponse(BaseModel):
     user_message: ChatMessageInDB
     ai_message: ChatMessageInDB
     ai_plan: Optional[AIPlan] = None # Include the AI plan in the response
     panel_data_update: Optional[PanelData] = None # Include panel data update in the response
+    rendered_panel_string: Optional[str] = Field(None, description="The Jinja2-rendered panel content to be displayed in the UI.")
+    display_panel_in_response: bool = Field(False, description="Whether the rendered panel string should be displayed in the UI.")
+    ai_persona_card: Optional[AIPersonaCardInfo] = None # Include AI persona card info

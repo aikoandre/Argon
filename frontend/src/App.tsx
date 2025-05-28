@@ -44,7 +44,7 @@ function AppWrapper() {
   return (
     <div className="min-h-screen flex flex-col bg-app-bg text-white">
       {/* Combined Fixed Header */}
-      <header className="fixed top-0 left-0 right-0 bg-app-bg p-4 flex justify-center items-center z-50">
+      <header className="fixed top-0 left-0 right-0 h-[56px] flex justify-center items-center z-50 mt-3">
         {/* Navigation Header */}
         <div className="bg-app-surface shadow-lg rounded-3xl p-3 flex items-center gap-x-4">
         <Link
@@ -106,10 +106,10 @@ function AppWrapper() {
         </div>
       </header>
       {/* Spacer to push content below fixed header */}
-      <div className="h-[40px]"></div> {/* h-40 is 160px, slightly more than 156px header height */}
+      <div className="h-[56px]"></div> {/* Match header height */}
       {/* Main Content Area */}
-      <main className={`flex-grow overflow-hidden transition-all duration-300 ease-in-out ${location.pathname.startsWith('/chat/') ? '' : 'p-4 md:p-6'}`}>
-        <div className="container mx-auto">
+      <main className={`flex-grow overflow-hidden transition-all duration-300 ease-in-out flex flex-col ${location.pathname.startsWith('/chat/') ? '' : 'p-4 md:p-6'}`}>
+        <div className="container mx-auto flex-1 flex flex-col">
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/chats" element={<ChatsListPage />} />

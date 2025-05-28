@@ -28,10 +28,10 @@ const ImageIcon = ({ className }: { className?: string }) => (
   <span className={`${iconBaseClass} ${className || ''}`.trim()}>image</span>
 );
 
-const VALID_ENTRY_TYPES = ["CHARACTER_LORE", "LOCATION", "FACTION", "ITEM", "CONCEPT"];
+const VALID_ENTRY_TYPES = ["CHARACTER_LORE", "LOCATION", "FACTION", "ITEM", "CONCEPT", "NARRATIVE_EVENT"];
 
 // Define the desired order for displaying sections
-const DISPLAY_ENTRY_TYPES_ORDER = ["CHARACTER_LORE", "LOCATION", "FACTION", "ITEM", "CONCEPT"];
+const DISPLAY_ENTRY_TYPES_ORDER = ["CHARACTER_LORE", "LOCATION", "FACTION", "ITEM", "CONCEPT", "NARRATIVE_EVENT"];
 
 interface SelectOption { value: string; label: string; }
 interface ModalProps { isOpen: boolean; onClose: () => void; children: React.ReactNode; title: string; }
@@ -65,6 +65,7 @@ interface LoreEntryFormData {
   faction_id: string | null;
   tags: string[];
   aliases: string[];
+  // event_data is not used for NARRATIVE_EVENT
 }
 
 export const getFriendlyEntryTypeName = (entryType: string): string => {
@@ -79,9 +80,9 @@ export const getFriendlyEntryTypeName = (entryType: string): string => {
       return "Item";
     case "CONCEPT":
       return "Concept";
-    // Adicione outros tipos que você possa ter
+    case "NARRATIVE_EVENT":
+      return "Event";
     default:
-      // Capitaliza e remove underscores para tipos não mapeados explicitamente
       return entryType.replace(/_/g, ' ').replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
   }
 };
@@ -253,6 +254,7 @@ const LoreEntriesPage: React.FC = () => {
       tags: formData.tags,
       aliases: formData.aliases,
       faction_id: formData.entry_type === "CHARACTER_LORE" ? formData.faction_id : null,
+      event_data: formData.entry_type === "EVENT" ? null : undefined,
       ...(!isEdit && { master_world_id: masterWorldId })
     };
 
@@ -287,6 +289,8 @@ const LoreEntriesPage: React.FC = () => {
         } else if (typeof err.response.data.detail === 'string') {
           apiError = err.response.data.detail;
         }
+      } else if (err.code === 'ECONNABORTED') {
+        apiError = 'Request timed out. The server might be slow to respond or there\'s a network issue.';
       }
       setError(apiError);
       console.error(err);
@@ -299,7 +303,7 @@ const LoreEntriesPage: React.FC = () => {
     if (window.confirm('Are you sure you want to delete this lore entry?')) {
       setIsLoading(true);
       try {
-        await deleteLoreEntry(entryId);
+        await deleteLoreEntry(masterWorldId!, entryId);
         const entriesData = await getAllLoreEntriesForMasterWorld(masterWorldId!);
         setLoreEntries(entriesData);
         const factionsData = await getAllLoreEntriesForMasterWorld(masterWorldId!, "FACTION");
@@ -339,7 +343,6 @@ const LoreEntriesPage: React.FC = () => {
               + New
             </button>
           </div>
-          <p className="text-gray-400">{currentMasterWorld?.description}</p>
         </div>
 
         {/* Search Input */}
@@ -357,7 +360,7 @@ const LoreEntriesPage: React.FC = () => {
         {error && <p className="bg-red-700 text-white p-3 rounded-md mb-4 text-center">{error}</p>}
 
         {/* Render sections by type */}
-        <div className="space-y-8">
+        <div className="space-y-8 pb-20">
           {DISPLAY_ENTRY_TYPES_ORDER.map(entryType => {
             const friendlyTypeName = getFriendlyEntryTypeName(entryType);
             const entriesOfType = loreEntries.filter(entry => entry.entry_type === entryType);
@@ -420,8 +423,11 @@ const LoreEntriesPage: React.FC = () => {
               </div>
             );
           })}
+
         </div>
 
+:start_line:437
+-------
         <Modal isOpen={isModalOpen} onClose={handleCloseModal} title={editingEntry ? 'Edit Lore Entry' : 'Create New Lore Entry'}>
           <form onSubmit={handleSubmit} className="space-y-4 max-h-[80vh] overflow-y-auto p-1 pr-2 custom-scrollbar">
             {/* Campo de imagem opcional - agora antes do campo Name, label em cima */}
@@ -457,7 +463,7 @@ const LoreEntriesPage: React.FC = () => {
             </div>
             <div>
               <label htmlFor="le-name" className="block text-sm font-medium text-gray-300 mb-1">Name <span className="text-app-accent">*</span></label>
-              <input type="text" name="name" id="le-name" value={formData.name} onChange={handleInputChange} required 
+              <input type="text" name="name" id="le-name" value={formData.name} onChange={handleInputChange} required
                      className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white" autoComplete="off"/>
             </div>
             <div>
@@ -497,46 +503,6 @@ const LoreEntriesPage: React.FC = () => {
                     clearIndicator: (base) => ({ ...base, color: "#9CA3AF", ':hover': { color: "#fff" } }),
                     indicatorSeparator: (base) => ({ ...base, backgroundColor: "#343a40" }),
                   }}
-              />
-            </div>
-            <div>
-              <label htmlFor="le-master_world" className="block text-sm font-medium text-gray-300 mb-1">Master World</label>
-              <Select<SelectOption>
-                inputId="le-master_world" name="master_world"
-                options={[] /* Provide your master world options here */}
-                value={null /* Provide the selected value here */}
-                onChange={() => {}} // Provide the handler here
-                classNamePrefix="react-select"
-                styles={{
-                  control: (base, state) => ({
-                    ...base,
-                    backgroundColor: "#343a40", // bg-app-surface
-                    borderColor: state.isFocused ? "#f8f9fa" : "#343a40", // app-accent or app-surface
-                    boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
-                    '&:hover': { borderColor: "#f8f9fa" },
-                    minHeight: "42px",
-                  }),
-                  singleValue: (base, state) => ({
-                    ...base,
-                    color: state.isDisabled ? "#6B7280" : "#fff"
-                  }),
-                  menu: (base) => ({ ...base, backgroundColor: "#343a40", zIndex: 10 }),
-                  option: (base, { isFocused, isSelected }) => ({
-                    ...base,
-                    backgroundColor: isSelected
-                      ? "#f8f9fa" // app-accent
-                      : isFocused
-                      ? "#dee2e6" // app-accent-2
-                      : "#343a40", // app-surface
-                    color: isSelected || isFocused ? "#212529" : "#fff", // text-app-bg or white
-                    ':active': { backgroundColor: "#f8f9fa", color: "#212529" },
-                  }),
-                  placeholder: (base) => ({ ...base, color: "#9CA3AF" }),
-                  input: (base) => ({ ...base, color: "#fff" }),
-                  dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
-                  clearIndicator: (base) => ({ ...base, color: "#9CA3AF", ':hover': { color: "#fff" } }),
-                  indicatorSeparator: (base) => ({ ...base, backgroundColor: "#343a40" }),
-                }}
               />
             </div>
             {formData.entry_type === "CHARACTER_LORE" && (
@@ -584,14 +550,15 @@ const LoreEntriesPage: React.FC = () => {
             )}
             <div>
               <label htmlFor="le-description" className="block text-sm font-medium text-gray-300 mb-1">Description</label>
-              <textarea name="description" id="le-description" rows={3} value={formData.description} onChange={handleInputChange} 
+              <textarea name="description" id="le-description" rows={3} value={formData.description} onChange={handleInputChange}
                         className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white" autoComplete="off"/>
             </div>
 
             <div>
               <label htmlFor="le-tags" className="block text-sm font-medium text-gray-300 mb-1">Tags</label>
               <ReactTagInput
-                tags={formData.tags}
+                key={`tags-${editingEntry?.id || 'new'}`}
+                tags={[...formData.tags]} // Ensure a new array reference is always passed
                 onChange={(newTags) => setFormData(prev => ({ ...prev, tags: newTags }))}
                 placeholder="Add tags (press enter, comma, or space)"
               />
@@ -599,7 +566,8 @@ const LoreEntriesPage: React.FC = () => {
             <div>
               <label htmlFor="le-aliases" className="block text-sm font-medium text-gray-300 mb-1">Aliases/Keywords</label>
               <ReactTagInput
-                tags={formData.aliases}
+                key={`aliases-${editingEntry?.id || 'new'}`}
+                tags={[...formData.aliases]} // Ensure a new array reference is always passed
                 onChange={(newAliases) => setFormData(prev => ({ ...prev, aliases: newAliases }))}
                 placeholder="Add aliases (press enter, comma, or space)"
               />

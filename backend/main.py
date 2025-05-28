@@ -1,6 +1,7 @@
 import sys
 import os
 import logging # Import logging early
+logger = logging.getLogger(__name__) # Get logger instance for this module
 
 # Configure basic logging to show DEBUG messages as early as possible
 logging.basicConfig(level=logging.INFO, # Changed to INFO
@@ -24,10 +25,10 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, PROJECT_ROOT)
 
 # Print PROJECT_ROOT and STATIC_DIR for immediate verification
-print(f"PROJECT_ROOT resolved to: {PROJECT_ROOT}");
+logger.info(f"PROJECT_ROOT resolved to: {PROJECT_ROOT}");
 import pathlib;
 STATIC_DIR_TEST = pathlib.Path(PROJECT_ROOT) / "static";
-print(f"STATIC_DIR resolved to: {STATIC_DIR_TEST}");
+logger.info(f"STATIC_DIR resolved to: {STATIC_DIR_TEST}");
 
 from starlette.responses import FileResponse, JSONResponse # Import FileResponse and JSONResponse
 from fastapi import FastAPI, BackgroundTasks, UploadFile, HTTPException, status
@@ -59,14 +60,14 @@ from backend.models.scenario_card import ScenarioCard
 from backend.models.chat_message import ChatMessage
 from backend.models.chat_session import ChatSession
 from backend.models.lore_entry import LoreEntry
+from backend.models.session_relationship import SessionRelationship # Import the new model
 from backend.models.user_settings import UserSettings
+from fastapi.responses import StreamingResponse
 
 app = FastAPI(title="Advanced Roleplay Engine API")
 
 import pathlib
 import mimetypes  # Import mimetypes for proper content type handling
-
-logger = logging.getLogger(__name__) # Get logger instance
 
 # Initialize mimetypes
 mimetypes.init()
@@ -98,6 +99,10 @@ app.mount("/static", static_files, name="static")
 from starlette.middleware.base import BaseHTTPMiddleware
 
 class ContentTypeMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app):
+        super().__init__(app)
+        self.logger = logging.getLogger(__name__) # Get logger instance for the middleware
+
     async def dispatch(self, request, call_next):
         try:
             response = await call_next(request)
@@ -108,6 +113,7 @@ class ContentTypeMiddleware(BaseHTTPMiddleware):
                 path.startswith("/api/")
                 and "content-type" not in response.headers
                 and not path.startswith("/api/images/serve")
+                and not isinstance(response, StreamingResponse) # Skip for StreamingResponse
                 and response.status_code != 204
                 and not content_type.startswith("multipart/form-data")
             ):
@@ -119,8 +125,14 @@ class ContentTypeMiddleware(BaseHTTPMiddleware):
                 response.headers["Access-Control-Allow-Methods"] = "*"
                 response.headers["Access-Control-Allow-Headers"] = "*"
             return response
+        except NameError as e:
+            self.logger.error(f"Error in middleware: A NameError occurred. Details: {e}")
+            response = JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"detail": "An internal server error occurred due to an undefined variable."}
+            )
         except Exception as e:
-            print(f"Error in middleware: {str(e)}")
+            self.logger.error(f"Error in middleware: {str(e)}")
             response = JSONResponse(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 content={"detail": str(e)}

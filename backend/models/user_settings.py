@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Float, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, Float, ForeignKey, Boolean
 from backend.database import Base
 
 class UserSettings(Base):
@@ -37,18 +37,41 @@ class UserSettings(Base):
     interaction_analysis_prompt_template = Column(Text, nullable=True, default=(
         "You are an expert interaction analyst. Your task is to extract structured information "
         "from the provided conversation turn, focusing on new facts, relationship changes, "
-        "lore modifications, and user persona updates. Output a JSON object according to the schema."
-        "\n\nUser Message: {{user_message}}\nAI Response: {{ai_response}}\n\n"
-        "Relevant Lore (from RAG):{% for lore in reranked_lore_entries %}\n- {{lore.text}}{% endfor %}"
-        "\n\nAI Plan (if available): {{ai_plan | tojson}}"
-        "\n\nOutput JSON strictly following this schema:\n"
-        "{'new_facts_established': [{'text': 'string', 'relevance_score': float, 'tags': ['string']}], "
-        "'relationship_changes': [{'character_pair': ['string', 'string'], 'change_type': 'string', 'new_value': any, 'reason': 'string'}], "
-        "'session_lore_updates': [{'base_lore_entry_id': 'string', 'field_to_update': 'string', 'new_content_segment': 'string', 'change_reason': 'string'}], "
-        "'user_persona_session_updates': [{'attribute': 'string', 'new_value': any, 'reason': 'string'}], "
-        "'triggered_event_ids': ['string'], "
-        "'dynamically_generated_npcs': [{'npc_name': 'string', 'description_notes': 'string', 'should_create_lore_entry': bool, 'suggested_entry_type': 'string'}], "
-        "'panel_data_update': {'current_time': 'string', 'current_date': 'string', 'current_location': 'string'}}"
+        "lore modifications, and user persona updates. Output a JSON object according to the schema.\n"
+        "\nUser Message: {{user_message}}\n"
+        "AI Response: {{ai_response}}\n"
+        "Relevant Lore (from RAG):{% for lore in reranked_lore_entries %}\n- {{lore.text}}{% endfor %}\n"
+        "AI Plan (if available): {{ai_plan | tojson}}\n"
+        "Current Relationship State (if available): {{current_relationship_state | tojson}}\n"
+        "\nOutput JSON strictly following this schema (do not invent fields, do not omit required fields):\n"
+        "{\n"
+        "  'new_facts_established': [\n"
+        "    {'text': 'string', 'relevance_score': float, 'tags': ['string']}\n"
+        "  ],\n"
+        "  'relationship_changes': [\n"
+        "    {\n"
+        "      'between_entities': ['ENTITY_ID_OR_NAME_1', 'ENTITY_ID_OR_NAME_2'],\n"
+        "      'dimension_changed': 'dimension_name (e.g., trust_score, affection_score, rivalry_score)',\n"
+        "      'change_value': 'change_description (e.g., +15, -5, significant_increase, slight_decrease)',\n"
+        "      'new_status_tags_add': ['descriptive_tag_1', 'descriptive_tag_2'],\n"
+        "      'new_status_tags_remove': ['tag_to_be_removed'],\n"
+        "      'reason_summary': 'brief justification'\n"
+        "    }\n"
+        "  ],\n"
+        "  'session_lore_updates': [\n"
+        "    {'base_lore_entry_id': 'string', 'field_to_update': 'string', 'new_content_segment': 'string', 'change_reason': 'string'}\n"
+        "  ],\n"
+        "  'user_persona_session_updates': [\n"
+        "    {'attribute': 'string', 'new_value': any, 'reason': 'string'}\n"
+        "  ],\n"
+        "  'triggered_event_ids': ['string'],\n"
+        "  'dynamically_generated_npcs': [\n"
+        "    {'npc_name': 'string', 'description_notes': 'string', 'should_create_lore_entry': bool, 'suggested_entry_type': 'string'}\n"
+        "  ],\n"
+        "  'panel_data_update': {'current_time': 'string', 'current_date': 'string', 'current_location': 'string'}\n"
+        "}\n"
+        "If no significant relationship change is detected, return an empty list for 'relationship_changes'.\n"
+        "Do not return any fields not present in the schema above."
     ))
 
     # LLM Generation Parameters
@@ -58,6 +81,9 @@ class UserSettings(Base):
     context_size = Column(Integer, nullable=True, default=164000) # Number of history messages or context tokens
     max_messages_for_context = Column(Integer, nullable=True, default=20) # Max number of messages to include in LLM context
     max_lore_entries_for_rag = Column(Integer, nullable=True, default=3) # Max number of lore entries to include after reranking
+
+    # Panel Configuration
+    display_in_message_panel = Column(Boolean, nullable=False, default=False) # Whether to display the panel in the AI's message
 
     # Active User Persona
     active_persona_id = Column(String, ForeignKey("user_personas.id", ondelete="SET NULL"), nullable=True)

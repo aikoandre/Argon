@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File, Form
+import logging
+from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File, Form, Path
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, cast, String # Import or_, and_, cast, String for OR conditions and database functions
 from typing import List, Dict
@@ -6,6 +7,8 @@ import json # Import json for parsing the data string
 import os # Import os for path manipulation
 from backend.services.mistral_client import add_embedding_task, MistralClient # New import for embedding tasks, and MistralClient
 from backend.services.faiss_service import get_faiss_index # New import for FAISS
+
+logger = logging.getLogger(__name__)
 
 # Adjust these imports based on your actual project structure
 from backend.database import get_db
@@ -106,7 +109,7 @@ async def create_lore_entry( # Renamed for clarity
 
 @router.get("/", response_model=List[LoreEntryInDB])
 async def get_all_lore_entries_for_master_world(
-    master_world_id: str,
+    master_world_id: str = Path(..., title="The ID of the master world"),
     entry_type: str | None = None,
     db: Session = Depends(get_db)
 ):
@@ -177,6 +180,7 @@ async def update_lore_entry( # Renamed for clarity
     else:
         print(f"LoreEntry '{db_lore_entry.name}' updated. Skipping embedding regeneration.")
 
+    logger.info(f"LoreEntry '{db_lore_entry.name}' (ID: {db_lore_entry.id}) update process completed. Returning response.")
     return db_lore_entry
 
 
