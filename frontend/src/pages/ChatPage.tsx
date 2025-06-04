@@ -14,8 +14,6 @@ import {
 } from "../services/api";
 import { type ChatSessionData } from "../services/api"; // ChatSessionData is from api.ts
 import { type ChatMessageData } from "../types/chat"; // Only import ChatMessageData, remove unused types
-import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
 
 // Default avatar images - using data URLs to avoid file serving issues for defaults
 const DEFAULT_USER_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'%3E%3C/path%3E%3Ccircle cx='12' cy='7' r='4'%3E%3C/circle%3E%3C/svg%3E";
@@ -55,17 +53,6 @@ const getImageUrl = (imageUrl: string | null) => {
   // Construct the final static URL with the correct base
   return `/static/images/${cleanedPath}`;
 };
-
-// Helper function to apply custom formatting before Markdown parsing
-const applyCustomFormatting = (content: string) => {
-  let formattedContent = content;
-
-  // Replace "text" with <span class="text-app-chat">text</span> for blue color
-  formattedContent = formattedContent.replace(/"([^"]+)"/g, '<span class="text-app-chat">$1</span>');
-
-  return formattedContent;
-};
-
 
 const ChatPage: React.FC = () => {
   const { chatId } = useParams<{ chatId: string }>();
@@ -472,8 +459,8 @@ const ChatPage: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen h-screen bg-app-bg">
-      <div className="w-full max-w-4xl mx-auto px-4 pt-20">
-        <div className="flex-1 overflow-y-auto pr-2 space-y-2 flex-col h-[calc(100vh-10.7rem)]"> 
+      <div className="w-full max-w-xl lg:max-w-2xl mx-auto pt-16">
+        <div className="flex-1 overflow-y-auto pr-2 space-y-2 flex-col h-[calc(100vh-10.7rem)] scrollbar-thin scrollbar-thumb-app-accent scrollbar-track-app-surface/30 rounded-xl">
           {messages.length === 0 && (
             <div className="flex justify-center pb-4">
               <div className="text-center">
@@ -513,13 +500,13 @@ const ChatPage: React.FC = () => {
                     } relative`}
                   >
                     <div className="p-3 flex">
-                      <div className="flex-shrink-0 w-16 mr-3">
+                      <div className="flex-shrink-0 w-20 mr-3">
                         <img
                           src={msg.sender_type === "USER"
                             ? getImageUrl(msg.active_persona_image_url ?? activePersonaImageUrl) || DEFAULT_USER_AVATAR
                             : processedAiAvatarSrc}
                           alt={msg.sender_type === "USER" ? "User" : aiName || "AI"}
-                          className="w-full h-auto max-h-32 object-cover rounded-lg bg-gray-700"
+                          className="w-full h-auto max-h-32 object-cover rounded-md bg-gray-700"
                           onError={(e) => {
                             const fallback =
                               msg.sender_type === "USER"
@@ -547,12 +534,37 @@ const ChatPage: React.FC = () => {
                             {formatTime(msg.timestamp)}
                           </span>
                         </div>
-                        <ReactMarkdown
-                          className="whitespace-pre-wrap break-words mt-0.5"
-                          rehypePlugins={[rehypeRaw as any]}
-                        >
-                          {applyCustomFormatting(msg.content)}
-                        </ReactMarkdown>
+                        {/* Message content with custom formatting, no markdown */}
+                        <div className="break-words mt-0">
+                          {msg.content.split(/(```[\s\S]*?```|\n)/g).map((part, idx, arr) => {
+                            // Remove leading line breaks for the first paragraph
+                            if (idx === 0) part = part.replace(/^\n+/, '');
+                            if (part.startsWith('```') && part.endsWith('```')) {
+                              // Code block
+                              const code = part.slice(3, -3).replace(/^\n|\n$/g, '');
+                              // Remove top margin for the first code block
+                              const preClass = idx === 0 ? "bg-black text-white rounded-md p-3 mb-2 overflow-x-auto text-sm" : "bg-black text-white rounded-md p-3 my-2 overflow-x-auto text-sm";
+                              return (
+                                <pre key={idx} className={preClass}>
+                                  <code>{code}</code>
+                                </pre>
+                              );
+                            } else if (part === '\n') {
+                              // Only render <br> if not the first element and previous part is not a code block
+                              if (idx === 0) return null;
+                              const prev = arr[idx - 1] || '';
+                              if (prev.startsWith('```') && prev.endsWith('```')) return null;
+                              return <br key={idx} />;
+                            } else {
+                              // Inline text, apply custom formatting for quoted and italic text
+                              let formatted = part
+                                .replace(/"([^"]+)"/g, '<span class="text-app-chat">$1</span>')
+                                .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+                              // Remove top margin for the first inline text
+                              return <span key={idx} style={idx === 0 ? { marginTop: 0 } : {}} dangerouslySetInnerHTML={{ __html: formatted }} />;
+                            }
+                          })}
+                        </div>
                       </div>
                     </div>
                     {msg.sender_type === "AI" &&
@@ -606,9 +618,9 @@ const ChatPage: React.FC = () => {
       {/* Input area */}
       <div
         ref={inputAreaRef}
-        className="fixed bottom-0 left-0 right-0 w-full shadow-lg bg-app-bg z-40"
+        className="fixed bottom-0 left-0 right-0 z-40 flex justify-center"
       >
-        <div className="max-w-4xl mx-auto px-2 sm:px-4 w-full py-2">
+        <div className="w-full max-w-xl lg:max-w-2xl mx-auto bg-app-bg shadow-lg">
           <form onSubmit={handleSendMessage} className="relative">
             <textarea
               rows={1}

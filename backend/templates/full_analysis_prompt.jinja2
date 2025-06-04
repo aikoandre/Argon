@@ -1,0 +1,79 @@
+You are analyzing a single conversation turn to extract key information.
+
+{% if user_prompt_instructions.analysis_instructions %}
+CUSTOM USER INSTRUCTIONS: {{ user_prompt_instructions.analysis_instructions }}
+{% endif %}
+
+{% if reasoning_model_available %}
+ANALYSIS REASONING INSTRUCTIONS: Use your reasoning capabilities to:
+- Think deeply about the subtext and implications of both messages
+- Consider the emotional dynamics and relationship progression
+- Analyze what each party might be feeling or thinking but not saying directly
+- Look for patterns, character development, and narrative significance
+- Consider both immediate and long-term implications of this interaction
+
+Reason through the conversation as if you're a perceptive observer who understands both characters deeply.
+{% endif %}
+
+User Message: {{ user_message }}
+AI Response: {{ ai_response }}
+
+{% if last_9_messages_formatted %}
+Recent Context (last 9 messages):
+{{ last_9_messages_formatted }}
+{% endif %}
+
+CRITICAL JSON OUTPUT REQUIREMENTS:
+- Respond with ONLY a valid JSON object
+- NO markdown formatting (no ```)
+- NO explanatory text before or after JSON
+- NO comments or additional content
+
+Required JSON structure:
+{
+  "new_facts_established": [
+    {"text": "concrete fact from interaction", "relevance_score": 0.8}
+  ],
+  "relationship_changes": [
+    {
+      "between_entities": ["entity1", "entity2"],
+      "dimension_changed": "trust_score",
+      "change_value": "+5",
+      "reason_summary": "helpful response"
+    }
+  ],
+  "session_lore_updates": [
+    {
+      "base_lore_entry_id": "lore_id",
+      "field_to_update": "description",
+      "new_content_segment": "updated information"
+    }
+  ],
+  "user_persona_session_updates": [
+    {
+      "attribute": "the attribute being updated (e.g. 'mood', 'role', 'relationship_status')",
+      "new_value": "the new value for the attribute",
+      "text": "short natural language summary of the update",
+      "relevance_score": 0.0-1.0
+    }
+    // If there are no updates, return an empty list: []
+  ],
+  "triggered_event_ids_candidates": ["event_id"],
+  "session_cache_updates": [
+    {
+      "text": "important detail to remember",
+      "key": "memory_type",
+      "value": "memory_value",
+      "relevance_score": 0.7
+    }
+  ],
+  "dynamic_memories_to_index": [
+    "Important memory to store for future conversations",
+    "Another key insight that should be retrievable later"
+  ]
+}
+
+For 'user_persona_session_updates', always return a list of objects. Each object MUST include all four fields: 'attribute', 'new_value', 'text', and 'relevance_score'. If there are no updates, return an empty list for this field.
+
+Focus ONLY on concrete, extractable information. Keep it simple and factual.
+Output ONLY the JSON object above, nothing else.

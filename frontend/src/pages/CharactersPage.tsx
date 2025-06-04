@@ -1,5 +1,4 @@
 import React, { useState, useEffect, type FormEvent, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import Select, { type SingleValue } from "react-select";
 import {
   getAllCharacterCards,
@@ -7,7 +6,6 @@ import {
   updateCharacterCard,
   deleteCharacterCard,
   getAllMasterWorlds,
-  createOrGetCardChat,
   type CharacterCardData,
   type MasterWorldData,
 } from "../services/api";
@@ -21,43 +19,98 @@ interface ModalProps {
   onClose: () => void;
   children: React.ReactNode;
   title: string;
+  imageFile?: File | null;
+  editingCharacter?: CharacterCardData | null;
+  onImageClick?: () => void;
 }
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title, imageFile, editingCharacter, onImageClick }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-app-bg p-6 rounded-2xl shadow-xl w-full max-w-lg text-white transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalShow">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-semibold">{title}</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl"
-          >
-            ×
-          </button>
+    <>
+      {/* Modal overlay */}
+      <div className="fixed inset-0 bg-black bg-opacity-75 z-40" />
+      {/* Modal content - centered */}
+      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+        <div className="bg-app-bg rounded-2xl shadow-xl text-white relative w-full max-w-xl lg:max-w-2xl max-h-[75vh] flex flex-col md:flex-row overflow-hidden">
+          {/* Image preview container */}
+          <div className="flex-shrink-0 p-6 flex items-center justify-center md:w-auto w-full relative">
+            <h2 className="absolute top-6 left-6 text-2xl font-semibold z-10">{title}</h2>
+            <div className="w-[280px] flex items-center justify-center rounded-lg overflow-hidden" style={{ aspectRatio: '3/4.5' }}>
+              <ModalImagePreview 
+                inlineOnly 
+                imageFile={imageFile}
+                editingCharacter={editingCharacter}
+                onImageClick={onImageClick}
+              />
+            </div>
+          </div>
+          {/* Form content container */}
+          <div className="flex-1 p-6 md:pl-0 flex flex-col min-w-[320px]">
+            <div className="flex items-center mb-4 flex-shrink-0 relative">
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-white text-3xl flex-shrink-0 absolute right-0 mt-4"
+              >
+                ×
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              {children}
+            </div>
+          </div>
         </div>
-        {children}
       </div>
-    </div>
+    </>
   );
 };
 
-// Icon components
-const EditIcon = ({ className = "" }: { className?: string }) => {
-  const iconBaseClass = "w-4 h-4";
-  return <span className={`${iconBaseClass} ${className || ''}`.trim()}>edit</span>;
+// ModalImagePreview now supports inlineOnly prop
+const ModalImagePreview: React.FC<{ 
+  inlineOnly?: boolean; 
+  imageFile?: File | null; 
+  editingCharacter?: CharacterCardData | null; 
+  onImageClick?: () => void;
+}> = ({ inlineOnly, imageFile, editingCharacter, onImageClick }) => {
+  // Use props if provided, otherwise fall back to window data
+  const data = inlineOnly ? { imageFile, editingCharacter } : (window as any)._modalImagePreviewData;
+  if (!data && !inlineOnly) return null;
+  
+  const { imageFile: dataImageFile, editingCharacter: dataEditingCharacter } = data || {};
+  const showImage = dataImageFile || (dataEditingCharacter && dataEditingCharacter.image_url);
+  
+  if (inlineOnly) {
+    return (
+      <div 
+        className="w-full h-full flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
+        onClick={onImageClick}
+      >
+        {showImage ? (
+          <img
+            src={dataImageFile ? URL.createObjectURL(dataImageFile) : dataEditingCharacter?.image_url || ''}
+            className="rounded-lg object-cover w-full h-full border border-gray-700 shadow-lg"
+            style={{ aspectRatio: '3/4.5' }}
+          />
+        ) : (
+          <div className="w-full h-full bg-app-surface rounded-lg flex items-center justify-center border border-gray-700">
+            <span className="material-icons-outlined text-6xl text-gray-400">person</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+  
+  if (!showImage) return null;
+  
+  return (
+    <div className="fixed left-1/2 top-1/2 -translate-x-[calc(100%+80px)] -translate-y-1/2 z-50 animate-slide-in-left pointer-events-none">
+      <img
+        src={dataImageFile ? URL.createObjectURL(dataImageFile) : dataEditingCharacter?.image_url || ''}
+        className="rounded-lg object-cover w-full h-full border border-gray-700 shadow-lg"
+        style={{ aspectRatio: '3/4.5' }}
+      />
+    </div>
+  );
 };
-const DeleteIcon = ({ className = "" }: { className?: string }) => {
-  const iconBaseClass = "w-4 h-4";
-  return <span className={`${iconBaseClass} ${className || ''}`.trim()}>delete</span>;
-};
-
-// Utility function for truncating filenames
-function truncateFilename(filename: string | null | undefined, maxLength = 20): string {
-  if (!filename) return "Select Image";
-  if (filename.length <= maxLength) return filename;
-  return filename.substring(0, maxLength - 3) + "...";
-}
 
 // Types
 interface SelectOption {
@@ -76,20 +129,11 @@ const initialFormFields: CharacterFormData = {
 };
 
 const CharactersPage: React.FC = () => {
-  const navigate = useNavigate();
   const handleImport = (data: any) => {
     // TODO: Implement import logic using extractJSONFromPNG or extractDataFromZip
     // For now, just log the data
     console.log('Imported character data:', data);
     // Example: setCharacters(importedCharacters);
-  };
-  const handleOpenChat = async (character: CharacterCardData) => {
-    try {
-      const chatId = await createOrGetCardChat('character', character.id);
-      navigate(`/chat/${chatId}`);
-    } catch (err) {
-      setError("Failed to start chat session");
-    }
   };
 
   // State management
@@ -242,29 +286,18 @@ const CharactersPage: React.FC = () => {
     setSelectedMasterWorldForForm(selectedOption);
   };
 
-  // Helper to handle image change or delete (unified logic)
-  const [imageRemoved, setImageRemoved] = useState<boolean>(false);
-  const handleImageChangeOrDelete = (file: File | null) => {
+  // Handle image selection
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (file) {
       setImageFile(file);
-      setImageRemoved(false); // New image selected, not removed
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    } else {
-      setImageFile(null);
-      if (editingCharacter && editingCharacter.image_url) {
-        setImageRemoved(true); // Mark for removal if editing and there was an image
-      } else {
-        setImageRemoved(false); // Just clear selection if creating new
-      }
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    handleImageChangeOrDelete(file || null); // No FileReader or setImagePreview
-  };
-  const handleRemoveImage = () => {
-    handleImageChangeOrDelete(null); // No setImagePreview(null)
+
+  // Handle image click to open file picker
+  const handleImageClick = () => {
+    fileInputRef.current?.click();
   };
 
   console.log("CharactersPage component rendering...");
@@ -278,7 +311,6 @@ const CharactersPage: React.FC = () => {
         instructions: character.instructions || "",
       });
       setImageFile(null);
-      setImageRemoved(false); // Reset imageRemoved when editing
       // Ensure we have valid arrays for dialogues and messages
       const dialogues = character.example_dialogues?.length
         ? character.example_dialogues.map((d: any) => String(d))
@@ -304,7 +336,6 @@ const CharactersPage: React.FC = () => {
       setCurrentExampleDialogues([""]);
       setCurrentDialogueIndex(0);
       setImageFile(null);
-      setImageRemoved(false); // Reset imageRemoved when creating
       setCurrentBeginningMessages([""]);
       setCurrentBmgIndex(0);
       setSelectedMasterWorldForForm(null);
@@ -322,6 +353,8 @@ const CharactersPage: React.FC = () => {
     setCurrentBmgIndex(0);
     setSelectedMasterWorldForForm(null);
     setError(null);
+    // Clean up window data
+    (window as any)._modalImagePreviewData = null;
   };
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -350,8 +383,6 @@ const CharactersPage: React.FC = () => {
     }
     if (imageFile) {
       characterFormData.append('image', imageFile);
-    } else if (editingCharacter && imageRemoved) {
-      characterFormData.append('remove_image', 'true');
     }
     setIsSubmitting(true);
     setError(null);
@@ -394,6 +425,16 @@ const CharactersPage: React.FC = () => {
   }));
 
   console.log("Characters data:", characters);
+
+  // Update window data for ModalImagePreview whenever relevant state changes
+  useEffect(() => {
+    if (isModalOpen) {
+      (window as any)._modalImagePreviewData = { 
+        imageFile, 
+        editingCharacter
+      };
+    }
+  }, [isModalOpen, imageFile, editingCharacter]);
 
   // Update image preview and card background logic
   useEffect(() => {
@@ -441,7 +482,7 @@ const CharactersPage: React.FC = () => {
             <div
               key={character.id}
               className="relative rounded-xl shadow-lg bg-app-surface cursor-pointer group min-w-[180px] max-w-[220px] aspect-[3/4.5] flex flex-col justify-end overflow-hidden"
-              onClick={() => handleOpenChat(character)}
+              onClick={() => handleOpenModal(character)}
             >
               {/* Card background image */}
               <CardImage
@@ -455,23 +496,15 @@ const CharactersPage: React.FC = () => {
                 <ExportButton cardData={character} cardType="character_card" imageUrl={character.image_url} />
                 <button
                   type="button"
-                  className="bg-app-surface/80 hover:bg-app-surface/90 rounded-full p-1 text-white"
-                  onClick={e => { e.stopPropagation(); handleOpenModal(character); }}
-                  title="Edit"
-                >
-                  <EditIcon />
-                </button>
-                <button
-                  type="button"
-                  className="bg-app-surface/80 hover:bg-red-700 rounded-full p-1 text-white"
+                  className="text-app-accent p-1"
                   onClick={e => { e.stopPropagation(); handleDelete(character.id); }}
                   title="Delete"
                 >
-                  <DeleteIcon />
+                  <span className="material-icons-outlined w-5 h-5">delete</span>
                 </button>
               </div>
               {/* Card footer with name */}
-              <div className="relative z-20 w-full px-3 pb-3 pt-8 flex flex-col justify-end min-h-[60px]">
+              <div className="relative z-20 w-full px-3 pb-3 pt-8 flex flex-col justify-end min-h-[30px] bg-black/60">
                 <span className="font-semibold text-lg text-white drop-shadow-md truncate" title={character.name}>{character.name}</span>
               </div>
             </div>
@@ -482,65 +515,58 @@ const CharactersPage: React.FC = () => {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         title={editingCharacter ? "Edit Character" : "Create New Character"}
+        imageFile={imageFile}
+        editingCharacter={editingCharacter}
+        onImageClick={handleImageClick}
       >
-        <div className="flex flex-row items-center justify-center gap-8 min-h-[320px]">
-          {/* Form section */}
-          <form
-            ref={formRef}
-            onSubmit={handleSubmit}
-            className="flex-1 space-y-2 max-h-[70vh] overflow-y-auto p-1 pr-4 custom-scrollbar min-w-[320px]"
-            style={{ maxWidth: 400 }}
-          >
-            {error && isModalOpen && (
-              <div className="bg-app-accent-2/20 border border-app-accent-3 text-app-accent p-3 rounded-md mb-4 text-sm">
-                ⚠️ {error}
-              </div>
-            )}
-            {/* Changed to a single column grid */}
-            <div className="grid grid-cols-1 gap-2">
-              {/* Image upload section */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Image</label>
-                <div className="flex items-center">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex-1 bg-app-surface hover:bg-gray-600 text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11 overflow-hidden whitespace-nowrap"
-                  >
-                    <span className="material-icons-outlined w-5 h-5 mr-2 flex-shrink-0">image</span>
-                    <span className="block truncate">
-                      {imageFile
-                        ? truncateFilename(imageFile.name)
-                        : (imageRemoved
-                            ? "Select Image"
-                            : (editingCharacter && editingCharacter.image_url
-                                ? truncateFilename(editingCharacter.image_url.split('/').pop() as string)
-                                : "Select Image"))}
-                    </span>
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleImageUpload}
-                  />
-                  <span className="h-11 w-px bg-gray-600" />
-                  <button
-                    type="button"
-                    onClick={handleRemoveImage}
-                    className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11"
-                    disabled={!(imageFile || (editingCharacter && editingCharacter.image_url && !imageRemoved))}
-                  >
-                    <DeleteIcon className="w-5 h-5" />
-                  </button>
+        {/* Remove the image preview from inside the modal's flex row */}
+        <form
+          ref={formRef}
+          onSubmit={handleSubmit}
+          className="flex-1 flex flex-col overflow-hidden"
+        >
+          <div className="flex-1 overflow-y-auto scrollbar-thin">
+            <div className="space-y-4">
+              {error && isModalOpen && (
+                <div className="bg-app-accent-2/20 border border-app-accent-3 text-app-accent p-3 rounded-md text-sm">
+                  ⚠️ {error}
                 </div>
+              )}
+              
+              {/* Hidden file input for image selection */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageUpload}
+              />
+              
+              {/* Name field - moved to first position */}
+              <div>
+                <label
+                  htmlFor="char-name"
+                  className="block text-sm font-medium text-app-accent-2 mb-2"
+                >
+                  Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  id="char-name"
+                  autoComplete="off"
+                  value={formFields.name}
+                  onChange={handleStaticInputChange}
+                  required
+                  className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
-              {/* Select Master World Section */}
+
+              {/* Select Master World Section - moved after Name */}
               <div>
                 <label
                   htmlFor="char-master_world"
-                  className="block text-sm font-medium text-gray-300 mb-2 mt-2"
+                  className="block text-sm font-medium text-gray-300 mb-2"
                 >
                   Master World
                 </label>
@@ -551,7 +577,7 @@ const CharactersPage: React.FC = () => {
                   onChange={handleMasterWorldChangeForForm}
                   isDisabled={isLoadingWorlds}
                   placeholder="Select Master World..."
-                  className="text-black mb-2"
+                  className="text-black"
                   classNamePrefix="react-select"
                   styles={{
                     control: (base, state) => ({
@@ -586,25 +612,8 @@ const CharactersPage: React.FC = () => {
                   }}
                 />
               </div>
-              {/* Name, Description, Instructions (usando formFields e handleStaticInputChange) */}
-              <div>
-                <label
-                  htmlFor="char-name"
-                  className="block text-sm font-medium text-app-accent-2 mb-2"
-                >
-                  Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  id="char-name"
-                  autoComplete="off"
-                  value={formFields.name}
-                  onChange={handleStaticInputChange}
-                  required
-                  className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500 mb-2"
-                />
-              </div>
+              
+              {/* Description field */}
               <div>
                 <label
                   htmlFor="char-description"
@@ -619,9 +628,11 @@ const CharactersPage: React.FC = () => {
                   rows={4}
                   value={formFields.description}
                   onChange={handleStaticInputChange}
-                  className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500 mb-2"
+                  className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
+
+              {/* Instructions field */}
               <div>
                 <label
                   htmlFor="char-instructions"
@@ -636,9 +647,10 @@ const CharactersPage: React.FC = () => {
                   rows={4}
                   value={formFields.instructions}
                   onChange={handleStaticInputChange}
-                  className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500 mb-2"
+                  className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
+              
               {/* Example Dialogues Section */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
@@ -700,8 +712,9 @@ const CharactersPage: React.FC = () => {
                   </button>
                 </div>
               </div>
+              
               {/* Beginning Messages Section */}
-              <div className="space-y-2 mt-2">
+              <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label
                     htmlFor="char-current_bmg"
@@ -761,8 +774,9 @@ const CharactersPage: React.FC = () => {
                   </button>
                 </div>
               </div>
+
               {/* Save & Export Button Row */}
-              <div className="flex gap-2 mt-4">
+              <div className="flex gap-2 pt-4">
                 <button
                   type="submit"
                   className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
@@ -776,24 +790,8 @@ const CharactersPage: React.FC = () => {
                 )}
               </div>
             </div>
-          </form>
-          {/* Image preview section, always 3/4.5 aspect ratio, large, centered */}
-          <div className="flex-shrink-0 flex items-center justify-center" style={{ minWidth: 240, maxWidth: 320 }}>
-            <div className="w-[240px] max-w-[320px] aspect-[3/4.5] flex items-center justify-center">
-              {(imageFile || (editingCharacter && editingCharacter.image_url && !imageRemoved)) ? (
-                <img
-                  src={imageFile ? URL.createObjectURL(imageFile) : editingCharacter?.image_url || ''}
-                  className="rounded-lg object-cover w-full h-full border border-gray-700 shadow"
-                  style={{ aspectRatio: '3/4.5' }}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-500 rounded-lg border border-gray-700" style={{ aspectRatio: '3/4.5' }}>
-                  <span className="material-icons-outlined text-5xl">image</span>
-                </div>
-              )}
-            </div>
           </div>
-        </div>
+        </form>
       </Modal>
     </div>
   );
