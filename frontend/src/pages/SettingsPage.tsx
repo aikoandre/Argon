@@ -20,12 +20,10 @@ const SettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<UserSettingsUpdateData>({
     selected_llm_model: "",
     primary_llm_api_key: "",
-    planning_llm_api_key: "",
     extraction_llm_api_key: "",
     analysis_llm_api_key: "",
     mistral_api_key: "",
     extraction_llm_model: "",
-    planning_llm_model: "",
     analysis_llm_model: "",
   });
   const [activeTab, setActiveTab] = useState<string>("primary"); // New state for active tab
@@ -60,10 +58,6 @@ const SettingsPage: React.FC = () => {
     return groupedOptions;
   }, [availableModels]);
 
-  const hasMistralModels = useMemo((): boolean => {
-    return availableModels.some(model => model.provider === "Mistral");
-  }, [availableModels]);
-
   const selectedModelOption = useMemo((): SelectOption | null => {
     return (
       modelOptions.find(
@@ -92,27 +86,6 @@ const SettingsPage: React.FC = () => {
       ) || null
     );
   }, [extractionModelOptions, settings.extraction_llm_model]);
-
-  const planningModelOptions = useMemo((): SelectOption[] => {
-    const openRouterModels = availableModels.filter(model => model.provider === "OpenRouter");
-    const groupedOptions: SelectOption[] = [];
-
-    if (openRouterModels.length > 0) {
-      groupedOptions.push({ value: "OpenRouter-Header", label: "--- OpenRouter Models ---", isDisabled: true });
-      openRouterModels.forEach(model => {
-        groupedOptions.push({ value: model.id, label: model.name || model.id, provider: model.provider });
-      });
-    }
-    return groupedOptions;
-  }, [availableModels]);
-
-  const selectedPlanningModelOption = useMemo((): SelectOption | null => {
-    return (
-      planningModelOptions.find(
-        (option) => option.value === settings.planning_llm_model && !option.isDisabled
-      ) || null
-    );
-  }, [planningModelOptions, settings.planning_llm_model]);
 
   const analysisModelOptions = useMemo((): SelectOption[] => {
     const openRouterModels = availableModels.filter(model => model.provider === "OpenRouter");
@@ -149,24 +122,20 @@ const SettingsPage: React.FC = () => {
           setSettings({
             selected_llm_model: settingsData.selected_llm_model || "",
             primary_llm_api_key: settingsData.primary_llm_api_key || "",
-            planning_llm_api_key: settingsData.planning_llm_api_key || "",
             extraction_llm_api_key: settingsData.extraction_llm_api_key || "",
             analysis_llm_api_key: settingsData.analysis_llm_api_key || "",
             mistral_api_key: settingsData.mistral_api_key || "",
             extraction_llm_model: settingsData.extraction_llm_model || "",
-            planning_llm_model: settingsData.planning_llm_model || "",
             analysis_llm_model: settingsData.analysis_llm_model || "",
           });
         } else {
           setSettings({
             selected_llm_model: "",
             primary_llm_api_key: "",
-            planning_llm_api_key: "",
             extraction_llm_api_key: "",
             analysis_llm_api_key: "",
             mistral_api_key: "",
             extraction_llm_model: "",
-            planning_llm_model: "",
             analysis_llm_model: "",
           });
         }
@@ -199,15 +168,6 @@ const SettingsPage: React.FC = () => {
     setError(null);
   };
 
-  const handlePlanningModelChange = (selectedOption: SingleValue<SelectOption>) => {
-    setSettings((prev) => ({
-      ...prev,
-      planning_llm_model: selectedOption ? selectedOption.value : "",
-    }));
-    setSuccessMessage(null);
-    setError(null);
-  };
-
   const handleAnalysisModelChange = (selectedOption: SingleValue<SelectOption>) => {
     setSettings((prev) => ({
       ...prev,
@@ -221,15 +181,6 @@ const SettingsPage: React.FC = () => {
     setSettings((prev) => ({
       ...prev,
       primary_llm_api_key: e.target.value,
-    }));
-    setSuccessMessage(null);
-    setError(null);
-  };
-
-  const handlePlanningApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSettings((prev) => ({
-      ...prev,
-      planning_llm_api_key: e.target.value,
     }));
     setSuccessMessage(null);
     setError(null);
@@ -312,17 +263,6 @@ const SettingsPage: React.FC = () => {
             onClick={() => setActiveTab("primary")}
           >
             Primary
-          </button>
-          <button
-            type="button"
-            className={`py-2 px-4 text-sm font-medium ${
-              activeTab === "planning"
-                ? "border-b-2 border-app-accent-2 text-app-accent-2"
-                : "text-gray-400 hover:text-white"
-            }`}
-            onClick={() => setActiveTab("planning")}
-          >
-            Planning
           </button>
           <button
             type="button"
@@ -447,108 +387,6 @@ const SettingsPage: React.FC = () => {
                   autoComplete="current-password"
                   value={settings.primary_llm_api_key || ""}
                   onChange={handlePrimaryApiKeyChange}
-                  disabled={isLoading}
-                  placeholder="sk-or-..."
-                  className="w-full p-2.5 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white focus:outline-none"
-                  aria-label={showApiKey ? "Hide API Key" : "Show API Key"}
-                >
-                  <span className="material-icons">
-                    {showApiKey ? "visibility_off" : "visibility"}
-                  </span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "planning" && (
-          <div className="space-y-6">
-            <div>
-              <label
-                htmlFor="planning_llm_model_input"
-                className="block text-sm font-medium text-app-accent-2 mb-1"
-              >
-                Planning LLM Model (OpenRouter):
-              </label>
-              <Select<SelectOption>
-                inputId="planning_llm_model_input"
-                options={planningModelOptions}
-                value={selectedPlanningModelOption}
-                onChange={handlePlanningModelChange}
-                isLoading={isLoading}
-                isClearable
-                isSearchable
-                placeholder="-- Type or select a Planning Model --"
-                noOptionsMessage={() =>
-                  isLoading
-                    ? "Loading models..."
-                    : modelsError
-                    ? "Could not load"
-                    : "No models found"
-                }
-                isDisabled={isLoading || modelsError !== null}
-                className="react-select-container"
-                classNamePrefix="react-select"
-                styles={{
-                  control: (base, state) => ({
-                    ...base,
-                    backgroundColor: "#343a40",
-                    borderColor: state.isFocused ? "#f8f9fa" : "#343a40",
-                    boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
-                    "&:hover": { borderColor: "#f8f9fa" },
-                    minHeight: "42px",
-                  }),
-                  singleValue: (base) => ({ ...base, color: "white" }),
-                  menu: (base) => ({
-                    ...base,
-                    backgroundColor: "#495057",
-                    zIndex: 10,
-                  }),
-                  option: (base, { isFocused, isSelected }) => ({
-                    ...base,
-                    backgroundColor: isSelected
-                      ? "#adb5bd"
-                      : isFocused
-                      ? "#dee2e6"
-                      : "#495057",
-                    color: isSelected || isFocused ? "#212529" : "#fff",
-                    ":active": { backgroundColor: "#f8f9fa", color: "#212529" },
-                  }),
-                  placeholder: (base) => ({ ...base, color: "#9CA3AF" }),
-                  input: (base) => ({ ...base, color: "white" }),
-                  dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
-                  clearIndicator: (base) => ({
-                    ...base,
-                    color: "#9CA3AF",
-                    ":hover": { color: "white" },
-                  }),
-                  indicatorSeparator: (base) => ({
-                    ...base,
-                    backgroundColor: "#343a40",
-                  }),
-                }}
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="planning_llm_api_key"
-                className="block text-sm font-medium text-app-accent-2 mb-1"
-              >
-                Planning LLM API Key:
-              </label>
-              <div className="relative">
-                <input
-                  type={showApiKey ? "text" : "password"}
-                  id="planning_llm_api_key"
-                  name="planning_llm_api_key"
-                  autoComplete="current-password"
-                  value={settings.planning_llm_api_key || ""}
-                  onChange={handlePlanningApiKeyChange}
                   disabled={isLoading}
                   placeholder="sk-or-..."
                   className="w-full p-2.5 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 pr-10"

@@ -7,3 +7,31 @@ node_modules/
 __pycache__/
 are_database.db
 static/
+
+# Alembic migration files (except versions/ if you want to keep migration scripts)
+backend/alembic/README
+backend/alembic/env.py
+backend/alembic/script.py.mako
+backend/alembic/__pycache__/
+backend/alembic/versions/__pycache__/
+
+# Memory bank
+memory-bank/
+
+# Cline rules
+.clinerules
+
+# FAISS files
+faiss_id_map.npy
+faiss_index.bin
+
+# All files inside static/images and its subfolders
+static/images/*
+static/images/characters/*
+static/images/lore/*
+static/images/personas/*
+static/images/scenarios/*
+static/images/worlds/*
+
+# Other files
+# (add more as needed)

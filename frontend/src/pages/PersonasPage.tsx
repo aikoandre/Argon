@@ -13,6 +13,9 @@ import {
   type MasterWorldData,
 } from "../services/api";
 import { CardImage } from '../components/CardImage';
+import { createPNGWithEmbeddedData } from '../utils/pngExport';
+import { AnimatePresence, motion } from 'framer-motion';
+import ExportButton from '../components/ExportButton';
 
 const iconBaseClass = "material-icons-outlined text-2xl flex-shrink-0";
 const EditIcon = ({ className }: { className?: string }) => (
@@ -304,6 +307,61 @@ const PersonasPage: React.FC = () => {
     }
   };
 
+  // Add handleExport function for persona export
+  const handleExport = async (persona: UserPersonaData) => {
+    try {
+      // Use ExportButton logic: prefer PNG unless persona has a masterWorld
+      // (If you want ZIP with masterWorld/lore, you can extend this logic)
+      const pngBlob = await createPNGWithEmbeddedData(persona, 'user_persona', persona.image_url);
+      const filename = `${(persona.name || 'persona').replace(/[^a-zA-Z0-9\-_]/g, '_').substring(0, 50)}.png`;
+      const url = URL.createObjectURL(pngBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError('Failed to export persona');
+      console.error(err);
+    }
+  };
+
+  // New handler for file import
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      if (file.name.endsWith('.png')) {
+        // Use extractJSONFromPNG for PNG import
+        const { extractJSONFromPNG } = await import('../utils/pngExport');
+        const data = await extractJSONFromPNG(file);
+        if (data && data.data) {
+          handleOpenModal(data.data);
+        } else {
+          setError('No persona data found in PNG.');
+        }
+      } else if (file.name.endsWith('.zip')) {
+        // Use extractDataFromZip for ZIP import
+        const { extractDataFromZip } = await import('../utils/zipExport');
+        const data = await extractDataFromZip(file);
+        if (data && data.data) {
+          handleOpenModal(data.data as UserPersonaData);
+        } else {
+          setError('No persona data found in ZIP.');
+        }
+      } else {
+        setError('Invalid file type. Please upload a PNG or ZIP file.');
+      }
+    } catch (err) {
+      setError('Failed to import file.');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Helper function for truncating filenames
   const truncateFilename = (filename: string | null | undefined, maxLength = 20): string => {
@@ -329,14 +387,29 @@ const PersonasPage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-4 md:p-8 text-white">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <h1 className="text-4xl font-bold text-white font-quintessential">My Personas</h1>
-        <button
-          onClick={() => handleOpenModal()}
-          className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
-        >
-          New +
-        </button>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-4xl font-bold font-quintessential text-white">Personas</h1>
+        <div>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md mr-2"
+          >
+            Import
+          </button>
+          <input
+            type="file"
+            accept=".png,.zip"
+            style={{ display: 'none' }}
+            ref={fileInputRef}
+            onChange={handleImportFile}
+          />
+          <button
+            onClick={() => handleOpenModal()}
+            className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
+          >
+            New +
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -378,6 +451,13 @@ const PersonasPage: React.FC = () => {
               >
                 <DeleteIcon className="h-5 w-5" />
               </button>
+              <button
+                onClick={e => { e.stopPropagation(); handleExport(persona); }}
+                className="text-gray-400 hover:text-green-500 transition-colors p-1 rounded-full"
+                title="Export Persona"
+              >
+                <span className="material-icons-outlined h-5 w-5">file_download</span>
+              </button>
             </div>
             <div className="absolute bottom-0 left-0 w-full bg-black/30 backdrop-blur-sm p-3 flex items-center rounded-b-lg">
               <h2 className="text-lg font-semibold text-white break-words whitespace-normal flex-1 leading-snug truncate" title={persona.name}>{persona.name}</h2>
@@ -394,142 +474,166 @@ const PersonasPage: React.FC = () => {
         onClose={handleCloseModal}
         title={editingPersona ? "Edit Persona" : "Create New Persona"}
       >
-        <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto p-1 pr-2 hide-scrollbar bg-app-bg rounded-lg">
-          {error && isModalOpen && (
-            <p className="bg-red-700 text-white p-3 rounded-md text-sm text-center">
-              {error}
-            </p>
-          )}
-          {/* Image upload section */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Image</label>
-            <div className="flex items-center">
-                  <button 
-                    type="button" 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex-1 bg-app-surface hover:bg-gray-600 text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11 overflow-hidden whitespace-nowrap"
-                  >
-                    <span className="material-icons-outlined w-5 h-5 mr-2 flex-shrink-0">image</span>
-                    <span className="block truncate">
-                      {imageFile
-                        ? truncateFilename(imageFile.name)
-                        : (imageRemoved
-                            ? "Select Image"
-                            : (editingPersona && editingPersona.image_url
-                                ? truncateFilename(editingPersona.image_url.split('/').pop() as string)
-                                : "Select Image"))}
-                    </span>
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleImageUpload}
-                  />
-                  <span className="h-11 w-px bg-gray-600" />
-                  <button 
-                    type="button" 
-                    onClick={handleRemoveImage}
-                    className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11"
-                    disabled={!(imageFile || (editingPersona && editingPersona.image_url && !imageRemoved))}
-                  >
-                    <span className="material-icons-outlined w-5 h-5">delete</span>
-                  </button>
-                </div>
+        <div className="flex flex-row gap-4 min-h-[320px] items-center justify-center">
+          {/* Form section */}
+          <form
+            onSubmit={handleSubmit}
+            className="flex-1 space-y-2 max-h-[70vh] overflow-y-auto p-1 pr-4 custom-scrollbar min-w-[320px]"
+            style={{ maxWidth: 400 }}
+          >
+            {error && isModalOpen && (
+              <p className="bg-red-700 text-white p-3 rounded-md text-sm text-center">
+                {error}
+              </p>
+            )}
+            <div className="mb-2">
+              <label className="block text-sm font-medium text-gray-300 mb-2">Image</label>
+              <div className="flex items-center">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-1 bg-app-surface hover:bg-gray-600 text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11 overflow-hidden whitespace-nowrap"
+                >
+                  <span className="material-icons-outlined w-5 h-5 mr-2 flex-shrink-0">image</span>
+                  <span className="block truncate">
+                    {imageFile
+                      ? truncateFilename(imageFile.name)
+                      : (imageRemoved
+                          ? "Select Image"
+                          : (editingPersona && editingPersona.image_url
+                              ? truncateFilename(editingPersona.image_url.split('/').pop() as string)
+                              : "Select Image"))}
+                  </span>
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageUpload}
+                />
+                <span className="h-11 w-px bg-gray-600" />
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11"
+                  disabled={!(imageFile || (editingPersona && editingPersona.image_url && !imageRemoved))}
+                >
+                  <DeleteIcon className="w-5 h-5" />
+                </button>
               </div>
-          <div>
-            <label
-              htmlFor="persona-master_world"
-              className="block text-sm font-medium text-gray-300 mb-1"
-            >
-              Master World (Optional)
-            </label>
-            <Select<SelectOption>
-              inputId="persona-master_world"
-              options={masterWorlds.map((w) => ({ value: w.id, label: w.name }))}
-              value={selectedMasterWorldForForm}
-              onChange={handleMasterWorldChangeForForm}
-              isDisabled={isLoadingWorlds}
-              placeholder="Select Master World..."
-              isClearable={true}
-              className="text-black"
-              classNamePrefix="react-select"
-              styles={{
-                control: (base, state) => ({
-                  ...base,
-                  backgroundColor: "#343a40",
-                  borderColor: state.isFocused ? "#f8f9fa" : "#343a40",
-                  boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
-                  "&:hover": { borderColor: "#f8f9fa" },
-                  minHeight: "42px",
-                }),
-                singleValue: (base) => ({ ...base, color: "white" }),
-                menu: (base) => ({
-                  ...base,
-                  backgroundColor: "#495057",
-                  zIndex: 10,
-                }),
-                option: (base, { isFocused, isSelected }) => ({
-                  ...base,
-                  backgroundColor: isSelected
-                    ? "#adb5bd"
-                    : isFocused
-                    ? "#dee2e6"
-                    : "#495057",
-                  color: isSelected || isFocused ? "#212529" : "#fff",
-                  ':active': { backgroundColor: "#f8f9fa", color: "#212529" },
-                }),
-                placeholder: (base) => ({ ...base, color: "#9CA3AF" }),
-                input: (base) => ({ ...base, color: "#fff" }),
-                dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
-                clearIndicator: (base) => ({ ...base, color: "#9CA3AF", ':hover': { color: "#fff" } }),
-                indicatorSeparator: (base) => ({ ...base, backgroundColor: "#343a40" }),
-              }}
-            />
+            </div>
+            <div>
+              <label htmlFor="persona-master_world" className="block text-sm font-medium text-gray-300 mb-1">Master World (Optional)</label>
+              <Select<SelectOption>
+                inputId="persona-master_world"
+                options={masterWorlds.map((w) => ({ value: w.id, label: w.name }))}
+                value={selectedMasterWorldForForm}
+                onChange={handleMasterWorldChangeForForm}
+                isDisabled={isLoadingWorlds}
+                placeholder="Select Master World..."
+                isClearable={true}
+                className="text-black"
+                classNamePrefix="react-select"
+                styles={{
+                  control: (base, state) => ({
+                    ...base,
+                    backgroundColor: "#343a40",
+                    borderColor: state.isFocused ? "#f8f9fa" : "#343a40",
+                    boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
+                    "&:hover": { borderColor: "#f8f9fa" },
+                    minHeight: "42px",
+                  }),
+                  singleValue: (base) => ({ ...base, color: "white" }),
+                  menu: (base) => ({ ...base, backgroundColor: "#495057", zIndex: 10 }),
+                  option: (base, { isFocused, isSelected }) => ({
+                    ...base,
+                    backgroundColor: isSelected
+                      ? "#adb5bd"
+                      : isFocused
+                      ? "#dee2e6"
+                      : "#495057",
+                    color: isSelected || isFocused ? "#212529" : "#fff",
+                    ':active': { backgroundColor: "#f8f9fa", color: "#212529" },
+                  }),
+                  placeholder: (base) => ({ ...base, color: "#9CA3AF" }),
+                  input: (base) => ({ ...base, color: "#fff" }),
+                  dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
+                  clearIndicator: (base) => ({ ...base, color: "#9CA3AF", ':hover': { color: "#fff" } }),
+                  indicatorSeparator: (base) => ({ ...base, backgroundColor: "#343a40" }),
+                }}
+              />
+            </div>
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1">Name <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                name="name"
+                id="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                required
+                className="w-full p-2 bg-app-surface border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="description" className="block text-sm font-medium text-gray-300 mb-1">Description</label>
+              <textarea
+                name="description"
+                id="description"
+                rows={4}
+                value={formData.description || ""}
+                onChange={handleInputChange}
+                className="w-full p-2 bg-app-surface border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                type="submit"
+                className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
+                disabled={isLoading}
+              >
+                {isLoading ? (editingPersona ? "Saving..." : "Creating...") : (editingPersona ? "Save Changes" : "Create Persona")}
+              </button>
+              {/* Export button inside modal */}
+              {editingPersona && (
+                <ExportButton cardData={editingPersona} cardType="user_persona" imageUrl={editingPersona.image_url} />
+              )}
+            </div>
+          </form>
+          {/* Image preview section, always 3/4.5 aspect ratio, large, centered, with framer-motion pop-up */}
+          <div className="flex-shrink-0 flex items-center justify-center" style={{ minWidth: 240, maxWidth: 320 }}>
+            <div className="w-[240px] max-w-[320px] aspect-[3/4.5] flex items-center justify-center">
+              <AnimatePresence>
+                {(imageFile || (editingPersona && editingPersona.image_url && !imageRemoved)) ? (
+                  <motion.img
+                    key="persona-image-preview"
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                    src={imageFile ? URL.createObjectURL(imageFile) : editingPersona?.image_url || ''}
+                    alt="Preview"
+                    className="rounded-lg object-cover w-full h-full border border-gray-700 shadow"
+                    style={{ aspectRatio: '3/4.5' }}
+                  />
+                ) : (
+                  <motion.div
+                    key="persona-image-placeholder"
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                    className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-500 rounded-lg border border-gray-700"
+                    style={{ aspectRatio: '3/4.5' }}
+                  >
+                    <span className="material-icons-outlined text-5xl">image</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
-          <div>
-            <label
-              htmlFor="name"
-              className="block text-sm font-medium text-gray-300 mb-1"
-            >
-              Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="name"
-              id="name"
-              value={formData.name}
-              onChange={handleInputChange}
-              required
-              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="description"
-              className="block text-sm font-medium text-gray-300 mb-1"
-            >
-              Description
-            </label>
-            <textarea
-              name="description"
-              id="description"
-              rows={4}
-              value={formData.description || ""}
-              onChange={handleInputChange}
-              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-          <div className="flex justify-end space-x-3 pt-2">
-            <button
-              type="submit"
-              className="px-4 py-2 text-sm bg-app-accent-2 text-app-surface rounded-md font-medium disabled:opacity-50"
-            >
-              {editingPersona ? "Save Changes" : "Create Persona"}
-            </button>
-          </div>
-        </form>
+        </div>
       </Modal>
     </div>
   );

@@ -11,21 +11,17 @@ import {
   getMasterWorldById,
   searchLoreEntries, // Import the new search function
   type LoreEntryData,
-  type LoreEntryCreateData,
-  type LoreEntryUpdateData,
-  type MasterWorldData
+  type MasterWorldData,
 } from '../services/api';
 
 import { useRef } from 'react';
 import { CardImage } from '../components/CardImage';
 import useDebounce from '../hooks/useDebounce';
+import { AnimatePresence, motion } from 'framer-motion';
 
 const iconBaseClass = "material-icons-outlined text-2xl flex-shrink-0";
 const DeleteIcon = ({ className }: { className?: string }) => (
   <span className={`${iconBaseClass} ${className || ''}`.trim()}>delete</span>
-);
-const ImageIcon = ({ className }: { className?: string }) => (
-  <span className={`${iconBaseClass} ${className || ''}`.trim()}>image</span>
 );
 
 const VALID_ENTRY_TYPES = ["CHARACTER_LORE", "LOCATION", "FACTION", "ITEM", "CONCEPT", "NARRATIVE_EVENT"];
@@ -118,10 +114,6 @@ const LoreEntriesPage: React.FC = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null); // Track current image
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleSelectImageClick = () => {
-    fileInputRef.current?.click();
-  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -426,159 +418,212 @@ const LoreEntriesPage: React.FC = () => {
 
         </div>
 
-:start_line:437
--------
-        <Modal isOpen={isModalOpen} onClose={handleCloseModal} title={editingEntry ? 'Edit Lore Entry' : 'Create New Lore Entry'}>
-          <form onSubmit={handleSubmit} className="space-y-4 max-h-[80vh] overflow-y-auto p-1 pr-2 custom-scrollbar">
-            {/* Campo de imagem opcional - agora antes do campo Name, label em cima */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Image</label>
-              <div className="flex items-center">
-                <button
-                  type="button"
-                  onClick={handleSelectImageClick}
-                  className="flex-1 bg-app-surface text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11 overflow-hidden whitespace-nowrap"
-                >
-                  <ImageIcon className="w-5 h-5 mr-2" />
-                  <span>{imageFile ? truncateFilename(imageFile.name) : currentImageUrl ? `Current: ${truncateFilename(currentImageUrl.split('/').pop() as string)}` : "Select Image"}</span>
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageUpload}
-                />
-                <span className="h-11 w-px bg-app-surface" />
-                <button
-                  type="button"
-                  className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11"
-                  onClick={handleRemoveImage}
-                  disabled={!imageFile && !currentImageUrl}
-                  title="Remove image"
-                >
-                  <DeleteIcon className="w-5 h-5" />
-                </button>
+        <Modal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          title={editingEntry ? "Edit Lore Entry" : "Create New Lore Entry"}
+        >
+          <div className="flex flex-row gap-4 min-h-[320px] items-center justify-center">
+            {/* Form section */}
+            <form
+              onSubmit={handleSubmit}
+              className="flex-1 space-y-2 max-h-[70vh] overflow-y-auto p-1 pr-4 custom-scrollbar min-w-[320px]"
+              style={{ maxWidth: 400 }}
+            >
+              {/* Campo de imagem opcional - agora antes do campo Name, label em cima */}
+              <div className="mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">Image</label>
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex-1 bg-app-surface hover:bg-gray-600 text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11 overflow-hidden whitespace-nowrap"
+                  >
+                    <span className="material-icons-outlined w-5 h-5 mr-2 flex-shrink-0">image</span>
+                    <span className="block truncate">
+                      {imageFile
+                        ? truncateFilename(imageFile.name)
+                        : (currentImageUrl
+                            ? truncateFilename(currentImageUrl.split('/').pop() as string)
+                            : "Select Image")}
+                    </span>
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                  />
+                  <span className="h-11 w-px bg-gray-600" />
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11"
+                    disabled={!(imageFile || currentImageUrl)}
+                  >
+                    <DeleteIcon className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
-            </div>
-            <div>
-              <label htmlFor="le-name" className="block text-sm font-medium text-gray-300 mb-1">Name <span className="text-app-accent">*</span></label>
-              <input type="text" name="name" id="le-name" value={formData.name} onChange={handleInputChange} required
-                     className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white" autoComplete="off"/>
-            </div>
-            <div>
-              <label htmlFor="le-entry_type" className="block text-sm font-medium text-gray-300 mb-1">Entry Type <span className="text-app-accent">*</span></label>
-              <Select<SelectOption>
-                  inputId="le-entry_type" name="entry_type" options={entryTypeOptions}
-                  value={entryTypeOptions.find(opt => opt.value === formData.entry_type) || null}
-                  onChange={(opt) => handleSelectChange(opt as SingleValue<SelectOption>, { name: 'entry_type' })}
-                  classNamePrefix="react-select"
-                  styles={{
-                    control: (base, state) => ({
-                      ...base,
-                      backgroundColor: "#343a40", // bg-app-surface
-                      borderColor: state.isFocused ? "#f8f9fa" : "#343a40", // app-accent or app-surface
-                      boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
-                      '&:hover': { borderColor: "#f8f9fa" },
-                      minHeight: "42px",
-                    }),
-                    singleValue: (base, state) => ({
-                      ...base,
-                      color: state.isDisabled ? "#6B7280" : "#fff"
-                    }),
-                    menu: (base) => ({ ...base, backgroundColor: "#343a40", zIndex: 10 }),
-                    option: (base, { isFocused, isSelected }) => ({
-                      ...base,
-                      backgroundColor: isSelected
-                        ? "#f8f9fa" // app-accent
-                        : isFocused
-                        ? "#dee2e6" // app-accent-2
-                        : "#343a40", // app-surface
-                      color: isSelected || isFocused ? "#212529" : "#fff", // text-app-bg or white
-                      ':active': { backgroundColor: "#f8f9fa", color: "#212529" },
-                    }),
-                    placeholder: (base) => ({ ...base, color: "#9CA3AF" }),
-                    input: (base) => ({ ...base, color: "#fff" }),
-                    dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
-                    clearIndicator: (base) => ({ ...base, color: "#9CA3AF", ':hover': { color: "#fff" } }),
-                    indicatorSeparator: (base) => ({ ...base, backgroundColor: "#343a40" }),
-                  }}
-              />
-            </div>
-            {formData.entry_type === "CHARACTER_LORE" && (
               <div>
-                <label htmlFor="le-faction_id" className="block text-sm font-medium text-gray-300 mb-1">Group</label>
+                <label htmlFor="le-name" className="block text-sm font-medium text-gray-300 mb-1">Name <span className="text-app-accent">*</span></label>
+                <input type="text" name="name" id="le-name" value={formData.name} onChange={handleInputChange} required
+                       className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white" autoComplete="off"/>
+              </div>
+              <div>
+                <label htmlFor="le-entry_type" className="block text-sm font-medium text-gray-300 mb-1">Entry Type <span className="text-app-accent">*</span></label>
                 <Select<SelectOption>
-                  inputId="le-faction_id" name="faction_id" options={factionsOptions}
-                  value={factionsOptions.find(opt => opt.value === formData.faction_id) || null}
-                  onChange={(opt) => handleSelectChange(opt as SingleValue<SelectOption>, { name: 'faction_id' })}
-                  isClearable placeholder="Select a faction..."
-                  classNamePrefix="react-select"
-                  noOptionsMessage={() => factionsOptions.length === 0 ? "No groups in this world. Create one first!" : "No options"}
-                  styles={{
-                    control: (base, state) => ({
-                      ...base,
-                      backgroundColor: "#343a40", // bg-app-surface
-                      borderColor: state.isFocused ? "#f8f9fa" : "#343a40", // app-accent or app-surface
-                      boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
-                      '&:hover': { borderColor: "#f8f9fa" },
-                      minHeight: "42px",
-                    }),
-                    singleValue: (base, state) => ({
-                      ...base,
-                      color: state.isDisabled ? "#6B7280" : "#fff"
-                    }),
-                    menu: (base) => ({ ...base, backgroundColor: "#343a40", zIndex: 10 }),
-                    option: (base, { isFocused, isSelected }) => ({
-                      ...base,
-                      backgroundColor: isSelected
-                        ? "#f8f9fa" // app-accent
-                        : isFocused
-                        ? "#dee2e6" // app-accent-2
-                        : "#343a40", // app-surface
-                      color: isSelected || isFocused ? "#212529" : "#fff", // text-app-bg or white
-                      ':active': { backgroundColor: "#f8f9fa", color: "#212529" },
-                    }),
-                    placeholder: (base) => ({ ...base, color: "#9CA3AF" }),
-                    input: (base) => ({ ...base, color: "#fff" }),
-                    dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
-                    clearIndicator: (base) => ({ ...base, color: "#9CA3AF", ':hover': { color: "#fff" } }),
-                    indicatorSeparator: (base) => ({ ...base, backgroundColor: "#343a40" }),
-                  }}
+                    inputId="le-entry_type" name="entry_type" options={entryTypeOptions}
+                    value={entryTypeOptions.find(opt => opt.value === formData.entry_type) || null}
+                    onChange={(opt) => handleSelectChange(opt as SingleValue<SelectOption>, { name: 'entry_type' })}
+                    classNamePrefix="react-select"
+                    styles={{
+                      control: (base, state) => ({
+                        ...base,
+                        backgroundColor: "#343a40", // bg-app-surface
+                        borderColor: state.isFocused ? "#f8f9fa" : "#343a40", // app-accent or app-surface
+                        boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
+                        '&:hover': { borderColor: "#f8f9fa" },
+                        minHeight: "42px",
+                      }),
+                      singleValue: (base, state) => ({
+                        ...base,
+                        color: state.isDisabled ? "#6B7280" : "#fff"
+                      }),
+                      menu: (base) => ({ ...base, backgroundColor: "#343a40", zIndex: 10 }),
+                      option: (base, { isFocused, isSelected }) => ({
+                        ...base,
+                        backgroundColor: isSelected
+                          ? "#f8f9fa" // app-accent
+                          : isFocused
+                          ? "#dee2e6" // app-accent-2
+                          : "#343a40", // app-surface
+                        color: isSelected || isFocused ? "#212529" : "#fff", // text-app-bg or white
+                        ':active': { backgroundColor: "#f8f9fa", color: "#212529" },
+                      }),
+                      placeholder: (base) => ({ ...base, color: "#9CA3AF" }),
+                      input: (base) => ({ ...base, color: "#fff" }),
+                      dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
+                      clearIndicator: (base) => ({ ...base, color: "#9CA3AF", ':hover': { color: "#fff" } }),
+                      indicatorSeparator: (base) => ({ ...base, backgroundColor: "#343a40" }),
+                    }}
                 />
               </div>
-            )}
-            <div>
-              <label htmlFor="le-description" className="block text-sm font-medium text-gray-300 mb-1">Description</label>
-              <textarea name="description" id="le-description" rows={3} value={formData.description} onChange={handleInputChange}
-                        className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white" autoComplete="off"/>
+              {formData.entry_type === "CHARACTER_LORE" && (
+                <div>
+                  <label htmlFor="le-faction_id" className="block text-sm font-medium text-gray-300 mb-1">Group</label>
+                  <Select<SelectOption>
+                    inputId="le-faction_id" name="faction_id" options={factionsOptions}
+                    value={factionsOptions.find(opt => opt.value === formData.faction_id) || null}
+                    onChange={(opt) => handleSelectChange(opt as SingleValue<SelectOption>, { name: 'faction_id' })}
+                    isClearable placeholder="Select a faction..."
+                    classNamePrefix="react-select"
+                    noOptionsMessage={() => factionsOptions.length === 0 ? "No groups in this world. Create one first!" : "No options"}
+                    styles={{
+                      control: (base, state) => ({
+                        ...base,
+                        backgroundColor: "#343a40", // bg-app-surface
+                        borderColor: state.isFocused ? "#f8f9fa" : "#343a40", // app-accent or app-surface
+                        boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
+                        '&:hover': { borderColor: "#f8f9fa" },
+                        minHeight: "42px",
+                      }),
+                      singleValue: (base, state) => ({
+                        ...base,
+                        color: state.isDisabled ? "#6B7280" : "#fff"
+                      }),
+                      menu: (base) => ({ ...base, backgroundColor: "#343a40", zIndex: 10 }),
+                      option: (base, { isFocused, isSelected }) => ({
+                        ...base,
+                        backgroundColor: isSelected
+                          ? "#f8f9fa" // app-accent
+                          : isFocused
+                          ? "#dee2e6" // app-accent-2
+                          : "#343a40", // app-surface
+                        color: isSelected || isFocused ? "#212529" : "#fff", // text-app-bg or white
+                        ':active': { backgroundColor: "#f8f9fa", color: "#212529" },
+                      }),
+                      placeholder: (base) => ({ ...base, color: "#9CA3AF" }),
+                      input: (base) => ({ ...base, color: "#fff" }),
+                      dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
+                      clearIndicator: (base) => ({ ...base, color: "#9CA3AF", ':hover': { color: "#fff" } }),
+                      indicatorSeparator: (base) => ({ ...base, backgroundColor: "#343a40" }),
+                    }}
+                  />
+                </div>
+              )}
+              <div>
+                <label htmlFor="le-description" className="block text-sm font-medium text-gray-300 mb-1">Description</label>
+                <textarea name="description" id="le-description" rows={3} value={formData.description} onChange={handleInputChange}
+                          className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white" autoComplete="off"/>
+              </div>
+              <div>
+                <label htmlFor="le-tags" className="block text-sm font-medium text-gray-300 mb-1">Tags</label>
+                <ReactTagInput
+                  key={`tags-${editingEntry?.id || 'new'}`}
+                  tags={[...formData.tags]}
+                  onChange={(newTags) => setFormData(prev => ({ ...prev, tags: newTags }))}
+                  placeholder="Add tags (press enter, comma, or space)"
+                />
+              </div>
+              <div>
+                <label htmlFor="le-aliases" className="block text-sm font-medium text-gray-300 mb-1">Aliases/Keywords</label>
+                <ReactTagInput
+                  key={`aliases-${editingEntry?.id || 'new'}`}
+                  tags={[...formData.aliases]}
+                  onChange={(newAliases) => setFormData(prev => ({ ...prev, aliases: newAliases }))}
+                  placeholder="Add aliases (press enter, comma, or space)"
+                />
+              </div>
+              <div className="flex gap-2 mt-4">
+                <button
+                  type="submit"
+                  className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (editingEntry ? "Saving..." : "Creating...") : (editingEntry ? "Save Changes" : "Create Lore Entry")}
+                </button>
+                {/* Export button inside modal */}
+                {editingEntry && (
+                  // <ExportButton cardData={editingEntry} cardType="lore_entry" imageUrl={editingEntry.image_url} />
+                  <div className="flex-1" /> // Spacer div to align buttons
+                )}
+              </div>
+            </form>
+            {/* Image preview section, always 3/4.5 aspect ratio, large, centered, with framer-motion pop-up */}
+            <div className="flex-shrink-0 flex items-center justify-center" style={{ minWidth: 240, maxWidth: 320 }}>
+              <div className="w-[240px] max-w-[320px] aspect-[3/4.5] flex items-center justify-center">
+                <AnimatePresence>
+                  {(imageFile || currentImageUrl) ? (
+                    <motion.img
+                      key="loreentry-image-preview"
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.8, opacity: 0 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                      src={imageFile ? URL.createObjectURL(imageFile) : currentImageUrl || ''}
+                      alt="Preview"
+                      className="rounded-lg object-cover w-full h-full border border-gray-700 shadow"
+                      style={{ aspectRatio: '3/4.5' }}
+                    />
+                  ) : (
+                    <motion.div
+                      key="loreentry-image-placeholder"
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.8, opacity: 0 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                      className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-500 rounded-lg border border-gray-700"
+                      style={{ aspectRatio: '3/4.5' }}
+                    >
+                      <span className="material-icons-outlined text-5xl">image</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
-
-            <div>
-              <label htmlFor="le-tags" className="block text-sm font-medium text-gray-300 mb-1">Tags</label>
-              <ReactTagInput
-                key={`tags-${editingEntry?.id || 'new'}`}
-                tags={[...formData.tags]} // Ensure a new array reference is always passed
-                onChange={(newTags) => setFormData(prev => ({ ...prev, tags: newTags }))}
-                placeholder="Add tags (press enter, comma, or space)"
-              />
-            </div>
-            <div>
-              <label htmlFor="le-aliases" className="block text-sm font-medium text-gray-300 mb-1">Aliases/Keywords</label>
-              <ReactTagInput
-                key={`aliases-${editingEntry?.id || 'new'}`}
-                tags={[...formData.aliases]} // Ensure a new array reference is always passed
-                onChange={(newAliases) => setFormData(prev => ({ ...prev, aliases: newAliases }))}
-                placeholder="Add aliases (press enter, comma, or space)"
-              />
-            </div>
-
-            <div className="flex justify-end space-x-3 pt-2">
-              <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm bg-app-accent-2 text-app-surface rounded-md font-medium disabled:opacity-50">
-                {isSubmitting ? (editingEntry ? 'Saving...' : 'Creating...') : (editingEntry ? 'Save Changes' : 'Create Entry')}
-              </button>
-            </div>
-          </form>
+          </div>
         </Modal>
       </div>
     </>

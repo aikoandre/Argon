@@ -3,7 +3,6 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 import uuid
-from backend.schemas.ai_plan import AIPlan, PanelData # New import
 from backend.schemas.character_card import CharacterCardBase # New import
 from backend.schemas.scenario_card import ScenarioCardBase # New import
 
@@ -53,8 +52,4 @@ class UserPersonaInfo(BaseModel):
 class ChatTurnResponse(BaseModel):
     user_message: ChatMessageInDB
     ai_message: ChatMessageInDB
-    ai_plan: Optional[AIPlan] = None # Include the AI plan in the response
-    panel_data_update: Optional[PanelData] = None # Include panel data update in the response
-    rendered_panel_string: Optional[str] = Field(None, description="The Jinja2-rendered panel content to be displayed in the UI.")
-    display_panel_in_response: bool = Field(False, description="Whether the rendered panel string should be displayed in the UI.")
     ai_persona_card: Optional[AIPersonaCardInfo] = None # Include AI persona card info

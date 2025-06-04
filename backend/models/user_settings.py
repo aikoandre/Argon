@@ -12,12 +12,10 @@ class UserSettings(Base):
 
     # API Key - Stored in plaintext as per user decision
     primary_llm_api_key = Column(String, nullable=True)
-    planning_llm_api_key = Column(String, nullable=True)
     extraction_llm_api_key = Column(String, nullable=True)
     analysis_llm_api_key = Column(String, nullable=True)
     mistral_api_key = Column(String, nullable=True)
     extraction_llm_model = Column(String, nullable=True, default="mistral/mistral-large-latest")
-    planning_llm_model = Column(String, nullable=True, default="deepseek-ai/deepseek-coder-v2-instruct")
     analysis_llm_model = Column(String, nullable=True, default="mistral/mistral-large-latest")
 
     # Prompt Configuration

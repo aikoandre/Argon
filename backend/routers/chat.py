@@ -42,15 +42,10 @@ jinja_env = Environment(
     undefined=Undefined  # Temporarily changed for debugging NameError
 )
 
-# Default Light Analysis LLM prompt template (using light_analysis_prompt.jinja2)
-light_analysis_default_prompt_template = jinja_env.get_template('light_analysis_prompt.jinja2')
-
 # Import SQLAlchemy models
 from backend.models.chat_session import ChatSession
 from backend.models.chat_message import ChatMessage
 from backend.models.user_settings import UserSettings
-from backend.schemas.ai_plan import AIPlan, PanelData
-from backend.schemas.ai_analysis_result import InteractionAnalysisResult, NewFact, RelationshipChange, SessionLoreUpdate, UserPersonaSessionUpdate, DynamicallyGeneratedLoreEntry
 from backend.models.session_cache_fact import SessionCacheFact
 from backend.services.event_manager_service import EventManagerService
 from backend.models.session_relationship import SessionRelationship
@@ -431,18 +426,6 @@ async def chat_message(
     main_llm_context = {}
     main_llm_prompt_template = jinja_env.from_string("""
 System: You are {{ai_persona_card.name}}. Your personality is {{ai_persona_card.description}} and your instructions are: {{ai_persona_card.instructions}}.
-{% if ai_plan %}
-Your current plan for this response is:
-Goal: {{ai_plan.response_goal}}
-Emotional Tone: {{ai_plan.emotional_tone}}
-Suggested Action: {{ai_plan.suggested_action}}
-Key information to consider from your knowledge: {{ ai_plan.key_info_from_rag_to_highlight | join(' ') }}
-Internal thought focus: {{ai_plan.internal_thought_focus}}
-{% if ai_plan.display_panel_in_response and ai_plan.rendered_panel_string %}
-Panel Information:
-{{ai_plan.rendered_panel_string}}
-{% endif %}
-{% endif %}
 
 {% if world_context_name_and_description %}
 World Context: {{world_context_name_and_description}}
@@ -461,7 +444,6 @@ Recent Chat History (last {{ chat_history_formatted | length }} messages):
 User ({{user_persona_details.name}}): {{user_input}}
 {{ai_persona_card.name}}:
 """)
-    planning_llm_prompt_template = jinja_env.get_template('planning_prompt.jinja2')
     # --- 1. Fetch ChatSession, UserSettings, Card, and SessionCacheFacts ---
     db_chat_session = db.query(ChatSession).options(joinedload(ChatSession.user_persona)).filter(ChatSession.id == chat_id).first()
     if not db_chat_session:
@@ -626,148 +608,6 @@ User ({{user_persona_details.name}}): {{user_input}}
     except Exception as e:
         logger.error(f"Error during RAG process: {e}")
         retrieved_lore_entries_context = "\n\nNote: An error occurred while retrieving relevant lore entries."
-    # --- LIGHT ANALYSIS LLM (synchronous, fast) ---
-    logger.info(f"[LLM-DEBUG] About to call Light Analysis LLM for chat_id: {chat_id}")
-    light_analysis_result = None
-    light_analysis_prompt_template_content = db_user_settings_obj.interaction_analysis_prompt_template
-    if not light_analysis_prompt_template_content:
-        logger.info("No Interaction Analysis prompt template configured in settings; using default light analysis template.")
-        light_analysis_prompt_template = light_analysis_default_prompt_template
-    else:
-        light_analysis_prompt_template = jinja_env.from_string(light_analysis_prompt_template_content)
-    last_5_messages = []
-    if len(messages_for_llm_context) > 0:
-        for msg in messages_for_llm_context[-5:-1]:
-            last_5_messages.append({
-                "sender_type": msg.sender_type,
-                "content": msg.content,
-                "active_persona_name": getattr(msg, "active_persona_name", None)
-            })
-        user_msg = messages_for_llm_context[-1]
-        last_5_messages.append({
-            "sender_type": user_msg.sender_type,
-            "content": user_msg.content,
-            "active_persona_name": getattr(user_msg, "active_persona_name", None)
-        })
-    if light_analysis_prompt_template and db_user_settings["analysis_llm_model"] and db_user_settings["analysis_llm_api_key"]:
-        light_analysis_llm_model = db_user_settings["analysis_llm_model"] # Use analysis_llm_model
-        light_analysis_api_key = db_user_settings["analysis_llm_api_key"]
-        light_analysis_context = {
-            "user_message": user_message_input.content,
-            "ai_persona_card": ai_persona_card_info.model_dump(),
-            "user_persona": {
-                "name": user_persona_name,
-                "description": user_persona_description
-            },
-            "current_panel_data": current_panel_data,
-            "last_5_messages": last_5_messages,
-        }
-        light_analysis_context["last_5_messages_formatted"] = "\n".join([
-            f"{msg['active_persona_name'] or msg['sender_type']}: {msg['content']}" for msg in last_5_messages
-        ])
-        light_analysis_context = replace_jinja_undefined(light_analysis_context)
-        light_analysis_prompt = light_analysis_prompt_template.render(light_analysis_context)
-        light_analysis_llm_messages = [
-            {"role": "system", "content": str(light_analysis_prompt)}
-        ]
-        try:
-            logger.info(f"[LLM-DEBUG] Light Analysis LLM call START for chat_id: {chat_id}")
-            sanitized_llm_messages = replace_jinja_undefined(light_analysis_llm_messages)
-            raw_light_analysis_response = await llm_client.extract_information(
-                messages=sanitized_llm_messages,
-                model=light_analysis_llm_model,
-                api_key=light_analysis_api_key,
-                temperature=0.2,
-                system_prompt=str(light_analysis_prompt),
-            )
-            logger.info(f"[LLM-DEBUG] Light Analysis LLM RAW RESPONSE for chat_id {chat_id}: {raw_light_analysis_response}")
-            try:
-                light_analysis_result = InteractionAnalysisResult.model_validate(raw_light_analysis_response)
-            except Exception as validation_e:
-                logger.error(f"Failed to validate Light Analysis LLM response against schema: {validation_e}. Raw response: {raw_light_analysis_response}")
-                light_analysis_result = InteractionAnalysisResult(
-                    immediate_panel_updates={},
-                    user_expressed_intent_summary="Validation failed.",
-                    simple_event_triggers_detected=[]
-                )
-        except Exception as e:
-            logger.error(f"Light Analysis LLM call failed: {e}")
-            light_analysis_result = InteractionAnalysisResult(
-                immediate_panel_updates={},
-                user_expressed_intent_summary="LLM call failed.",
-                simple_event_triggers_detected=[]
-            )
-    else:
-        logger.warning("Light Analysis LLM model, API key, or prompt template not configured; skipping.")
-        light_analysis_result = InteractionAnalysisResult(
-            immediate_panel_updates={},
-            user_expressed_intent_summary="Light analysis skipped.",
-            simple_event_triggers_detected=[]
-        )
-    logger.info(f"[LLM-DEBUG] About to call Planning LLM for chat_id: {chat_id}")
-    ai_plan: Optional[AIPlan] = None
-    active_event_details = []
-    if db_user_settings["planning_llm_model"] and db_user_settings["planning_llm_api_key"]:
-        planning_llm_model = db_user_settings["planning_llm_model"]
-        planning_api_key = db_user_settings["planning_llm_api_key"]
-        planning_llm_context = {
-            "ai_persona_card": ai_persona_card_info.model_dump(),
-            "user_persona": {
-                "name": user_persona_name,
-                "description": user_persona_description
-            },
-            "user_query_transformed": optimized_query_text,
-            "relationship_with_user": None,
-            "reranked_lore_entries": [{"text": get_text_to_embed_from_lore_entry(entry)} for entry in reranked_lore_entries],
-            "chat_history_formatted": chat_history_formatted,
-            "current_panel_data": current_panel_data,
-            "active_events": active_event_details,
-            "light_analysis": light_analysis_result.model_dump() if isinstance(light_analysis_result, InteractionAnalysisResult) else {},
-        }
-        logger.info(f"[LLM-DEBUG] Planning LLM Context 'light_analysis' type: {type(planning_llm_context['light_analysis'])}")
-        logger.info(f"[LLM-DEBUG] Planning LLM Context 'light_analysis' content: {planning_llm_context['light_analysis']}")
-        planning_llm_context = replace_jinja_undefined(planning_llm_context)
-        planning_prompt = planning_llm_prompt_template.render(planning_llm_context)
-        planning_llm_messages = [
-            {"role": "system", "content": planning_prompt}
-        ]
-        try:
-            planning_response_str = await llm_client.get_chat_completion(
-                model=planning_llm_model,
-                messages=planning_llm_messages,
-                api_key=planning_api_key,
-                temperature=0.2,
-                max_tokens=500,
-                top_p=db_user_settings["top_p"]
-            )
-            planning_llm_raw_response = planning_response_str
-            logger.info(f"[LLM-DEBUG] Planning LLM RAW RESPONSE for chat_id {chat_id}: {planning_llm_raw_response}")
-            import re
-            json_match = re.search(r"```json\n(.*?)```", planning_llm_raw_response, re.DOTALL)
-            if json_match:
-                json_string = json_match.group(1)
-                logger.info(f"[LLM-DEBUG] Extracted JSON for AIPlan: {json_string}")
-            else:
-                json_string = planning_llm_raw_response
-                logger.warning(f"[LLM-DEBUG] No JSON markdown found, assuming raw response is JSON: {json_string}")
-            ai_plan = AIPlan.model_validate_json(json_string)
-        except Exception as e:
-            logger.error(f"Planning LLM failed: {e}")
-            ai_plan = AIPlan(response_goal="Continue the conversation naturally.")
-    else:
-        logger.warning("Planning LLM model or API key not configured; using fallback plan.")
-        ai_plan = AIPlan(response_goal="Continue the conversation naturally.")
-    main_llm_context["ai_plan"] = ai_plan
-    main_llm_context["reranked_lore_entries"] = reranked_lore_entries
-    main_llm_context["chat_history_formatted"] = chat_history_formatted
-    main_llm_context["user_input"] = user_message_input.content
-    main_llm_context["world_context_name_and_description"] = "" # Placeholder for now, if needed
-    main_llm_context = replace_jinja_undefined(main_llm_context)
-    final_full_prompt = main_llm_prompt_template.render(main_llm_context)
-    final_llm_messages = [
-        {"role": "system", "content": final_full_prompt},
-        {"role": "user", "content": user_message_input.content}
-    ]
     # --- MAIN LLM CALL (non-streaming) ---
     try:
         ai_response_content = await llm_client.get_chat_completion(
@@ -834,7 +674,7 @@ User ({{user_persona_details.name}}): {{user_input}}
             user_message=user_message_input.content,
             ai_response=ai_response_content,
             rag_results=[{"text": get_text_to_embed_from_lore_entry(entry)} for entry in reranked_lore_entries], # Pass processed lore entries
-            ai_plan=ai_plan.model_dump() if ai_plan else None, # Pass the AI plan
+            ai_plan=None, # Removed ai_plan
             ai_persona_card_data={
                 "id": str(ai_persona_card.id),
                 "name": ai_persona_card.name,
@@ -842,7 +682,6 @@ User ({{user_persona_details.name}}): {{user_input}}
                 "instructions": getattr(ai_persona_card, 'instructions', None)
             },
             user_persona_data=user_persona_data,
-            active_event_details=active_event_details,
             analysis_llm_api_key=db_user_settings.get("analysis_llm_api_key", None), # Use analysis_llm_api_key
             analysis_llm_model=db_user_settings.get("analysis_llm_model", "") # Use analysis_llm_model
         )
@@ -855,16 +694,16 @@ User ({{user_persona_details.name}}): {{user_input}}
         "active_persona_image_url": persona_image_url,
         "message_id": str(db_ai_message.id),
         "timestamp": db_ai_message.timestamp.isoformat() if hasattr(db_ai_message, 'timestamp') else None,
-        "panel_data_update": ai_plan.panel_data_update.model_dump(exclude_unset=True) if ai_plan and ai_plan.panel_data_update else None,
-        "rendered_panel_string": ai_plan.rendered_panel_string if ai_plan and ai_plan.rendered_panel_string else None,
-        "display_panel_in_response": ai_plan.display_panel_in_response if ai_plan and ai_plan.display_panel_in_response is not None else False,
+        "panel_data_update": None, # Removed panel_data_update
+        "rendered_panel_string": None, # Removed rendered_panel_string
+        "display_panel_in_response": False, # Removed display_panel_in_response
     }
     persona_info = replace_jinja_undefined(persona_info)
     # Return a ChatTurnResponse object
     return ChatTurnResponse(
         user_message=ChatMessageInDB.model_validate(db_user_message),
         ai_message=ChatMessageInDB.model_validate(db_ai_message),
-        ai_plan=ai_plan,
+        ai_plan=None, # Removed ai_plan
         panel_data_update=persona_info["panel_data_update"],
         rendered_panel_string=persona_info["rendered_panel_string"],
         display_panel_in_response=persona_info["display_panel_in_response"],

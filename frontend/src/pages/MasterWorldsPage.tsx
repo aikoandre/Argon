@@ -10,6 +10,8 @@ import {
 import ReactTagInput from "@pathofdev/react-tag-input";
 import "@pathofdev/react-tag-input/build/index.css";
 import { CardImage } from "../components/CardImage";
+import { AnimatePresence, motion } from 'framer-motion';
+import MasterWorldExportButton from '../components/MasterWorldExportButton';
 
 const iconBaseClass = "material-icons-outlined text-2xl flex-shrink-0";
 const EditIcon = ({ className }: { className?: string }) => (
@@ -17,9 +19,6 @@ const EditIcon = ({ className }: { className?: string }) => (
 );
 const DeleteIcon = ({ className }: { className?: string }) => (
   <span className={`${iconBaseClass} ${className || ''}`.trim()}>delete</span>
-);
-const ImageIcon = ({ className }: { className?: string }) => (
-  <span className={`${iconBaseClass} ${className || ''}`.trim()}>image</span>
 );
 
 interface ModalProps {
@@ -218,6 +217,41 @@ const MasterWorldsPage: React.FC = () => {
     return filename.substring(0, maxLength - 3) + '...';
   };
 
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    try {
+      if (fileExtension === 'png') {
+        // Use extractJSONFromPNG to get PNGExportData
+        const { extractJSONFromPNG } = await import('../utils/pngExport');
+        const data = await extractJSONFromPNG(file);
+        if (data && data.masterWorld) {
+          setMasterWorlds([data.masterWorld]);
+          setError(null);
+        } else {
+          setError('No valid world data found in PNG.');
+        }
+      } else if (fileExtension === 'zip') {
+        // Use extractDataFromZip to get ZipExportData
+        const { extractDataFromZip } = await import('../utils/zipExport');
+        const data = await extractDataFromZip(file);
+        if (data && data.type === 'master_world' && data.data) {
+          setMasterWorlds([data.data]);
+          setError(null);
+        } else {
+          setError('No valid world data found in ZIP.');
+        }
+      } else {
+        setError('Invalid file type. Please upload a PNG or ZIP file.');
+      }
+    } catch (err) {
+      setError('Failed to import world.');
+      console.error(err);
+    }
+  };
+
   if (isLoading && masterWorlds.length === 0) {
     return (
       <p className="text-center text-gray-400 p-10">Loading Your Worlds...</p>
@@ -228,12 +262,27 @@ const MasterWorldsPage: React.FC = () => {
     <div className="container mx-auto p-4 md:p-8 max-h-screen overflow-y-auto custom-scrollbar">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold font-quintessential text-white">Worlds</h1>
-        <button
-          onClick={() => handleOpenModal()}
-          className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
-        >
-          New +
-        </button>
+        <div>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md mr-2"
+          >
+            Import
+          </button>
+          <input
+            type="file"
+            accept=".png,.zip"
+            style={{ display: 'none' }}
+            ref={fileInputRef}
+            onChange={handleImportFile}
+          />
+          <button
+            onClick={() => handleOpenModal()}
+            className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
+          >
+            New +
+          </button>
+        </div>
       </div>
 
       {error && !isModalOpen && (
@@ -305,112 +354,135 @@ const MasterWorldsPage: React.FC = () => {
         onClose={handleCloseModal}
         title={editingWorld ? "Edit World" : "Create New World"}
       >
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-4 max-h-[80vh] overflow-y-auto p-1 pr-2"
-        >
-          {error && isModalOpen && (
-            <p className="bg-red-700 text-white p-3 rounded-md text-sm text-center mb-3">
-              {error}
-            </p>
-          )}
-          {/* Campo de imagem opcional - antes do campo Name, label em cima */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Image</label>
-            <div className="flex items-center">
-              <button
-                type="button"
-                onClick={handleSelectImageClick}
-                className="flex-1 bg-app-surface text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11 overflow-hidden whitespace-nowrap"
-              >
-                <ImageIcon className="w-5 h-5 mr-2" />
-                <span>{imageFile ? truncateFilename(imageFile.name) : currentImageUrl ? `Current: ${truncateFilename(currentImageUrl.split('/').pop() as string)}` : "Select Image"}</span>
-              </button>
+        <div className="flex flex-row gap-4 min-h-[320px] items-center justify-center">
+          {/* Form section */}
+          <form
+            onSubmit={handleSubmit}
+            className="flex-1 space-y-2 max-h-[70vh] overflow-y-auto p-1 pr-4 custom-scrollbar min-w-[320px]"
+            style={{ maxWidth: 400 }}
+          >
+            {error && isModalOpen && (
+              <p className="bg-red-700 text-white p-3 rounded-md text-sm text-center mb-3">
+                {error}
+              </p>
+            )}
+            <div className="mb-2">
+              <label className="block text-sm font-medium text-gray-300 mb-2">Image</label>
+              <div className="flex items-center">
+                <button
+                  type="button"
+                  onClick={handleSelectImageClick}
+                  className="flex-1 bg-app-surface hover:bg-gray-600 text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11 overflow-hidden whitespace-nowrap"
+                >
+                  <span className="material-icons-outlined w-5 h-5 mr-2 flex-shrink-0">image</span>
+                  <span className="block truncate">
+                    {imageFile
+                      ? truncateFilename(imageFile.name)
+                      : (currentImageUrl
+                          ? truncateFilename(currentImageUrl.split('/').pop() as string)
+                          : "Select Image")}
+                  </span>
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageUpload}
+                />
+                <span className="h-11 w-px bg-gray-600" />
+                <button
+                  type="button"
+                  onClick={() => { setImageFile(null); setCurrentImageUrl(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                  className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11"
+                  disabled={!(imageFile || currentImageUrl)}
+                >
+                  <DeleteIcon className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div>
+              <label htmlFor="mw-name" className="block text-sm font-medium text-gray-300 mb-2">World Name <span className="text-app-accent">*</span></label>
               <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleImageUpload}
+                type="text"
+                name="name"
+                id="mw-name"
+                value={formData.name}
+                onChange={handleInputChange}
+                required
+                className="w-full p-2 bg-app-surface rounded-md text-white focus:ring-app-accent"
+                autoComplete="off"
               />
-              <span className="h-11 w-px bg-app-surface" />
+            </div>
+            <div>
+              <label htmlFor="mw-description" className="block text-sm font-medium text-gray-300 mb-2">Description</label>
+              <textarea
+                name="description"
+                id="mw-description"
+                rows={5}
+                value={formData.description}
+                onChange={handleInputChange}
+                className="w-full p-2 bg-app-surface rounded-md text-white focus:ring-app-accent"
+                autoComplete="off"
+              />
+            </div>
+            <div>
+              <label htmlFor="mw-tags" className="block text-sm font-medium text-gray-300 mb-2">Tags</label>
+              <div className="bg-app-surface rounded-md">
+                <ReactTagInput
+                  tags={formData.tags}
+                  onChange={(newTags) => setFormData(prev => ({ ...prev, tags: newTags }))}
+                  placeholder="Add tags (press enter, comma, or space)"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
               <button
-                type="button"
-                className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11"
-                onClick={() => { setImageFile(null); setCurrentImageUrl(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-                disabled={!imageFile && !currentImageUrl}
-                title="Remove image"
+                type="submit"
+                className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
+                disabled={isSubmitting}
               >
-                <DeleteIcon className="w-5 h-5" />
+                {isSubmitting ? (editingWorld ? "Saving..." : "Creating...") : (editingWorld ? "Save Changes" : "Create World")}
               </button>
+              {/* Export button inside modal */}
+              {editingWorld && (
+                <MasterWorldExportButton masterWorld={editingWorld} />
+              )}
+            </div>
+          </form>
+          {/* Image preview section, always 3/4.5 aspect ratio, large, centered, with framer-motion pop-up */}
+          <div className="flex-shrink-0 flex items-center justify-center" style={{ minWidth: 240, maxWidth: 320 }}>
+            <div className="w-[240px] max-w-[320px] aspect-[3/4.5] flex items-center justify-center">
+              <AnimatePresence>
+                {(imageFile || currentImageUrl) ? (
+                  <motion.img
+                    key="masterworld-image-preview"
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                    src={imageFile ? URL.createObjectURL(imageFile) : currentImageUrl || ''}
+                    alt="Preview"
+                    className="rounded-lg object-cover w-full h-full border border-gray-700 shadow"
+                    style={{ aspectRatio: '3/4.5' }}
+                  />
+                ) : (
+                  <motion.div
+                    key="masterworld-image-placeholder"
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                    className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-500 rounded-lg border border-gray-700"
+                    style={{ aspectRatio: '3/4.5' }}
+                  >
+                    <span className="material-icons-outlined text-5xl">image</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
-          <div>
-            <label
-              htmlFor="mw-name"
-              className="block text-sm font-medium text-gray-300 mb-2"
-            >
-              World Name <span className="text-app-accent">*</span>
-            </label>
-            <input
-              type="text"
-              name="name"
-              id="mw-name"
-              value={formData.name}
-              onChange={handleInputChange}
-              required
-              className="w-full p-2 bg-app-surface rounded-md text-white focus:ring-app-accent"
-              autoComplete="off"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="mw-description"
-              className="block text-sm font-medium text-gray-300 mb-2"
-            >
-              Description
-            </label>
-            <textarea
-              name="description"
-              id="mw-description"
-              rows={5}
-              value={formData.description}
-              onChange={handleInputChange}
-              className="w-full p-2 bg-app-surface rounded-md text-white focus:ring-app-accent"
-              autoComplete="off"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="mw-tags"
-              className="block text-sm font-medium text-gray-300 mb-2"
-            >
-              Tags
-            </label>
-            <div className="bg-app-surface rounded-md">
-              <ReactTagInput
-                tags={formData.tags}
-                onChange={(newTags) => setFormData(prev => ({ ...prev, tags: newTags }))}
-                placeholder="Add tags (press enter, comma, or space)"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end space-x-3 pt-2">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="bg-app-accent-2 text-app-bg font-semibold py-2 px-4 rounded-md disabled:opacity-50"
-            >
-              {isSubmitting
-                ? editingWorld
-                  ? "Saving..."
-                  : "Creating..."
-                : editingWorld
-                ? "Save Changes"
-                : "Create World"}
-            </button>
-          </div>
-        </form>
+        </div>
       </Modal>
     </div>
   );

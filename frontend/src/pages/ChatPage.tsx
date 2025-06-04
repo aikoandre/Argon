@@ -15,7 +15,7 @@ import {
 import { type ChatSessionData } from "../services/api"; // ChatSessionData is from api.ts
 import { type ChatMessageData } from "../types/chat"; // Only import ChatMessageData, remove unused types
 import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw'; // eslint-disable-line @typescript-eslint/ban-ts-comment
+import rehypeRaw from 'rehype-raw';
 
 // Default avatar images - using data URLs to avoid file serving issues for defaults
 const DEFAULT_USER_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'%3E%3C/path%3E%3Ccircle cx='12' cy='7' r='4'%3E%3C/circle%3E%3C/svg%3E";
