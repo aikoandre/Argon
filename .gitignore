@@ -24,3 +24,4 @@ faiss_index.bin
 static/images/
 .vscode/
 
+backend/models/rerank_models/
