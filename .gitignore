@@ -21,9 +21,6 @@ memory-bank/
 faiss_id_map.npy
 faiss_index.bin
 
-static/images/*
-static/images/characters/*
-static/images/lore/*
-static/images/personas/*
-static/images/scenarios/*
-static/images/worlds/*
+static/images/
+.vscode/
+
