@@ -331,7 +331,7 @@ def get_chat_session_details(chat_id: str, db: Session = Depends(get_db)):
 def get_chat_session_messages(
     chat_id: str, skip: int = 0, limit: int = 1000, db: Session = Depends(get_db)
 ):
-    db_chat_session = db.query(ChatSession).filter(ChatMessage.chat_session_id == chat_id).first()
+    db_chat_session = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
     if db_chat_session is None:
         raise HTTPException(status_code=404, detail="Chat session not found")
 

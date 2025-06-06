@@ -39,7 +39,7 @@ import asyncio
 from backend.services import mistral_client
 from backend.background_tasks import embedding_worker
 from backend.services.mistral_client import embedding_queue # Removed initialize_mistral_client
-from backend.routers.lore_entries import router as lore_entries_router
+from backend.routers.lore_entries import router as lore_entries_router, all_lore_router
 from backend.routers.chat import router as chat_router
 from backend.routers.scenarios import router as scenarios_router
 from backend.routers.personas import router as personas_router
@@ -236,6 +236,7 @@ async def test_serve_image():
 
 # Include other routers
 app.include_router(lore_entries_router)
+app.include_router(all_lore_router)
 app.include_router(chat_router, prefix="/api/chat")
 app.include_router(scenarios_router)
 app.include_router(personas_router)

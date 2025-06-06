@@ -458,9 +458,9 @@ const ChatPage: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen h-screen bg-app-bg">
-      <div className="w-full max-w-xl lg:max-w-2xl mx-auto pt-16">
-        <div className="flex-1 overflow-y-auto pr-2 space-y-2 flex-col h-[calc(100vh-10.7rem)] scrollbar-thin scrollbar-thumb-app-accent scrollbar-track-app-surface/30 rounded-xl">
+    <div className="flex flex-col h-screen overflow-hidden bg-app-bg">
+      <div className="w-full max-w-xl lg:max-w-2xl mx-auto pt-16 pb-4 flex-1 flex flex-col min-h-0">
+        <div className="flex-1 overflow-y-auto pr-2 space-y-2 scrollbar-thin scrollbar-thumb-app-accent scrollbar-track-app-surface/30 rounded-xl min-h-0">
           {messages.length === 0 && (
             <div className="flex justify-center pb-4">
               <div className="text-center">
@@ -618,9 +618,9 @@ const ChatPage: React.FC = () => {
       {/* Input area */}
       <div
         ref={inputAreaRef}
-        className="fixed bottom-0 left-0 right-0 z-40 flex justify-center"
+        className="flex justify-center p-4 bg-app-bg"
       >
-        <div className="w-full max-w-xl lg:max-w-2xl mx-auto bg-app-bg shadow-lg">
+        <div className="w-full max-w-xl lg:max-w-2xl mx-auto">
           <form onSubmit={handleSendMessage} className="relative">
             <textarea
               rows={1}

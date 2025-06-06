@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File, Form, Path
+from fastapi import APIRouter, Depends, HTTPException, Body, Form, Path
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, cast, String # Import or_, and_, cast, String for OR conditions and database functions
 from typing import List, Dict
@@ -17,10 +17,15 @@ from backend.models.lore_entry import LoreEntry as LoreEntryModel
 from backend.schemas.lore_entry import LoreEntryCreate, LoreEntryUpdate, LoreEntryInDB
 from backend.models.user_settings import UserSettings as UserSettingsModel
 
-from backend.file_storage import save_uploaded_file, delete_image_file # Import image storage functions
-
 router = APIRouter(
     prefix="/api/master_worlds/{master_world_id}/lore_entries", # Corrected to match frontend
+    tags=["Lore Entries"],
+    responses={404: {"description": "Not found"}},
+)
+
+# Additional router for getting all lore entries across all master worlds
+all_lore_router = APIRouter(
+    prefix="/api/lore_entries",
     tags=["Lore Entries"],
     responses={404: {"description": "Not found"}},
 )
@@ -54,7 +59,6 @@ def get_text_to_embed_from_lore_entry(lore_entry: LoreEntryModel) -> str:
 async def create_lore_entry( # Renamed for clarity
     master_world_id: str,
     data: str = Form(...), # Expect JSON string for LoreEntryCreate
-    image: UploadFile | None = File(None), # Optional image file
     db: Session = Depends(get_db)
 ):
     try:
@@ -69,21 +73,8 @@ async def create_lore_entry( # Renamed for clarity
     if lore_entry_create.master_world_id != master_world_id:
         raise HTTPException(status_code=400, detail="Path master_world_id does not match payload master_world_id.")
 
-    # db_settings = db.query(UserSettingsModel).filter(UserSettingsModel.id == USER_SETTINGS_ID).first()
-    # if not db_settings or not db_settings.mistral_api_key:
-    #     raise HTTPException(status_code=500, detail="Mistral API key not configured in user settings.")
-
-    image_url = None
-    if image:
-        try:
-            # Pass entity_type="lore" when saving the image
-            image_url = await save_uploaded_file(image, entity_type="lore")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to upload image: {e}")
-
     # Create the LoreEntry object
-    db_lore_entry = LoreEntryModel(**lore_entry_create.model_dump(), image_url=image_url)
-    # db_lore_entry.master_world_id = master_world_id # Already part of LoreEntryCreate
+    db_lore_entry = LoreEntryModel(**lore_entry_create.model_dump())
     
     db.add(db_lore_entry)
     db.commit()
@@ -126,7 +117,6 @@ async def update_lore_entry( # Renamed for clarity
     master_world_id: str,
     lore_entry_id: str,
     data: str = Form(...), # Expect JSON string for LoreEntryUpdate
-    image: UploadFile | None = File(None), # Optional image file
     db: Session = Depends(get_db)
 ):
     try:
@@ -139,19 +129,6 @@ async def update_lore_entry( # Renamed for clarity
     db_lore_entry = db.query(LoreEntryModel).filter(LoreEntryModel.id == lore_entry_id, LoreEntryModel.master_world_id == master_world_id).first()
     if not db_lore_entry:
         raise HTTPException(status_code=404, detail="LoreEntry not found")
-
-    # db_settings = db.query(UserSettingsModel).filter(UserSettingsModel.id == USER_SETTINGS_ID).first()
-    # if not db_settings or not db_settings.mistral_api_key:
-    #     raise HTTPException(status_code=500, detail="Mistral API key not configured in user settings.")
-
-    # Handle image update
-    if image:
-        if db_lore_entry.image_url:
-            delete_image_file(db_lore_entry.image_url) # Delete old image
-        db_lore_entry.image_url = await save_uploaded_file(image, entity_type="lore")
-    elif image is None and db_lore_entry.image_url and "image" in json.loads(data): # Check if image was explicitly removed
-        delete_image_file(db_lore_entry.image_url)
-        db_lore_entry.image_url = None
 
     # Update the LoreEntry fields
     update_data = lore_entry_update.model_dump(exclude_unset=True)
@@ -194,10 +171,6 @@ async def delete_lore_entry(
     if not db_lore_entry:
         raise HTTPException(status_code=404, detail="LoreEntry not found")
     
-    # Delete associated image if it exists
-    if db_lore_entry.image_url:
-        delete_image_file(db_lore_entry.image_url)
-
     # Remove embedding from FAISS index
     faiss_index = get_faiss_index()
     faiss_index.remove_embedding(db_lore_entry.id)
@@ -259,3 +232,19 @@ async def search_lore_entries(
             sorted_lore_entries.append(lore_entry_map[lore_id])
 
     return sorted_lore_entries
+
+
+# New endpoint to get all lore entries across all master worlds
+@all_lore_router.get("/", response_model=List[LoreEntryInDB])
+async def get_all_lore_entries(
+    entry_type: str | None = None,
+    db: Session = Depends(get_db)
+):
+    """Get all lore entries across all master worlds, optionally filtered by entry_type."""
+    query = db.query(LoreEntryModel)
+    
+    if entry_type:
+        query = query.filter(LoreEntryModel.entry_type == entry_type)
+    
+    lore_entries = query.all()
+    return lore_entries

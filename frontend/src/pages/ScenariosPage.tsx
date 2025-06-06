@@ -16,17 +16,9 @@ import {
 } from "../services/api";
 import { CardImage } from '../components/CardImage';
 import { createPNGWithEmbeddedData } from '../utils/pngExport';
-import { createZipWithEmbeddedData } from '../utils/zipExport';
-import { motion, AnimatePresence } from 'framer-motion';
 import ExportButton from '../components/ExportButton';
 
 const iconBaseClass = "material-icons-outlined text-2xl flex-shrink-0";
-const EditIcon = ({ className }: { className?: string }) => (
-  <span className={`${iconBaseClass} ${className || ''}`.trim()}>edit</span>
-);
-const DeleteIcon = ({ className }: { className?: string }) => (
-  <span className={`${iconBaseClass} ${className || ''}`.trim()}>delete</span>
-);
 
 interface SelectOption {
   value: string;
@@ -38,24 +30,120 @@ interface ModalProps {
   onClose: () => void;
   children: React.ReactNode;
   title: string;
+  imageFile?: File | null;
+  editingScenario?: ScenarioCardData | null;
+  onImageClick?: () => void;
+  formRef?: React.RefObject<HTMLFormElement | null>;
+  isSubmitting?: boolean;
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title, imageFile, editingScenario, onImageClick, formRef, isSubmitting }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity duration-300 ease-in-out">
-      <div className="bg-app-bg p-6 rounded-lg shadow-xl w-full max-w-lg text-white transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalShow">
-        <div className="flex justify-between items-center mb-6 relative">
-          <h2 className="text-xl font-semibold text-app-accent text-center w-full">{title}</h2>
-          <button
-            onClick={onClose}
-            className="text-app-accent-3 hover:text-app-accent transition-colors text-2xl absolute right-6 top-6"
-          >
-            ×
-          </button>
+    <>
+      {/* Modal overlay */}
+      <div className="fixed inset-0 bg-black bg-opacity-75 z-[60]" />
+      {/* Modal content - centered */}
+      <div className="fixed inset-0 flex items-center justify-center z-[60] p-4">
+        <div className="bg-app-bg rounded-2xl shadow-xl text-white relative w-full max-w-xl lg:max-w-2xl max-h-[60vh] h-[60vh] flex flex-row overflow-hidden">
+          {/* Left column - Image preview and buttons */}
+          <div className="flex-shrink-0 p-6 flex flex-col md:w-auto w-full relative">
+            {/* Title */}
+            <h2 className="text-2xl font-semibold mb-6 z-10">{title}</h2>
+            
+            {/* Image Preview */}
+            <div className="w-[280px] flex items-center justify-center rounded-lg overflow-hidden mb-4" style={{ aspectRatio: '3/4.5' }}>
+              <ModalImagePreview 
+                inlineOnly 
+                imageFile={imageFile}
+                editingScenario={editingScenario}
+                onImageClick={onImageClick}
+              />
+            </div>
+            
+            {/* Save & Export Buttons */}
+            <div className="flex gap-2 justify-center">
+              <button
+                type="submit"
+                form="scenario-form"
+                onClick={(e) => {
+                  e.preventDefault();
+                  formRef?.current?.requestSubmit();
+                }}
+                className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (editingScenario ? "Saving..." : "Creating...") : (editingScenario ? "Save Changes" : "Create Scenario")}
+              </button>
+              {editingScenario && (
+                <ExportButton cardData={editingScenario} cardType="scenario_card" imageUrl={editingScenario.image_url} />
+              )}
+            </div>
+          </div>
+          {/* Form content container - ensure scroll works */}
+          <div className="flex-1 p-6 md:pl-0 flex flex-col min-w-[320px] min-h-0 h-full overflow-y-auto max-h-[75vh] scrollbar-thin">
+            <div className="flex items-center flex-shrink-0 relative">
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-white text-3xl flex-shrink-0 absolute right-0 mt-4"
+              >
+                ×
+              </button>
+            </div>
+            <div className="flex-1">
+              {children}
+            </div>
+          </div>
         </div>
-        {children}
       </div>
+    </>
+  );
+};
+
+// ModalImagePreview now supports inlineOnly prop
+const ModalImagePreview: React.FC<{ 
+  inlineOnly?: boolean; 
+  imageFile?: File | null; 
+  editingScenario?: ScenarioCardData | null; 
+  onImageClick?: () => void;
+}> = ({ inlineOnly, imageFile, editingScenario, onImageClick }) => {
+  // Use props if provided, otherwise fall back to window data
+  const data = inlineOnly ? { imageFile, editingScenario } : (window as any)._modalImagePreviewData;
+  if (!data && !inlineOnly) return null;
+  
+  const { imageFile: dataImageFile, editingScenario: dataEditingScenario } = data || {};
+  const showImage = dataImageFile || (dataEditingScenario && dataEditingScenario.image_url);
+  
+  if (inlineOnly) {
+    return (
+      <div 
+        className="w-full h-full flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
+        onClick={onImageClick}
+      >
+        {showImage ? (
+          <img
+            src={dataImageFile ? URL.createObjectURL(dataImageFile) : dataEditingScenario?.image_url || ''}
+            className="rounded-lg object-cover w-full h-full border border-gray-700 shadow-lg"
+            style={{ aspectRatio: '3/4.5' }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-500 rounded-lg border border-gray-700">
+            <span className="material-icons-outlined text-5xl">image</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+  
+  if (!showImage) return null;
+  
+  return (
+    <div className="fixed left-1/2 top-1/2 -translate-x-[calc(100%+80px)] -translate-y-1/2 z-50 animate-slide-in-left pointer-events-none">
+      <img
+        src={dataImageFile ? URL.createObjectURL(dataImageFile) : dataEditingScenario?.image_url || ''}
+        className="rounded-lg object-cover w-full h-full border border-gray-700 shadow-lg"
+        style={{ aspectRatio: '3/4.5' }}
+      />
     </div>
   );
 };
@@ -73,13 +161,6 @@ const initialFormFields: ScenarioFormData = {
 };
 
 const initialBeginningMessages = [""];
-
-// Utility function for truncating filenames
-function truncateFilename(filename: string | null | undefined, maxLength = 20): string {
-  if (!filename) return "Select Image";
-  if (filename.length <= maxLength) return filename;
-  return filename.substring(0, maxLength - 3) + "...";
-}
 
 const ScenariosPage: React.FC = () => {
   const navigate = useNavigate(); // Add this line
@@ -102,6 +183,8 @@ const ScenariosPage: React.FC = () => {
   const [currentBmgIndex, setCurrentBmgIndex] = useState<number>(0);
   // Image states
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageRemoved, setImageRemoved] = useState<boolean>(false);
 
@@ -128,12 +211,15 @@ const ScenariosPage: React.FC = () => {
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle image click to open file picker
+  const handleImageClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Handle file input change
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     handleImageChangeOrDelete(file || null);
-  };
-  const handleRemoveImage = () => {
-    handleImageChangeOrDelete(null);
   };
 
   // Master World states
@@ -293,6 +379,8 @@ const ScenariosPage: React.FC = () => {
     setFormFields(initialFormFields);
     setSelectedMasterWorldForForm(null);
     setError(null);
+    // Clear window data for ModalImagePreview
+    (window as any)._modalImagePreviewData = null;
     // Always refresh scenarios after closing modal to ensure UI is up to date
     fetchScenarios();
   };
@@ -356,14 +444,16 @@ const ScenariosPage: React.FC = () => {
   };
 
   const handleDelete = async (scenarioId: string) => {
-    try {
-      await deleteScenarioCard(scenarioId);
-      // Refresh the scenarios list
-      const data = await getAllScenarioCards();
-      setScenarios(data);
-    } catch (err) {
-      console.error("Failed to delete scenario:", err);
-      setError("Failed to delete scenario");
+    if (window.confirm('Are you sure you want to delete this scenario?')) {
+      try {
+        await deleteScenarioCard(scenarioId);
+        // Refresh the scenarios list
+        const data = await getAllScenarioCards();
+        setScenarios(data);
+      } catch (err) {
+        console.error("Failed to delete scenario:", err);
+        setError("Failed to delete scenario");
+      }
     }
   };
 
@@ -402,16 +492,8 @@ const ScenariosPage: React.FC = () => {
     if (fileExtension === 'png') {
       // Handle PNG import
       try {
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-        // Extract scenario data from PNG
-        const scenarioData = await createPNGWithEmbeddedData(scenario, "scenario_card");
-        console.log("Imported scenario data from PNG:", scenarioData);
-        // TODO: Populate form fields and open modal for imported scenario
+        // TODO: Implement PNG data extraction and populate form fields
+        console.log("PNG import not yet implemented");
       } catch (err) {
         console.error("Failed to import PNG:", err);
         setError("Failed to import PNG");
@@ -419,16 +501,8 @@ const ScenariosPage: React.FC = () => {
     } else if (fileExtension === 'zip') {
       // Handle ZIP import
       try {
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-        // Extract scenario data from ZIP
-        const scenarioData = await createZipWithEmbeddedData(scenario, "scenario_card");
-        console.log("Imported scenario data from ZIP:", scenarioData);
-        // TODO: Populate form fields and open modal for imported scenario
+        // TODO: Implement ZIP data extraction and populate form fields
+        console.log("ZIP import not yet implemented");
       } catch (err) {
         console.error("Failed to import ZIP:", err);
         setError("Failed to import ZIP");
@@ -443,24 +517,27 @@ const ScenariosPage: React.FC = () => {
     label: w.name,
   }));
 
+  // Update window data for ModalImagePreview whenever relevant state changes
+  useEffect(() => {
+    if (isModalOpen) {
+      (window as any)._modalImagePreviewData = { 
+        imageFile, 
+        editingScenario
+      };
+    }
+  }, [isModalOpen, imageFile, editingScenario]);
+
   return (
     <div className="container mx-auto p-4 md:p-8 max-h-screen overflow-y-auto custom-scrollbar">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold font-quintessential text-white">Scenarios</h1>
         <div>
           <button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => importFileInputRef.current?.click()}
             className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md mr-2"
           >
             Import
           </button>
-          <input
-            type="file"
-            accept=".png,.zip"
-            style={{ display: 'none' }}
-            ref={fileInputRef}
-            onChange={handleImportFile}
-          />
           <button
             onClick={() => handleOpenModal()}
             className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
@@ -469,6 +546,15 @@ const ScenariosPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Hidden input for import */}
+      <input
+        type="file"
+        accept=".png,.zip"
+        style={{ display: 'none' }}
+        ref={importFileInputRef}
+        onChange={handleImportFile}
+      />
 
       {isLoading && (
         <p className="text-center text-gray-400 p-10">Loading scenarios...</p>
@@ -500,42 +586,37 @@ const ScenariosPage: React.FC = () => {
             <div
               key={scen.id}
               className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer group"
-              onClick={() => handleScenarioClick(scen.id)}
+              onClick={() => handleOpenModal(scen)}
             >
               {/* Use CardImage for scenario images for consistent backend handling */}
               <CardImage
                 imageUrl={imageUrl}
                 className="absolute inset-0"
               />
-              {/* Top right icons */}
-              <div className="absolute top-2 right-2 flex space-x-2 z-10">
-                <button
-                  onClick={e => { e.stopPropagation(); handleOpenModal(scen); }}
-                  className="text-gray-400 hover:text-app-accent transition-colors"
-                  title="Edit Scenario"
-                >
-                  <EditIcon className="h-5 w-5" />
-                </button>
-                <button
-                  onClick={e => { e.stopPropagation(); handleDelete(scen.id); }}
-                  className="text-gray-400 hover:text-red-500 transition-colors"
-                  title="Delete Scenario"
-                >
-                  <DeleteIcon className="h-5 w-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={e => { e.stopPropagation(); handleExport(scen); }}
-                  className="text-gray-400 hover:text-green-500 transition-colors p-1 rounded-full"
-                  title="Export Scenario"
-                >
-                  <span className="material-icons-outlined">download</span>
-                </button>
-              </div>
+              {/* Delete button positioned at top-right */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(scen.id);
+                }}
+                className="absolute top-2 right-2 z-20 text-app-accent hover:text-red-500 p-1.5 rounded-full transition-colors"
+                title="Delete Scenario"
+              >
+                <span className="material-icons-outlined text-2xl">delete</span>
+              </button>
               {/* Bottom info (footer) */}
               <div className="absolute bottom-0 left-0 w-full">
-                <div className="w-full bg-black/30 backdrop-blur-sm p-3 flex flex-col items-start rounded-b-lg">
-                  <div className="font-semibold text-lg text-white drop-shadow-md break-words">{scen.name}</div>
+                <div className="w-full bg-black/30 backdrop-blur-sm p-3 flex flex-row items-center justify-between rounded-b-lg">
+                  <div className="font-semibold text-lg text-white drop-shadow-md break-words flex-1" title={scen.name}>{scen.name}</div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleScenarioClick(scen.id);
+                    }}
+                    className="bg-app-accent text-black px-3 py-1 rounded-2xl text-sm font-semibold ml-2 hover:bg-app-accent/80 transition-colors"
+                  >
+                    Chat
+                  </button>
                 </div>
               </div>
             </div>
@@ -543,317 +624,248 @@ const ScenariosPage: React.FC = () => {
         })}
       </div>
 
+      {/* Hidden file input for image upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
+
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         title={editingScenario ? "Edit Scenario" : "Create New Scenario"}
+        imageFile={imageFile}
+        editingScenario={editingScenario}
+        onImageClick={handleImageClick}
+        formRef={formRef}
+        isSubmitting={isSubmitting}
       >
-        <div className="flex flex-row items-center justify-center gap-8 min-h-[320px]">
-          {/* Form section */}
-          <form
-            onSubmit={handleSubmit}
-            className="flex-1 space-y-2 max-h-[70vh] overflow-y-auto p-1 pr-4 custom-scrollbar min-w-[320px]"
-            style={{ maxWidth: 400 }}
-          >
-            {error && isModalOpen && (
-              <p className="bg-red-700 text-white p-3 rounded-md text-sm text-center">
-                {error}
-              </p>
-            )}
-            <div className="mb-2">
-              <label className="block text-sm font-medium text-gray-300 mb-2">Image</label>
-              <div className="flex items-center">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex-1 bg-app-surface hover:bg-gray-600 text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11 overflow-hidden whitespace-nowrap"
-                >
-                  <span className="material-icons-outlined w-5 h-5 mr-2 flex-shrink-0">image</span>
-                  <span className="block truncate">
-                    {imageFile
-                      ? truncateFilename(imageFile.name)
-                      : (imageRemoved
-                          ? "Select Image"
-                          : (editingScenario && editingScenario.image_url
-                              ? truncateFilename(editingScenario.image_url.split('/').pop() as string)
-                              : "Select Image"))}
-                  </span>
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageUpload}
-                />
-                <span className="h-11 w-px bg-gray-600" />
-                <button
-                  type="button"
-                  onClick={handleRemoveImage}
-                  className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11"
-                  disabled={!(imageFile || (editingScenario && editingScenario.image_url && !imageRemoved))}
-                >
-                  <DeleteIcon className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
+        <form
+          ref={formRef}
+          id="scenario-form"
+          onSubmit={handleSubmit}
+          className="flex-1 flex flex-col overflow-hidden"
+        >
+          <div className="flex-1 overflow-y-auto scrollbar-thin">
+            <div className="space-y-4">
+              {error && isModalOpen && (
+                <p className="bg-app-accent-2/20 border border-app-accent-3 text-app-accent p-3 rounded-md text-sm">
+                  {error}
+                </p>
+              )}
 
-            <div>
-              <label
-                htmlFor="scen-master_world"
-                className="block text-sm font-medium text-gray-300 mb-2"
-              >
-                Master World
-              </label>
-              <Select<SelectOption>
-                inputId="scen-master_world"
-                options={masterWorldOptions}
-                value={selectedMasterWorldForForm}
-                onChange={handleMasterWorldChangeForForm}
-                isDisabled={isLoadingWorlds}
-                placeholder="Select Master World..."
-                className="text-black"
-                classNamePrefix="react-select"
-                styles={
-                  {
-                   // Estilos para tema escuro
-                  control: (base, state) => ({
-                    ...base,
-                    backgroundColor: "#343a40", // bg-gray-800
-                    borderColor: state.isFocused ? "#f8f9fa" : "#343a40", // border-blue-500 (focus), border-gray-600
-                    boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
-                    "&:hover": { borderColor: "#f8f9fa" }, // border-gray-500 (hover)
-                    minHeight: "42px", // Para alinhar com inputs padrão
-                  }),
-                  singleValue: (base) => ({ ...base, color: "white" }),
-                  menu: (base) => ({
-                    ...base,
-                    backgroundColor: "#495057",
-                    zIndex: 10,
-                  }),
-                  option: (base, { isFocused, isSelected }) => ({
-                    ...base,
-                    backgroundColor: isSelected
-                    ? "#adb5bd"
-                    : isFocused
-                    ? "#dee2e6"
-                    : "#495057", // bg-blue-600 (selected), bg-gray-700 (focus)
-                    color: isSelected || isFocused ? "#212529" : "#fff", // text-app-bg or white
+              <div>
+                <label
+                  htmlFor="scen-name"
+                  className="block text-sm font-medium text-app-accent-2 mb-2"
+                >
+                  Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  id="scen-name"
+                  autoComplete="off"
+                  value={formFields.name}
+                  onChange={handleStaticInputChange}
+                  required
+                  className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="scen-master_world"
+                  className="block text-sm font-medium text-gray-300 mb-2"
+                >
+                  Master World
+                </label>
+                <Select<SelectOption>
+                  inputId="scen-master_world"
+                  options={masterWorldOptions}
+                  value={selectedMasterWorldForForm}
+                  onChange={handleMasterWorldChangeForForm}
+                  isDisabled={isLoadingWorlds}
+                  placeholder="Select Master World..."
+                  className="text-black"
+                  classNamePrefix="react-select"
+                  styles={{
+                    control: (base, state) => ({
+                      ...base,
+                      backgroundColor: "#343a40",
+                      borderColor: state.isFocused ? "#f8f9fa" : "#343a40",
+                      boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
+                      "&:hover": { borderColor: "#f8f9fa" },
+                      minHeight: "42px",
+                    }),
+                    singleValue: (base) => ({ ...base, color: "white" }),
+                    menu: (base) => ({
+                      ...base,
+                      backgroundColor: "#495057",
+                      zIndex: 10,
+                    }),
+                    option: (base, { isFocused, isSelected }) => ({
+                      ...base,
+                      backgroundColor: isSelected
+                        ? "#adb5bd"
+                        : isFocused
+                        ? "#dee2e6"
+                        : "#495057",
+                      color: isSelected || isFocused ? "#212529" : "#fff",
                       ':active': { backgroundColor: "#f8f9fa", color: "#212529" },
-                  }),
+                    }),
                     placeholder: (base) => ({ ...base, color: "#9CA3AF" }),
                     input: (base) => ({ ...base, color: "#fff" }),
                     dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
                     clearIndicator: (base) => ({ ...base, color: "#9CA3AF", ':hover': { color: "#fff" } }),
                     indicatorSeparator: (base) => ({ ...base, backgroundColor: "#343a40" }),
                   }}
-              />
-            </div>
+                />
+              </div>
 
-            <div>
-              <label
-                htmlFor="scen-name"
-                className="block text-sm font-medium text-gray-300 mb-2"
-              >
-                Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="name"
-                id="scen-name"
-                autoComplete="off"
-                value={formFields.name}
-                onChange={handleStaticInputChange}
-                required
-                className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="scen-description"
-                className="block text-sm font-medium text-gray-300 mb-2"
-              >
-                Description
-              </label>
-              <textarea
-                name="description"
-                id="scen-description"
-                autoComplete="off"
-                rows={4}
-                value={formFields.description}
-                onChange={handleStaticInputChange}
-                className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="scen-instructions"
-                className="block text-sm font-medium text-gray-300 mb-2"
-              >
-                Instructions
-              </label>
-              <textarea
-                name="instructions"
-                id="scen-instructions"
-                autoComplete="off"
-                rows={4}
-                value={formFields.instructions}
-                onChange={handleStaticInputChange}
-                className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Example Dialogues Section */}
-            <div className="space-y-2 mb-2">
-              <div className="flex justify-between items-center">
-                <label className="block text-sm font-medium text-gray-300">
-                  Example Dialogues ({currentDialogueIndex + 1}/{currentExampleDialogues.length})
+              <div>
+                <label
+                  htmlFor="scen-description"
+                  className="block text-sm font-medium text-gray-300 mb-2"
+                >
+                  Description
                 </label>
-                <div className="flex space-x-2">
+                <textarea
+                  name="description"
+                  id="scen-description"
+                  autoComplete="off"
+                  rows={4}
+                  value={formFields.description}
+                  onChange={handleStaticInputChange}
+                  className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="scen-instructions"
+                  className="block text-sm font-medium text-gray-300 mb-2"
+                >
+                  Instructions
+                </label>
+                <textarea
+                  name="instructions"
+                  id="scen-instructions"
+                  autoComplete="off"
+                  rows={4}
+                  value={formFields.instructions}
+                  onChange={handleStaticInputChange}
+                  className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Example Dialogues Section */}
+              <div className="space-y-2 mb-2">
+                <div className="flex justify-between items-center">
+                  <label className="block text-sm font-medium text-gray-300">
+                    Example Dialogues ({currentDialogueIndex + 1}/{currentExampleDialogues.length})
+                  </label>
+                  <div className="flex space-x-2">
+                    <button
+                      type="button"
+                      onClick={addDialogueField}
+                      className="text-xs bg-app-accent-3 hover:bg-app-accent text-black font-semibold py-1 px-2 rounded-md"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      onClick={removeCurrentDialogueField}
+                      className="text-xs bg-app-accent-3 hover:bg-app-accent text-black font-semibold py-1 px-2 rounded-md disabled:opacity-50"
+                      disabled={currentExampleDialogues.length === 1 && currentExampleDialogues[0].trim() === ""}
+                    >
+                      -
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  rows={3}
+                  value={currentExampleDialogues[currentDialogueIndex] || ""}
+                  onChange={(e) => handleCurrentDialogueChange(e.target.value)}
+                  className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+                />
+                <div className="flex justify-start space-x-2 mt-2">
                   <button
                     type="button"
-                    onClick={addDialogueField}
-                    className="text-xs bg-app-accent-3 hover:bg-app-accent text-black font-semibold py-1 px-2 rounded-md"
+                    onClick={() => navigateDialogues("prev")}
+                    disabled={currentDialogueIndex === 0}
+                    className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
                   >
-                    +
+                    Previous
                   </button>
                   <button
                     type="button"
-                    onClick={removeCurrentDialogueField}
-                    className="text-xs bg-app-accent-3 hover:bg-app-accent text-black font-semibold py-1 px-2 rounded-md disabled:opacity-50"
-                    disabled={currentExampleDialogues.length === 1 && currentExampleDialogues[0].trim() === ""}
+                    onClick={() => navigateDialogues("next")}
+                    disabled={currentDialogueIndex === currentExampleDialogues.length - 1}
+                    className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
                   >
-                    -
+                    Next
                   </button>
                 </div>
               </div>
-              <textarea
-                rows={3}
-                value={currentExampleDialogues[currentDialogueIndex] || ""}
-                onChange={(e) => handleCurrentDialogueChange(e.target.value)}
-                className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
-              />
-              <div className="flex justify-start space-x-2 mt-2">
-                <button
-                  type="button"
-                  onClick={() => navigateDialogues("prev")}
-                  disabled={currentDialogueIndex === 0}
-                  className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigateDialogues("next")}
-                  disabled={currentDialogueIndex === currentExampleDialogues.length - 1}
-                  className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
 
-            <div className="space-y-2 mt-2">
-              <div className="flex justify-between items-center">
-                <label className="block text-sm font-medium text-gray-300">
-                  Beginning Messages ({currentBmgIndex + 1}/{currentBeginningMessages.length})
-                </label>
-                <div className="flex space-x-2">
+              <div className="space-y-2 mt-2">
+                <div className="flex justify-between items-center">
+                  <label className="block text-sm font-medium text-gray-300">
+                    Beginning Messages ({currentBmgIndex + 1}/{currentBeginningMessages.length})
+                  </label>
+                  <div className="flex space-x-2">
+                    <button
+                      type="button"
+                      onClick={addBmgField}
+                      className="text-xs bg-app-accent-3 hover:bg-app-accent text-black font-semibold py-1 px-2 rounded-md"
+                      title="Add New Beginning Message"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      onClick={removeCurrentBmgField}
+                      className="text-xs bg-app-accent-3 hover:bg-app-accent text-black font-semibold py-1 px-2 rounded-md disabled:opacity-50"
+                      disabled={currentBeginningMessages.length === 1 && currentBeginningMessages[0].trim() === ""}
+                      title="Remove Current Beginning Message"
+                    >
+                      -
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  id="scen-beginning_message"
+                  rows={3}
+                  value={currentBeginningMessages[currentBmgIndex] || ""}
+                  onChange={(e) => handleCurrentBmgChange(e.target.value)}
+                  className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white font-mono text-sm focus:ring-blue-500 focus:border-blue-500"
+                />
+                <div className="flex justify-start space-x-2 mt-2">
                   <button
                     type="button"
-                    onClick={addBmgField}
-                    className="text-xs bg-app-accent-3 hover:bg-app-accent text-black font-semibold py-1 px-2 rounded-md"
-                    title="Add New Beginning Message"
+                    onClick={() => navigateBmg("prev")}
+                    disabled={currentBmgIndex === 0}
+                    className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
                   >
-                    +
+                    Previous
                   </button>
                   <button
                     type="button"
-                    onClick={removeCurrentBmgField}
-                    className="text-xs bg-app-accent-3 hover:bg-app-accent text-black font-semibold py-1 px-2 rounded-md disabled:opacity-50"
-                    disabled={currentBeginningMessages.length === 1 && currentBeginningMessages[0].trim() === ""}
-                    title="Remove Current Beginning Message"
+                    onClick={() => navigateBmg("next")}
+                    disabled={currentBmgIndex === currentBeginningMessages.length - 1}
+                    className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
                   >
-                    -
+                    Next
                   </button>
                 </div>
               </div>
-              <textarea
-                id="scen-beginning_message"
-                rows={3}
-                value={currentBeginningMessages[currentBmgIndex] || ""}
-                onChange={(e) => handleCurrentBmgChange(e.target.value)}
-                className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white font-mono text-sm focus:ring-blue-500 focus:border-blue-500"
-              />
-              <div className="flex justify-start space-x-2 mt-2">
-                <button
-                  type="button"
-                  onClick={() => navigateBmg("prev")}
-                  disabled={currentBmgIndex === 0}
-                  className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigateBmg("next")}
-                  disabled={currentBmgIndex === currentBeginningMessages.length - 1}
-                  className="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded-md disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-
-            <div className="flex gap-2 mt-4">
-              <button
-                type="submit"
-                className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (editingScenario ? "Saving..." : "Creating...") : (editingScenario ? "Save Changes" : "Create Scenario")}
-              </button>
-              {/* Export button inside modal */}
-              {editingScenario && (
-                <ExportButton cardData={editingScenario} cardType="scenario_card" imageUrl={editingScenario.image_url} />
-              )}
-            </div>
-          </form>
-          {/* Image preview section, always 3/4.5 aspect ratio, large, centered, with framer-motion pop-up */}
-          <div className="flex-shrink-0 flex items-center justify-center" style={{ minWidth: 240, maxWidth: 320 }}>
-            <div className="w-[240px] max-w-[320px] aspect-[3/4.5] flex items-center justify-center">
-              <AnimatePresence>
-                {(imageFile || (editingScenario && editingScenario.image_url && !imageRemoved)) ? (
-                  <motion.img
-                    key="scenario-image-preview"
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.8, opacity: 0 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                    src={imageFile ? URL.createObjectURL(imageFile) : editingScenario?.image_url || ''}
-                    alt="Preview"
-                    className="rounded-lg object-cover w-full h-full border border-gray-700 shadow"
-                    style={{ aspectRatio: '3/4.5' }}
-                  />
-                ) : (
-                  <motion.div
-                    key="scenario-image-placeholder"
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.8, opacity: 0 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                    className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-500 rounded-lg border border-gray-700"
-                    style={{ aspectRatio: '3/4.5' }}
-                  >
-                    <span className="material-icons-outlined text-5xl">image</span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </div>
           </div>
-        </div>
+        </form>
       </Modal>
     </div>
   );

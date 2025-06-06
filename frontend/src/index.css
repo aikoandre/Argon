@@ -3,36 +3,40 @@
 @tailwind utilities;
 
 /* Custom scrollbar for Webkit browsers (Chrome, Safari) */
-::-webkit-scrollbar {
+body::-webkit-scrollbar {
+  display: none; /* Hide document scrollbar */
+}
+
+/* Keep these for other elements that need scrollbars */
+.scrollable::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-::-webkit-scrollbar-track {
+.scrollable::-webkit-scrollbar-track {
   background: rgba(222, 226, 230, 0.1); /* app-accent-2 with translucency */
   border-radius: 10px;
 }
 
-::-webkit-scrollbar-thumb {
+.scrollable::-webkit-scrollbar-thumb {
   background-color: rgba(248, 249, 250, 0.4); /* app-accent with translucency */
   border-radius: 10px;
   border: 2px solid transparent; /* Creates padding around the thumb */
   background-clip: content-box; /* Ensures border doesn't obscure transparency */
 }
 
-::-webkit-scrollbar-thumb:hover {
+.scrollable::-webkit-scrollbar-thumb:hover {
   background-color: rgba(248, 249, 250, 0.6); /* app-accent, slightly less transparent on hover */
 }
 
 /* Custom scrollbar for Firefox */
 html, body {
   height: 100%;
-  overflow: hidden;
+  overflow: hidden; /* Hide document scrollbar */
 }
 
 html {
-  scrollbar-width: thin; /* "auto" or "thin" */
-  scrollbar-color: rgba(248, 249, 250, 0.4) rgba(222, 226, 230, 0.1); /* thumb and track color */
+  scrollbar-width: none; /* Hide scrollbar for Firefox */
 }
 
 /* Thin, transparent scrollbar for chat area */
@@ -50,6 +54,14 @@ html {
 .scrollbar-thin {
   scrollbar-width: thin;
   scrollbar-color: rgba(248, 249, 250, 0.4) transparent;
+}
+
+/* Tailwind scrollbar utilities support */
+.scrollbar-thumb-app-accent::-webkit-scrollbar-thumb {
+  background-color: rgba(248, 249, 250, 0.4);
+}
+.scrollbar-track-app-surface\/30::-webkit-scrollbar-track {
+  background-color: rgba(222, 226, 230, 0.3);
 }
 
 @keyframes modalShow {

@@ -14,7 +14,6 @@ import {
 } from "../services/api";
 import { CardImage } from '../components/CardImage';
 import { createPNGWithEmbeddedData } from '../utils/pngExport';
-import { AnimatePresence, motion } from 'framer-motion';
 import ExportButton from '../components/ExportButton';
 
 const iconBaseClass = "material-icons-outlined text-2xl flex-shrink-0";
@@ -38,30 +37,120 @@ interface PersonaFormData {
   master_world_id: string | null;
 }
 
-// Componente de Modal simples (você pode criar um arquivo separado para ele depois)
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   children: React.ReactNode;
   title: string;
+  imageFile?: File | null;
+  editingPersona?: UserPersonaData | null;
+  onImageClick?: () => void;
+  isSubmitting?: boolean;
 }
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
-  if (!isOpen) return null;
 
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title, imageFile, editingPersona, onImageClick, isSubmitting }) => {
+  if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-app-bg p-6 rounded-2xl shadow-xl w-full max-w-lg text-white transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalShow">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-semibold">{title}</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl"
-          >
-            ×
-          </button>
+    <>
+      {/* Modal overlay */}
+      <div className="fixed inset-0 bg-black bg-opacity-75 z-[60]" />
+      {/* Modal content - centered */}
+      <div className="fixed inset-0 flex items-center justify-center z-[60] p-4">
+        <div className="bg-app-bg rounded-2xl shadow-xl text-white relative w-full max-w-xl lg:max-w-2xl max-h-[60vh] h-[60vh] flex flex-row overflow-hidden">
+          {/* Left column - Image preview and buttons */}
+          <div className="flex-shrink-0 p-6 flex flex-col md:w-auto w-full relative">
+            {/* Title */}
+            <h2 className="text-2xl font-semibold mb-6 z-10">{title}</h2>
+            
+            {/* Image Preview */}
+            <div className="w-[280px] flex items-center justify-center rounded-lg overflow-hidden mb-4" style={{ aspectRatio: '3/4.5' }}>
+              <ModalImagePreview 
+                inlineOnly 
+                imageFile={imageFile}
+                editingPersona={editingPersona}
+                onImageClick={onImageClick}
+              />
+            </div>
+            
+            {/* Save & Export Buttons */}
+            <div className="flex gap-2 justify-center">
+              <button
+                type="submit"
+                form="persona-form"
+                className="bg-app-accent-2 text-app-surface font-semibold px-2 rounded-lg shadow-md"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (editingPersona ? "Saving..." : "Creating...") : (editingPersona ? "Save Changes" : "Create Persona")}
+              </button>
+              {editingPersona && (
+                <ExportButton cardData={editingPersona} cardType="user_persona" imageUrl={editingPersona.image_url} />
+              )}
+            </div>
+          </div>
+          {/* Form content container - ensure scroll works */}
+          <div className="flex-1 p-6 md:pl-0 flex flex-col min-w-[320px] min-h-0 h-full overflow-y-auto max-h-[75vh] scrollbar-thin">
+            <div className="flex items-center flex-shrink-0 relative">
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-white text-3xl flex-shrink-0 absolute right-0 mt-4"
+              >
+                ×
+              </button>
+            </div>
+            <div className="flex-1">
+              {children}
+            </div>
+          </div>
         </div>
-        {children}
       </div>
+    </>
+  );
+};
+
+// ModalImagePreview component for personas
+const ModalImagePreview: React.FC<{ 
+  inlineOnly?: boolean; 
+  imageFile?: File | null; 
+  editingPersona?: UserPersonaData | null; 
+  onImageClick?: () => void;
+}> = ({ inlineOnly, imageFile, editingPersona, onImageClick }) => {
+  // Use props if provided, otherwise fall back to window data
+  const data = inlineOnly ? { imageFile, editingPersona } : (window as any)._modalImagePreviewData;
+  if (!data && !inlineOnly) return null;
+  
+  const { imageFile: dataImageFile, editingPersona: dataEditingPersona } = data || {};
+  const showImage = dataImageFile || (dataEditingPersona && dataEditingPersona.image_url);
+  
+  if (inlineOnly) {
+    return (
+      <div 
+        className="w-full h-full flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
+        onClick={onImageClick}
+      >
+        {showImage ? (
+          <img
+            src={dataImageFile ? URL.createObjectURL(dataImageFile) : dataEditingPersona?.image_url || ''}
+            className="rounded-lg object-cover w-full h-full border border-gray-700 shadow-lg"
+            style={{ aspectRatio: '3/4.5' }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-500 rounded-lg border border-gray-700">
+            <span className="material-icons-outlined text-5xl">image</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+  
+  if (!showImage) return null;
+  
+  return (
+    <div className="fixed left-1/2 top-1/2 -translate-x-[calc(100%+80px)] -translate-y-1/2 z-50 animate-slide-in-left pointer-events-none">
+      <img
+        src={dataImageFile ? URL.createObjectURL(dataImageFile) : dataEditingPersona?.image_url || ''}
+        className="rounded-lg object-cover w-full h-full border border-gray-700 shadow-lg"
+        style={{ aspectRatio: '3/4.5' }}
+      />
     </div>
   );
 };
@@ -83,7 +172,9 @@ const PersonasPage: React.FC = () => {
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
   const [imageRemoved, setImageRemoved] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // State for MasterWorld dropdown
   const [masterWorlds, setMasterWorlds] = useState<MasterWorldData[]>([]);
@@ -164,12 +255,15 @@ const PersonasPage: React.FC = () => {
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle image click to open file picker
+  const handleImageClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Handle file input change
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     handleImageChangeOrDelete(file || null);
-  };
-  const handleRemoveImage = () => {
-    handleImageChangeOrDelete(null);
   };
 
   const handleOpenModal = (persona?: UserPersonaData) => {
@@ -217,6 +311,8 @@ const PersonasPage: React.FC = () => {
     setImageRemoved(false);
     setSelectedMasterWorldForForm(null);
     setError(null);
+    // Clear window data for ModalImagePreview
+    (window as any)._modalImagePreviewData = null;
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -226,7 +322,7 @@ const PersonasPage: React.FC = () => {
       return;
     }
 
-    setIsLoading(true);
+    setIsSubmitting(true);
     setError(null);
     try {
       const personaFormData = new FormData();
@@ -267,7 +363,7 @@ const PersonasPage: React.FC = () => {
       );
       console.error(err);
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -363,20 +459,20 @@ const PersonasPage: React.FC = () => {
     }
   };
 
-  // Helper function for truncating filenames
-  const truncateFilename = (filename: string | null | undefined, maxLength = 20): string => {
-    if (!filename) return "Select Image";
-    if (filename.length <= maxLength) return filename;
-    return filename.substring(0, maxLength - 3) + '...';
-  };
-
-  // Prepare options for the Master World dropdown <-- Added this mapping inside the component
+  // Prepare options for the Master World dropdown
   const masterWorldOptionsForForm: SelectOption[] = masterWorlds.map((w) => ({
     value: w.id,
     label: w.name,
   }));
   // Add a "No Master World" option
   masterWorldOptionsForForm.unshift({ value: "", label: "No Master World" });
+
+  // Update window data for ModalImagePreview whenever relevant state changes
+  useEffect(() => {
+    if (isModalOpen) {
+      (window as any)._modalImagePreviewData = { imageFile, editingPersona };
+    }
+  }, [isModalOpen, imageFile, editingPersona]);
 
   if (isLoading && personas.length === 0 && isLoadingWorlds) {
     // Mostra loading só na primeira carga
@@ -386,12 +482,12 @@ const PersonasPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-8 text-white">
+    <div className="container mx-auto p-4 md:p-8 max-h-screen overflow-y-auto custom-scrollbar">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold font-quintessential text-white">Personas</h1>
         <div>
           <button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => importFileInputRef.current?.click()}
             className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md mr-2"
           >
             Import
@@ -400,7 +496,7 @@ const PersonasPage: React.FC = () => {
             type="file"
             accept=".png,.zip"
             style={{ display: 'none' }}
-            ref={fileInputRef}
+            ref={importFileInputRef}
             onChange={handleImportFile}
           />
           <button
@@ -429,211 +525,131 @@ const PersonasPage: React.FC = () => {
           <div
             key={persona.id}
             className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer group"
-            onClick={() => handleActivatePersona(persona.id)}
-            title={activePersonaId === persona.id ? 'Active' : 'Click to activate'}
+            onClick={() => handleOpenModal(persona)}
+            title="Click to open modal"
           >
             <CardImage
               imageUrl={persona.image_url ?? null}
               className="absolute inset-0"
             />
-            <div className="absolute top-2 right-2 flex space-x-2 z-10">
-              <button
-                onClick={e => { e.stopPropagation(); handleOpenModal(persona); }}
-                className="text-gray-400 hover:text-app-accent transition-colors"
-                title="Edit Persona"
-              >
-                <EditIcon className="h-5 w-5" />
-              </button>
               <button
                 onClick={e => { e.stopPropagation(); handleDelete(persona.id); }}
-                className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full"
+                className="absolute top-2 right-3 z-20 text-app-accent hover:text-red-500 p-1.5 rounded-full transition-colors"
                 title="Delete Persona"
               >
-                <DeleteIcon className="h-5 w-5" />
+                <DeleteIcon className="w-5 h-5" />
               </button>
-              <button
-                onClick={e => { e.stopPropagation(); handleExport(persona); }}
-                className="text-gray-400 hover:text-green-500 transition-colors p-1 rounded-full"
-                title="Export Persona"
-              >
-                <span className="material-icons-outlined h-5 w-5">file_download</span>
-              </button>
-            </div>
             <div className="absolute bottom-0 left-0 w-full bg-black/30 backdrop-blur-sm p-3 flex items-center rounded-b-lg">
               <h2 className="text-lg font-semibold text-white break-words whitespace-normal flex-1 leading-snug truncate" title={persona.name}>{persona.name}</h2>
-              {activePersonaId === persona.id && (
-                <span className="ml-2 bg-app-accent text-app-surface text-xs px-2 py-0.5 rounded-full font-semibold">Active</span>
-              )}
+              <button
+                onClick={e => { e.stopPropagation(); handleActivatePersona(persona.id); }}
+                className={`ml-2 text-black px-3 py-1 rounded-2xl text-sm font-semibold transition-colors ${
+                  activePersonaId === persona.id 
+                    ? 'bg-app-accent text-app-surface hover:bg-app-accent/80' 
+                    : 'bg-gray-600 text-white hover:bg-gray-500'
+                }`}
+                title={activePersonaId === persona.id ? 'Click to deactivate' : 'Click to activate'}
+              >
+                {activePersonaId === persona.id ? 'Active' : 'Inactive'}
+              </button>
             </div>
           </div>
         ))}
       </div>
 
+      {/* Hidden file input for image upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
+
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         title={editingPersona ? "Edit Persona" : "Create New Persona"}
+        imageFile={imageFile}
+        editingPersona={editingPersona}
+        onImageClick={handleImageClick}
+        isSubmitting={isSubmitting}
       >
-        <div className="flex flex-row gap-4 min-h-[320px] items-center justify-center">
-          {/* Form section */}
-          <form
-            onSubmit={handleSubmit}
-            className="flex-1 space-y-2 max-h-[70vh] overflow-y-auto p-1 pr-4 custom-scrollbar min-w-[320px]"
-            style={{ maxWidth: 400 }}
-          >
-            {error && isModalOpen && (
-              <p className="bg-red-700 text-white p-3 rounded-md text-sm text-center">
-                {error}
-              </p>
-            )}
-            <div className="mb-2">
-              <label className="block text-sm font-medium text-gray-300 mb-2">Image</label>
-              <div className="flex items-center">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex-1 bg-app-surface hover:bg-gray-600 text-white font-semibold py-2 rounded-l-md flex items-center justify-center focus:outline-none h-11 overflow-hidden whitespace-nowrap"
-                >
-                  <span className="material-icons-outlined w-5 h-5 mr-2 flex-shrink-0">image</span>
-                  <span className="block truncate">
-                    {imageFile
-                      ? truncateFilename(imageFile.name)
-                      : (imageRemoved
-                          ? "Select Image"
-                          : (editingPersona && editingPersona.image_url
-                              ? truncateFilename(editingPersona.image_url.split('/').pop() as string)
-                              : "Select Image"))}
-                  </span>
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageUpload}
-                />
-                <span className="h-11 w-px bg-gray-600" />
-                <button
-                  type="button"
-                  onClick={handleRemoveImage}
-                  className="bg-app-surface hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-r-md flex items-center justify-center focus:outline-none h-11"
-                  disabled={!(imageFile || (editingPersona && editingPersona.image_url && !imageRemoved))}
-                >
-                  <DeleteIcon className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-            <div>
-              <label htmlFor="persona-master_world" className="block text-sm font-medium text-gray-300 mb-1">Master World (Optional)</label>
-              <Select<SelectOption>
-                inputId="persona-master_world"
-                options={masterWorlds.map((w) => ({ value: w.id, label: w.name }))}
-                value={selectedMasterWorldForForm}
-                onChange={handleMasterWorldChangeForForm}
-                isDisabled={isLoadingWorlds}
-                placeholder="Select Master World..."
-                isClearable={true}
-                className="text-black"
-                classNamePrefix="react-select"
-                styles={{
-                  control: (base, state) => ({
-                    ...base,
-                    backgroundColor: "#343a40",
-                    borderColor: state.isFocused ? "#f8f9fa" : "#343a40",
-                    boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
-                    "&:hover": { borderColor: "#f8f9fa" },
-                    minHeight: "42px",
-                  }),
-                  singleValue: (base) => ({ ...base, color: "white" }),
-                  menu: (base) => ({ ...base, backgroundColor: "#495057", zIndex: 10 }),
-                  option: (base, { isFocused, isSelected }) => ({
-                    ...base,
-                    backgroundColor: isSelected
-                      ? "#adb5bd"
-                      : isFocused
-                      ? "#dee2e6"
-                      : "#495057",
-                    color: isSelected || isFocused ? "#212529" : "#fff",
-                    ':active': { backgroundColor: "#f8f9fa", color: "#212529" },
-                  }),
-                  placeholder: (base) => ({ ...base, color: "#9CA3AF" }),
-                  input: (base) => ({ ...base, color: "#fff" }),
-                  dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
-                  clearIndicator: (base) => ({ ...base, color: "#9CA3AF", ':hover': { color: "#fff" } }),
-                  indicatorSeparator: (base) => ({ ...base, backgroundColor: "#343a40" }),
-                }}
-              />
-            </div>
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1">Name <span className="text-red-500">*</span></label>
-              <input
-                type="text"
-                name="name"
-                id="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                required
-                className="w-full p-2 bg-app-surface border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-300 mb-1">Description</label>
-              <textarea
-                name="description"
-                id="description"
-                rows={4}
-                value={formData.description || ""}
-                onChange={handleInputChange}
-                className="w-full p-2 bg-app-surface border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            <div className="flex gap-2 mt-4">
-              <button
-                type="submit"
-                className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
-                disabled={isLoading}
-              >
-                {isLoading ? (editingPersona ? "Saving..." : "Creating...") : (editingPersona ? "Save Changes" : "Create Persona")}
-              </button>
-              {/* Export button inside modal */}
-              {editingPersona && (
-                <ExportButton cardData={editingPersona} cardType="user_persona" imageUrl={editingPersona.image_url} />
-              )}
-            </div>
-          </form>
-          {/* Image preview section, always 3/4.5 aspect ratio, large, centered, with framer-motion pop-up */}
-          <div className="flex-shrink-0 flex items-center justify-center" style={{ minWidth: 240, maxWidth: 320 }}>
-            <div className="w-[240px] max-w-[320px] aspect-[3/4.5] flex items-center justify-center">
-              <AnimatePresence>
-                {(imageFile || (editingPersona && editingPersona.image_url && !imageRemoved)) ? (
-                  <motion.img
-                    key="persona-image-preview"
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.8, opacity: 0 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                    src={imageFile ? URL.createObjectURL(imageFile) : editingPersona?.image_url || ''}
-                    alt="Preview"
-                    className="rounded-lg object-cover w-full h-full border border-gray-700 shadow"
-                    style={{ aspectRatio: '3/4.5' }}
-                  />
-                ) : (
-                  <motion.div
-                    key="persona-image-placeholder"
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.8, opacity: 0 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                    className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-500 rounded-lg border border-gray-700"
-                    style={{ aspectRatio: '3/4.5' }}
-                  >
-                    <span className="material-icons-outlined text-5xl">image</span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+        <form
+          id="persona-form"
+          onSubmit={handleSubmit}
+          className="space-y-4"
+        >
+          {error && isModalOpen && (
+            <p className="g-app-accent-2/20 border border-app-accent-3 text-app-accent p-3 rounded-md text-sm">
+              {error}
+            </p>
+          )}
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium text-app-accent-2 mb-2">Name <span className="text-red-500">*</span></label>
+            <input
+              type="text"
+              name="name"
+              id="name"
+              value={formData.name}
+              onChange={handleInputChange}
+              required
+              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+            />
           </div>
-        </div>
+          <div>
+            <label htmlFor="persona-master_world" className="block text-sm font-medium text-gray-300 mb-1">Master World (Optional)</label>
+            <Select<SelectOption>
+              inputId="persona-master_world"
+              options={masterWorldOptionsForForm}
+              value={selectedMasterWorldForForm}
+              onChange={handleMasterWorldChangeForForm}
+              isDisabled={isLoadingWorlds}
+              placeholder="Select Master World..."
+              isClearable={true}
+              className="text-black"
+              classNamePrefix="react-select"
+              styles={{
+                control: (base, state) => ({
+                  ...base,
+                  backgroundColor: "#343a40",
+                  borderColor: state.isFocused ? "#f8f9fa" : "#343a40",
+                  boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
+                  "&:hover": { borderColor: "#f8f9fa" },
+                  minHeight: "42px",
+                }),
+                singleValue: (base) => ({ ...base, color: "white" }),
+                menu: (base) => ({ ...base, backgroundColor: "#495057", zIndex: 10 }),
+                option: (base, { isFocused, isSelected }) => ({
+                  ...base,
+                  backgroundColor: isSelected
+                    ? "#adb5bd"
+                    : isFocused
+                    ? "#dee2e6"
+                    : "#495057",
+                  color: isSelected || isFocused ? "#212529" : "#fff",
+                  ':active': { backgroundColor: "#f8f9fa", color: "#212529" },
+                }),
+                placeholder: (base) => ({ ...base, color: "#9CA3AF" }),
+                input: (base) => ({ ...base, color: "#fff" }),
+                dropdownIndicator: (base) => ({ ...base, color: "#9CA3AF" }),
+                clearIndicator: (base) => ({ ...base, color: "#9CA3AF", ':hover': { color: "#fff" } }),
+                indicatorSeparator: (base) => ({ ...base, backgroundColor: "#343a40" }),
+              }}
+            />
+          </div>
+          <div>
+            <label htmlFor="description" className="block text-sm font-medium text-gray-300 mb-1">Description</label>
+            <textarea
+              name="description"
+              id="description"
+              rows={8}
+              value={formData.description || ""}
+              onChange={handleInputChange}
+              className="w-full p-2 bg-app-surface border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+        </form>
       </Modal>
     </div>
   );

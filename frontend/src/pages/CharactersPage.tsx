@@ -1,5 +1,9 @@
 import React, { useState, useEffect, type FormEvent, useRef } from "react";
 import Select, { type SingleValue } from "react-select";
+import { useNavigate } from "react-router-dom";
+import { 
+  createOrGetCardChat,
+} from "../services/api";
 import {
   getAllCharacterCards,
   createCharacterCard,
@@ -10,8 +14,10 @@ import {
   type MasterWorldData,
 } from "../services/api";
 import { CardImage } from "../components/CardImage";
-import ImportButton from "../components/ImportButton";
+import { createPNGWithEmbeddedData } from '../utils/pngExport';
 import ExportButton from "../components/ExportButton";
+
+const iconBaseClass = "material-icons-outlined text-2xl flex-shrink-0";
 
 // Modal component (inline, as in other pages)
 interface ModalProps {
@@ -22,20 +28,25 @@ interface ModalProps {
   imageFile?: File | null;
   editingCharacter?: CharacterCardData | null;
   onImageClick?: () => void;
+  formRef?: React.RefObject<HTMLFormElement | null>;
+  isSubmitting?: boolean;
 }
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title, imageFile, editingCharacter, onImageClick }) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title, imageFile, editingCharacter, onImageClick, formRef, isSubmitting }) => {
   if (!isOpen) return null;
   return (
     <>
       {/* Modal overlay */}
-      <div className="fixed inset-0 bg-black bg-opacity-75 z-40" />
+      <div className="fixed inset-0 bg-black bg-opacity-75 z-[60]" />
       {/* Modal content - centered */}
-      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-        <div className="bg-app-bg rounded-2xl shadow-xl text-white relative w-full max-w-xl lg:max-w-2xl max-h-[75vh] flex flex-col md:flex-row overflow-hidden">
-          {/* Image preview container */}
-          <div className="flex-shrink-0 p-6 flex items-center justify-center md:w-auto w-full relative">
-            <h2 className="absolute top-6 left-6 text-2xl font-semibold z-10">{title}</h2>
-            <div className="w-[280px] flex items-center justify-center rounded-lg overflow-hidden" style={{ aspectRatio: '3/4.5' }}>
+      <div className="fixed inset-0 flex items-center justify-center z-[60] p-4">
+        <div className="bg-app-bg rounded-2xl shadow-xl text-white relative w-full max-w-xl lg:max-w-2xl max-h-[60vh] h-[60vh] flex flex-row overflow-hidden">
+          {/* Left column - Image preview and buttons */}
+          <div className="flex-shrink-0 p-6 flex flex-col md:w-auto w-full relative">
+            {/* Title */}
+            <h2 className="text-2xl font-semibold mb-6 z-10">{title}</h2>
+            
+            {/* Image Preview */}
+            <div className="w-[280px] flex items-center justify-center rounded-lg overflow-hidden mb-4" style={{ aspectRatio: '3/4.5' }}>
               <ModalImagePreview 
                 inlineOnly 
                 imageFile={imageFile}
@@ -43,10 +54,29 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title, imageFi
                 onImageClick={onImageClick}
               />
             </div>
+            
+            {/* Save & Export Buttons */}
+            <div className="flex gap-2 justify-center">
+              <button
+                type="submit"
+                form="character-form"
+                onClick={(e) => {
+                  e.preventDefault();
+                  formRef?.current?.requestSubmit();
+                }}
+                className="bg-app-accent-2 text-app-surface font-semibold px-2 rounded-lg shadow-md"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (editingCharacter ? "Saving..." : "Creating...") : (editingCharacter ? "Save Changes" : "Create Character")}
+              </button>
+              {editingCharacter && (
+                <ExportButton cardData={editingCharacter} cardType="character_card" imageUrl={editingCharacter.image_url} />
+              )}
+            </div>
           </div>
-          {/* Form content container */}
-          <div className="flex-1 p-6 md:pl-0 flex flex-col min-w-[320px]">
-            <div className="flex items-center mb-4 flex-shrink-0 relative">
+          {/* Form content container - ensure scroll works */}
+          <div className="flex-1 p-6 md:pl-0 flex flex-col min-w-[320px] min-h-0 h-full overflow-y-auto max-h-[75vh] scrollbar-thin">
+            <div className="flex items-center flex-shrink-0 relative">
               <button
                 onClick={onClose}
                 className="text-gray-400 hover:text-white text-3xl flex-shrink-0 absolute right-0 mt-4"
@@ -54,7 +84,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title, imageFi
                 ×
               </button>
             </div>
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1">
               {children}
             </div>
           </div>
@@ -129,13 +159,8 @@ const initialFormFields: CharacterFormData = {
 };
 
 const CharactersPage: React.FC = () => {
-  const handleImport = (data: any) => {
-    // TODO: Implement import logic using extractJSONFromPNG or extractDataFromZip
-    // For now, just log the data
-    console.log('Imported character data:', data);
-    // Example: setCharacters(importedCharacters);
-  };
-
+  const navigate = useNavigate();
+  
   // State management
   const [characters, setCharacters] = useState<CharacterCardData[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -156,6 +181,7 @@ const CharactersPage: React.FC = () => {
   const [currentBmgIndex, setCurrentBmgIndex] = useState<number>(0);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   // Estados para MasterWorld
@@ -407,15 +433,75 @@ const CharactersPage: React.FC = () => {
       setIsSubmitting(false);
     }
   };
-  const handleDelete = async (characterId: string) => {
+
+  const handleCharacterClick = async (characterId: string) => {
     try {
-      await deleteCharacterCard(characterId);
-      // Refresh the characters list
-      const data = await getAllCharacterCards();
-      setCharacters(data);
+      const chatId = await createOrGetCardChat('character', characterId);
+      navigate(`/chat/${chatId}`);
+    } catch (error) {
+      console.error('Error handling character session:', error);
+      setError('Could not start character session');
+    }
+  };
+
+  // Export handler for character export
+  const handleExport = async (character: CharacterCardData) => {
+    try {
+      const pngBlob = await createPNGWithEmbeddedData(character, 'character_card', character.image_url);
+      const filename = `${(character.name || 'character').replace(/[^a-zA-Z0-9\-_]/g, '_').substring(0, 50)}.png`;
+      const url = URL.createObjectURL(pngBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("Failed to delete character:", err);
-      setError("Failed to delete character");
+      setError('Failed to export character');
+      console.error(err);
+    }
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    if (fileExtension === 'png') {
+      // Handle PNG import
+      try {
+        // TODO: Implement PNG data extraction and populate form fields
+        console.log("PNG import not yet implemented");
+      } catch (err) {
+        console.error("Failed to import PNG:", err);
+        setError("Failed to import PNG");
+      }
+    } else if (fileExtension === 'zip') {
+      // Handle ZIP import
+      try {
+        // TODO: Implement ZIP data extraction and populate form fields
+        console.log("ZIP import not yet implemented");
+      } catch (err) {
+        console.error("Failed to import ZIP:", err);
+        setError("Failed to import ZIP");
+      }
+    } else {
+      setError("Invalid file type. Please upload a PNG or ZIP file.");
+    }
+  };
+
+  const handleDelete = async (characterId: string) => {
+    if (window.confirm('Are you sure you want to delete this character?')) {
+      setIsLoading(true);
+      try {
+        await deleteCharacterCard(characterId);
+        const refreshedData = await getAllCharacterCards();
+        setCharacters(refreshedData);
+      } catch (err: any) {
+        setError(err.response?.data?.detail || 'Failed to delete character.');
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -450,11 +536,16 @@ const CharactersPage: React.FC = () => {
 
   console.log("CharactersPage component returning JSX...");
   return (
-    <div className="container mx-auto p-4 md:p-8 text-white max-h-screen overflow-y-auto custom-scrollbar">
+    <div className="container mx-auto p-4 md:p-8 max-h-screen overflow-y-auto custom-scrollbar">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold font-quintessential text-white">Characters</h1>
-        <div className="flex gap-2">
-          <ImportButton onImport={handleImport} expectedType="character_card" />
+        <div>
+          <button
+            onClick={() => importFileInputRef.current?.click()}
+            className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md mr-2"
+          >
+            Import
+          </button>
           <button
             onClick={() => handleOpenModal()}
             className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
@@ -463,6 +554,16 @@ const CharactersPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Hidden input for import */}
+      <input
+        type="file"
+        accept=".png,.zip"
+        style={{ display: 'none' }}
+        ref={importFileInputRef}
+        onChange={handleImportFile}
+      />
+
       {isLoading && (
         <p className="text-center text-gray-400 p-10">Loading characters...</p>
       )}
@@ -481,31 +582,39 @@ const CharactersPage: React.FC = () => {
           {characters.map((character) => (
             <div
               key={character.id}
-              className="relative rounded-xl shadow-lg bg-app-surface cursor-pointer group min-w-[180px] max-w-[220px] aspect-[3/4.5] flex flex-col justify-end overflow-hidden"
+              className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer group"
               onClick={() => handleOpenModal(character)}
             >
-              {/* Card background image */}
+              {/* Use CardImage for character images for consistent backend handling */}
               <CardImage
                 imageUrl={character.image_url}
-                className="absolute inset-0 w-full h-full z-0"
+                className="absolute inset-0"
               />
-              {/* Overlay for gradient at bottom */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent z-10 pointer-events-none" />
-              {/* Top right icons (edit/delete/export) */}
-              <div className="absolute top-2 right-2 flex gap-1 z-20">
-                <ExportButton cardData={character} cardType="character_card" imageUrl={character.image_url} />
-                <button
-                  type="button"
-                  className="text-app-accent p-1"
-                  onClick={e => { e.stopPropagation(); handleDelete(character.id); }}
-                  title="Delete"
-                >
-                  <span className="material-icons-outlined w-5 h-5">delete</span>
-                </button>
-              </div>
-              {/* Card footer with name */}
-              <div className="relative z-20 w-full px-3 pb-3 pt-8 flex flex-col justify-end min-h-[30px] bg-black/60">
-                <span className="font-semibold text-lg text-white drop-shadow-md truncate" title={character.name}>{character.name}</span>
+              {/* Delete button positioned at top-right */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(character.id);
+                }}
+                className="absolute top-2 right-2 z-20 text-app-accent hover:text-red-500 p-1.5 rounded-full transition-colors"
+                title="Delete Character"
+              >
+                <span className="material-icons-outlined text-2xl">delete</span>
+              </button>
+              {/* Bottom info (footer) */}
+              <div className="absolute bottom-0 left-0 w-full">
+                <div className="w-full bg-black/30 backdrop-blur-sm p-3 flex flex-row items-center justify-between rounded-b-lg">
+                  <div className="font-semibold text-lg text-white drop-shadow-md break-words flex-1" title={character.name}>{character.name}</div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCharacterClick(character.id);
+                    }}
+                    className="bg-app-accent text-black px-3 py-1 rounded-2xl text-sm font-semibold ml-2 hover:bg-app-accent/80 transition-colors"
+                  >
+                    Chat
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -518,10 +627,13 @@ const CharactersPage: React.FC = () => {
         imageFile={imageFile}
         editingCharacter={editingCharacter}
         onImageClick={handleImageClick}
+        formRef={formRef}
+        isSubmitting={isSubmitting}
       >
         {/* Remove the image preview from inside the modal's flex row */}
         <form
           ref={formRef}
+          id="character-form"
           onSubmit={handleSubmit}
           className="flex-1 flex flex-col overflow-hidden"
         >
@@ -529,7 +641,7 @@ const CharactersPage: React.FC = () => {
             <div className="space-y-4">
               {error && isModalOpen && (
                 <div className="bg-app-accent-2/20 border border-app-accent-3 text-app-accent p-3 rounded-md text-sm">
-                  ⚠️ {error}
+                  {error}
                 </div>
               )}
               
@@ -773,21 +885,6 @@ const CharactersPage: React.FC = () => {
                     Next
                   </button>
                 </div>
-              </div>
-
-              {/* Save & Export Button Row */}
-              <div className="flex gap-2 pt-4">
-                <button
-                  type="submit"
-                  className="bg-app-accent-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (editingCharacter ? "Saving..." : "Creating...") : (editingCharacter ? "Save Changes" : "Create Character")}
-                </button>
-                {/* Export button always visible for editing */}
-                {editingCharacter && (
-                  <ExportButton cardData={editingCharacter} cardType="character_card" imageUrl={editingCharacter.image_url} />
-                )}
               </div>
             </div>
           </div>

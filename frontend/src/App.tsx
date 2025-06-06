@@ -7,8 +7,7 @@ import ChatsListPage from "./pages/ChatsListPage";
 import NewChatPage from "./pages/NewChatPage";
 import ChatPage from "./pages/ChatPage";
 import CharactersPage from "./pages/CharactersPage";
-import MasterWorldsPage from "./pages/MasterWorldsPage";
-import LoreEntriesPage from "./pages/LoreEntriesPage";
+import MasterWorldPage from "./pages/MasterWorldPage";
 import ScenariosPage from "./pages/ScenariosPage";
 import "./App.css";
 import "./styles/colors.css";
@@ -84,6 +83,7 @@ function AppWrapper() {
           className={`px-2 rounded-full transition-colors ${
             location.pathname.startsWith("/world-lore") ? "text-app-accent" : "text-app-flat"
           } hover:bg-app-surface/50`}
+          title="Master Worlds"
         >
           <WorldsIcon />
         </Link>
@@ -118,11 +118,9 @@ function AppWrapper() {
             <Route path="/personas" element={<PersonasPage />} />
             <Route path="/characters" element={<CharactersPage />} />
             <Route path="/scenarios" element={<ScenariosPage />} />
-            <Route path="/world-lore" element={<MasterWorldsPage />} />
-            <Route
-              path="/world-lore/:masterWorldId/entries"
-              element={<LoreEntriesPage />}
-            />
+            <Route path="/world-lore" element={<MasterWorldPage />} />
+            <Route path="/world-lore/entries" element={<MasterWorldPage />} />
+            <Route path="/world-lore/:masterWorldId/entries" element={<MasterWorldPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </div>
