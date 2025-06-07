@@ -36,9 +36,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import asyncio
-from backend.services import mistral_client
 from backend.background_tasks import embedding_worker
-from backend.services.mistral_client import embedding_queue # Removed initialize_mistral_client
 from backend.routers.lore_entries import router as lore_entries_router, all_lore_router
 from backend.routers.chat import router as chat_router
 from backend.routers.scenarios import router as scenarios_router

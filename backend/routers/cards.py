@@ -8,7 +8,8 @@ from typing import List
 from backend import models as api_models # Pydantic models
 from backend.db import crud, models as db_models # CRUD functions and DB models
 from backend.db.database import get_db # DB session dependency
-from backend.services import mistral_client # Para enfileirar embeddings
+from backend.services.litellm_service import litellm_service # LiteLLM service for embeddings
+from backend.services.faiss_service import get_faiss_index # FAISS service for embeddings
 
 router = APIRouter(
     prefix="/api/cards", # Prefixo para todas as rotas neste arquivo
@@ -26,10 +27,41 @@ async def create_new_global_lore(
     """Cria um novo cartão de Global Lore."""
     db_lore = crud.create_global_lore(db=db, lore=lore)
 
-    # Enfileira a tarefa de embedding para o conteúdo do cartão
-    task_data = {"card_id": str(db_lore.id), "text": db_lore.content} # Passa ID como string
-    background_tasks.add_task(mistral_client.add_embedding_task, task_data)
-    print(f"Lore card {db_lore.id} criado, tarefa de embedding adicionada.")
+    # Generate embedding directly using LiteLLM service
+    try:
+        # Get user settings for embedding generation (assuming ID 1 for global settings)
+        from backend.models.user_settings import UserSettings as UserSettingsModel
+        
+        db_settings = db.query(UserSettingsModel).filter(UserSettingsModel.id == 1).first()
+        if db_settings:
+            user_settings_dict = {
+                "embedding_llm_provider": getattr(db_settings, "embedding_llm_provider", "mistral"),
+                "embedding_llm_model": getattr(db_settings, "embedding_llm_model", "mistral-embed"),
+                "embedding_llm_api_key": getattr(db_settings, "embedding_llm_api_key", None) or db_settings.mistral_api_key,
+            }
+            
+            # Generate embedding using LiteLLM service
+            embeddings = await litellm_service.get_service_completion(
+                service_type="embedding",
+                messages=[],  # Not used for embedding
+                user_settings=user_settings_dict,
+                input_text=db_lore.content
+            )
+            
+            if embeddings and len(embeddings) > 0:
+                embedding_vector = embeddings[0]
+                
+                # Add to FAISS index
+                faiss_index = get_faiss_index()
+                await faiss_index.add_embedding(str(db_lore.id), embedding_vector, "global_lore")
+                
+                print(f"Lore card {db_lore.id} criado, embedding gerado e adicionado ao FAISS.")
+            else:
+                print(f"Falha ao gerar embedding para o lore card {db_lore.id}.")
+        else:
+            print(f"Configurações de usuário não encontradas. Pulando embedding para o lore card {db_lore.id}.")
+    except Exception as e:
+        print(f"Erro ao gerar embedding para o lore card {db_lore.id}: {e}")
 
     return db_lore # Retorna o objeto criado (Pydantic fará a conversão)
 

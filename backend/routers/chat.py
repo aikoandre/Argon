@@ -15,13 +15,13 @@ from sqlalchemy.orm import joinedload
 from fastapi.responses import StreamingResponse
 
 from backend.services.faiss_service import get_faiss_index
-from backend.services.mistral_client import MistralClient
+# MistralClient removed - now using LiteLLM service for embeddings
 from backend.services.rerank_service import get_auxiliary_rerank_service, get_principal_rerank_service
 from backend.schemas.event import FixedEventData
 from backend.background_tasks import run_full_interaction_analysis
 
 from backend.services.query_transformation_service import QueryTransformationService
-from backend.services.openrouter_client import OpenRouterClient # Import OpenRouterClient
+from backend.services.litellm_service import litellm_service # Import LiteLLM service
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ from backend.db.crud import create_chat_session as crud_create_chat_session
 
 # Global service instances
 faiss_index = get_faiss_index()
-mistral_client = MistralClient()
+# mistral_client removed - now using LiteLLM service for embeddings
 auxiliary_rerank_service = get_auxiliary_rerank_service()
 principal_rerank_service = get_principal_rerank_service()
 
@@ -390,39 +390,40 @@ async def chat_message(
     if not db_user_settings_obj:
         raise HTTPException(status_code=500, detail="User settings not configured. Please configure settings first.")
     db_user_settings = {
+        # Legacy configuration
         "llm_provider": db_user_settings_obj.llm_provider,
         "primary_llm_api_key": db_user_settings_obj.primary_llm_api_key,
-        "planning_llm_api_key": db_user_settings_obj.planning_llm_api_key,
-        "extraction_llm_api_key": db_user_settings_obj.extraction_llm_api_key,
         "analysis_llm_api_key": db_user_settings_obj.analysis_llm_api_key,
         "selected_llm_model": db_user_settings_obj.selected_llm_model,
         "mistral_api_key": db_user_settings_obj.mistral_api_key,
         "max_messages_for_context": db_user_settings_obj.max_messages_for_context,
-        "planning_llm_model": db_user_settings_obj.planning_llm_model,
+        "analysis_llm_model": getattr(db_user_settings_obj, "analysis_llm_model", None),
+        
+        # New LiteLLM configuration
+        "primary_llm_provider": getattr(db_user_settings_obj, "primary_llm_provider", None),
+        "primary_llm_model": getattr(db_user_settings_obj, "primary_llm_model", None),
+        "primary_llm_api_key_new": getattr(db_user_settings_obj, "primary_llm_api_key_new", None),
+        "analysis_llm_provider": getattr(db_user_settings_obj, "analysis_llm_provider", None),
+        "analysis_llm_model_new": getattr(db_user_settings_obj, "analysis_llm_model_new", None),
+        "analysis_llm_api_key_new": getattr(db_user_settings_obj, "analysis_llm_api_key_new", None),
+        "maintenance_llm_provider": getattr(db_user_settings_obj, "maintenance_llm_provider", None),
+        "maintenance_llm_model": getattr(db_user_settings_obj, "maintenance_llm_model", None),
+        "maintenance_llm_api_key": getattr(db_user_settings_obj, "maintenance_llm_api_key", None),
+        "embedding_llm_provider": getattr(db_user_settings_obj, "embedding_llm_provider", None),
+        "embedding_llm_model": getattr(db_user_settings_obj, "embedding_llm_model", None),
+        "embedding_llm_api_key": getattr(db_user_settings_obj, "embedding_llm_api_key", None),
+        
+        # Other settings
         "top_p": getattr(db_user_settings_obj, "top_p", 1.0),
         "max_response_tokens": getattr(db_user_settings_obj, "max_response_tokens", 512),
-        "extraction_llm_model": getattr(db_user_settings_obj, "extraction_llm_model", None),
-        "analysis_llm_model": getattr(db_user_settings_obj, "analysis_llm_model", None),
     }
-    openrouter_client = OpenRouterClient()
-    mistral_client = MistralClient()
-    llm_client = None
-    selected_llm_model = None
-    api_key = None
-    if db_user_settings["llm_provider"] == "OpenRouter":
-        if not db_user_settings["primary_llm_api_key"]:
-            raise HTTPException(status_code=500, detail="OpenRouter API key is missing. Please configure it in settings.")
-        llm_client = openrouter_client
-        selected_llm_model = db_user_settings["selected_llm_model"]
-        api_key = db_user_settings["primary_llm_api_key"]
-    elif db_user_settings["llm_provider"] == "MistralDirect":
-        if not db_user_settings["mistral_api_key"]:
-            raise HTTPException(status_code=500, detail="Mistral API key is missing. Please configure it in settings.")
-        llm_client = mistral_client
-        selected_llm_model = db_user_settings["selected_llm_model"]
-        api_key = db_user_settings["mistral_api_key"]
-    else:
-        raise HTTPException(status_code=400, detail="Unsupported LLM provider configured.")
+    # LiteLLM service will handle provider routing internally
+    # Validate that primary LLM settings are configured
+    if not db_user_settings.get("primary_llm_api_key") and not db_user_settings.get("primary_llm_api_key_new"):
+        raise HTTPException(status_code=500, detail="Primary LLM API key is missing. Please configure it in settings.")
+    
+    if not db_user_settings.get("selected_llm_model") and not db_user_settings.get("primary_llm_model"):
+        raise HTTPException(status_code=500, detail="Primary LLM model is missing. Please configure it in settings.")
     main_llm_context = {}
     main_llm_prompt_template = jinja_env.from_string("""
 System: You are {{ai_persona_card.name}}. Your personality is {{ai_persona_card.description}} and your instructions are: {{ai_persona_card.instructions}}.
@@ -503,19 +504,25 @@ User ({{user_persona_details.name}}): {{user_input}}
         else:
             sender_name = getattr(msg, "active_persona_name", None) or card_name_for_prompt
         chat_history_formatted += f"{sender_name}: {msg.content}\n"
-    # --- Query Transformation Step (Extraction LLM) ---
-    query_transform_service = QueryTransformationService(openrouter_client)
+    # --- Query Transformation Step (Analysis LLM) ---
+    query_transform_service = QueryTransformationService()
     optimized_query_text = user_message_input.content # Default in case of failure
     try:
-        if db_user_settings["extraction_llm_model"] and db_user_settings["primary_llm_api_key"]:
+        if db_user_settings.get("analysis_llm_model") and (db_user_settings.get("analysis_llm_api_key") or db_user_settings.get("analysis_llm_api_key_new")):
+            # Determine provider and API key for analysis LLM
+            analysis_provider = db_user_settings.get("analysis_llm_provider", "openrouter").lower()
+            analysis_api_key = db_user_settings.get("analysis_llm_api_key_new") or db_user_settings.get("analysis_llm_api_key")
+            analysis_model = db_user_settings.get("analysis_llm_model_new") or db_user_settings.get("analysis_llm_model")
+            
             optimized_query_text = await query_transform_service.transform_query(
                 user_message_input.content,
-                model=db_user_settings["extraction_llm_model"],
-                api_key=db_user_settings["primary_llm_api_key"]
+                model=analysis_model,
+                api_key=analysis_api_key,
+                provider=analysis_provider
             )
             logger.info(f"Optimized query text: {optimized_query_text}")
         else:
-            logger.warning("Extraction LLM model or API key not configured. Skipping query transformation.")
+            logger.warning("Analysis LLM model or API key not configured. Skipping query transformation.")
     except Exception as e:
         logger.error(f"Query transformation failed, using raw message: {e}")
         optimized_query_text = user_message_input.content
@@ -528,13 +535,17 @@ User ({{user_persona_details.name}}): {{user_input}}
     retrieved_lore_entries_context = ""
     reranked_lore_entries = []
     try:
-        mistral_api_key = db_user_settings["mistral_api_key"]
-        if not mistral_api_key:
-            logger.warning("Mistral API key is not configured. Skipping LoreEntry embedding search.")
-        else:
-            query_embedding = mistral_client.create_embeddings([query_text_for_reranker], api_key=mistral_api_key)
-            if query_embedding and len(query_embedding) > 0:
-                query_embedding_vector = query_embedding[0]
+        # Use LiteLLM service for embeddings instead of direct Mistral client
+        try:
+            # Get embedding using LiteLLM service
+            embedding_response = await litellm_service.get_service_completion(
+                service_type="embedding",
+                messages=[],  # Not used for embedding
+                user_settings=db_user_settings,
+                input_text=query_text_for_reranker
+            )
+            if embedding_response and len(embedding_response) > 0:
+                query_embedding_vector = embedding_response[0]
                 top_n_faiss_candidates = 100
                 similar_lore_entry_ids_with_distances = faiss_index.search_similar(query_embedding_vector, k=top_n_faiss_candidates)
                 if similar_lore_entry_ids_with_distances:
@@ -604,20 +615,99 @@ User ({{user_persona_details.name}}): {{user_input}}
                 else:
                     logger.info("No similar lore entries found in FAISS for the query.")
             else:
-                logger.warning("Failed to generate embedding for the user query using Mistral Embed.")
+                logger.warning("Failed to generate embedding for the user query using LiteLLM service.")
+        except Exception as embedding_error:
+            logger.error(f"Error during embedding generation: {embedding_error}")
+            logger.warning("Failed to generate embedding for the user query using LiteLLM service.")
     except Exception as e:
         logger.error(f"Error during RAG process: {e}")
         retrieved_lore_entries_context = "\n\nNote: An error occurred while retrieving relevant lore entries."
+    
+    # --- TEMPLATE RENDERING AND MESSAGE CONSTRUCTION ---
+    # Prepare context for the main generation template
+    from backend.services.event_manager_service import EventManagerService
+    from backend.models.user_prompt_instructions import UserPromptInstructions
+    from backend.services.message_preprocessing_service import MessagePreprocessingService
+    
+    # Get user prompt instructions
+    user_prompt_instructions = db.query(UserPromptInstructions).first()
+    if not user_prompt_instructions:
+        # Create default empty instructions
+        class DefaultInstructions:
+            primary_instructions = None
+            analysis_instructions = None 
+            extraction_instructions = None
+        user_prompt_instructions = DefaultInstructions()
+    
+    # Get active events for this session
+    active_events = db.query(ActiveSessionEvent).filter(
+        ActiveSessionEvent.chat_session_id == chat_id
+    ).all()
+    
+    # Process user message for placeholder replacement and OOC detection
+    preprocessing_service = MessagePreprocessingService()
+    ai_character_name = preprocessing_service.get_ai_character_name(ai_persona_card)
+    user_persona_name = preprocessing_service.get_user_persona_name(user_persona)
+    preprocessed_message = preprocessing_service.preprocess_user_message(
+        user_message_input.content, ai_character_name, user_persona_name
+    )
+    
+    # Build context for main generation template
+    main_llm_context = {
+        "ai_persona_card": ai_persona_card_info,
+        "user_persona": {
+            "name": user_persona_name,
+            "description": user_persona_description
+        },
+        "user_input": preprocessed_message.content,
+        "chat_history_formatted": chat_history_formatted.strip(),
+        "reranked_lore_entries": reranked_lore_entries,
+        "current_panel_data": current_panel_data,
+        "active_events": active_events,
+        "user_prompt_instructions": user_prompt_instructions,
+        "get_text_to_embed_from_lore_entry": get_text_to_embed_from_lore_entry,
+    }
+    
+    main_llm_context = replace_jinja_undefined(main_llm_context)
+    
+    # Load and render the generation template
+    main_llm_prompt_template = jinja_env.get_template('main_generation_enhanced.jinja2')
+    final_full_prompt = main_llm_prompt_template.render(main_llm_context)
+    
+    # Construct final messages for LLM
+    if preprocessed_message.is_ooc:
+        ooc_system_prompt = f"""You are an AI assistant helping with roleplay management. The user has sent an out-of-character (OOC) message.
+
+Original character context: {ai_persona_card_info.name} - {ai_persona_card_info.description}
+
+Respond helpfully to their OOC request without staying in character."""
+        final_llm_messages = [
+            {"role": "system", "content": ooc_system_prompt},
+            {"role": "user", "content": f"[OOC] {preprocessed_message.ooc_content}"}
+        ]
+    else:
+        final_llm_messages = [
+            {"role": "system", "content": final_full_prompt},
+            {"role": "user", "content": preprocessed_message.content}
+        ]
+    
     # --- MAIN LLM CALL (non-streaming) ---
     try:
-        ai_response_content = await llm_client.get_chat_completion(
-            model=selected_llm_model,
+        # Use LiteLLM service for primary LLM generation
+        response = await litellm_service.get_service_completion(
+            service_type="primary",
             messages=final_llm_messages,
-            api_key=api_key,
-            temperature=0.7, # Or your desired temperature
+            user_settings=db_user_settings,
+            temperature=0.7,
             max_tokens=db_user_settings["max_response_tokens"],
             top_p=db_user_settings["top_p"]
         )
+        
+        # Extract content from LiteLLM response
+        if isinstance(response, dict) and "choices" in response:
+            ai_response_content = response["choices"][0]["message"]["content"]
+        else:
+            ai_response_content = str(response)
         logger.info(f"[LLM-DEBUG] Main LLM RAW RESPONSE for chat_id {chat_id}: {ai_response_content[:200]}...")
     except Exception as e:
         logger.error(f"Main LLM call failed: {e}")

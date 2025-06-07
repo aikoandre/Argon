@@ -1,15 +1,39 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Text # Text was used in model, can be str here
+from typing import Optional
+
+class LLMProviderConfig(BaseModel):
+    """Configuration for a specific LLM service"""
+    provider: str = Field(..., description="Provider name (openrouter, mistral, google)")
+    model: str = Field(..., description="Model name")
+    api_key: str = Field(..., description="API key for the provider")
 
 class UserSettingsBase(BaseModel):
+    # Legacy LLM Configuration (for backward compatibility)
     llm_provider: Optional[str] = Field(None, description="E.g., OpenRouter, OpenAI, MistralDirect")
     selected_llm_model: Optional[str] = Field(None, description="E.g., gpt-4o, mistralai/Mixtral-8x7B-Instruct-v0.1")
-    primary_llm_api_key: Optional[str] = Field(None, description="API Key for the primary LLM (stored as plaintext)")
-    extraction_llm_api_key: Optional[str] = Field(None, description="API Key for the extraction LLM (stored as plaintext)")
-    analysis_llm_api_key: Optional[str] = Field(None, description="API Key for the analysis LLM (stored as plaintext)")
-    mistral_api_key: Optional[str] = Field(None, description="Mistral AI API Key (stored as plaintext)")
-    extraction_llm_model: Optional[str] = Field(None, description="Model for information extraction LLM (e.g., OpenRouter)")
-    analysis_llm_model: Optional[str] = Field(None, description="Model for analysis LLM (e.g., OpenRouter)")
+    primary_llm_api_key: Optional[str] = Field(None, description="API Key for the primary LLM (legacy)")
+    extraction_llm_api_key: Optional[str] = Field(None, description="API Key for the extraction LLM (legacy)")
+    analysis_llm_api_key: Optional[str] = Field(None, description="API Key for the analysis LLM (legacy)")
+    mistral_api_key: Optional[str] = Field(None, description="Mistral AI API Key (legacy)")
+    extraction_llm_model: Optional[str] = Field(None, description="Model for information extraction LLM (legacy)")
+    analysis_llm_model: Optional[str] = Field(None, description="Model for analysis LLM (legacy)")
+    
+    # New LiteLLM Provider Configurations
+    primary_llm_provider: Optional[str] = Field(None, description="Provider for primary LLM")
+    primary_llm_model: Optional[str] = Field(None, description="Model for primary LLM")
+    primary_llm_api_key_new: Optional[str] = Field(None, description="API key for primary LLM")
+    
+    analysis_llm_provider: Optional[str] = Field(None, description="Provider for analysis LLM")
+    analysis_llm_model_new: Optional[str] = Field(None, description="Model for analysis LLM")
+    analysis_llm_api_key_new: Optional[str] = Field(None, description="API key for analysis LLM")
+    
+    maintenance_llm_provider: Optional[str] = Field(None, description="Provider for maintenance LLM")
+    maintenance_llm_model: Optional[str] = Field(None, description="Model for maintenance LLM")
+    maintenance_llm_api_key: Optional[str] = Field(None, description="API key for maintenance LLM")
+    
+    embedding_llm_provider: Optional[str] = Field(None, description="Provider for embedding LLM")
+    embedding_llm_model: Optional[str] = Field(None, description="Model for embedding LLM")
+    embedding_llm_api_key: Optional[str] = Field(None, description="API key for embedding LLM")
     generation_prompt_template: Optional[str] = Field(None, description="Prompt template for response generation.")
     language: Optional[str] = Field(default="English", description="Language for AI responses.")
     interaction_analysis_prompt_template: Optional[str] = Field(

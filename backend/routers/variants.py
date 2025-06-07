@@ -7,8 +7,6 @@ from backend.models.temp_variant_memory import TempVariantMemory
 from backend.models.chat_message import ChatMessage
 from backend.models.full_analysis_result import FullAnalysisResult
 from backend.database import get_db
-from backend.services.openrouter_client import OpenRouterClient
-from backend.services.mistral_client import MistralClient
 
 router = APIRouter(tags=["Variants"], prefix="/variants")
 
@@ -125,9 +123,10 @@ async def generate_variant_for_message(message_id: str, db: Session = Depends(ge
         USER_SETTINGS_ID, QueryTransformationService,
         jinja_env, replace_jinja_undefined,
         get_text_to_embed_from_lore_entry,
-        is_reasoning_capable_model, robust_llm_call,
-        mistral_client, AIPersonaCardInfo, MessagePreprocessingService
+        is_reasoning_capable_model,
+        AIPersonaCardInfo, MessagePreprocessingService
     )
+    from backend.services.litellm_service import litellm_service
     
     # Import models directly from their respective modules
     from backend.models.user_settings import UserSettings
@@ -171,25 +170,46 @@ async def generate_variant_for_message(message_id: str, db: Session = Depends(ge
             id=1, primary_instructions="", extraction_instructions="", analysis_instructions=""
         )
     
-    # Set up LLM clients
-    llm_client = None
-    selected_llm_model = None
-    api_key = None
+    # Build user settings dict for LiteLLM service
+    db_user_settings = {
+        "primary_llm_provider": getattr(user_settings, "primary_llm_provider", None),
+        "primary_llm_model": getattr(user_settings, "primary_llm_model", None), 
+        "primary_llm_api_key": getattr(user_settings, "primary_llm_api_key", None),
+        "primary_llm_api_key_new": getattr(user_settings, "primary_llm_api_key_new", None),
+        "selected_llm_model": user_settings.selected_llm_model,
+        "llm_provider": user_settings.llm_provider,
+        "mistral_api_key": user_settings.mistral_api_key,
+        "max_response_tokens": user_settings.max_response_tokens,
+        "top_p": user_settings.top_p
+    }
     
-    if user_settings.llm_provider == "OpenRouter":
-        if not user_settings.primary_llm_api_key:
-            raise HTTPException(status_code=500, detail="OpenRouter API key is missing.")
-        llm_client = OpenRouterClient()
-        selected_llm_model = user_settings.selected_llm_model
-        api_key = user_settings.primary_llm_api_key
-    elif user_settings.llm_provider == "MistralDirect":
-        if not user_settings.mistral_api_key:
-            raise HTTPException(status_code=500, detail="Mistral API key is missing.")
-        llm_client = mistral_client
-        selected_llm_model = user_settings.selected_llm_model
-        api_key = user_settings.mistral_api_key
+    # Determine provider, model and API key for primary LLM
+    if db_user_settings.get("primary_llm_provider") and db_user_settings.get("primary_llm_model"):
+        # Use new LiteLLM configuration
+        provider = db_user_settings["primary_llm_provider"].lower()
+        model = db_user_settings["primary_llm_model"]
+        api_key = db_user_settings.get("primary_llm_api_key_new") or db_user_settings.get("primary_llm_api_key")
     else:
-        raise HTTPException(status_code=400, detail="Unsupported LLM provider.")
+        # Fall back to legacy configuration
+        if user_settings.llm_provider == "OpenRouter":
+            if not user_settings.primary_llm_api_key:
+                raise HTTPException(status_code=500, detail="OpenRouter API key is missing.")
+            provider = "openrouter"
+            model = user_settings.selected_llm_model
+            api_key = user_settings.primary_llm_api_key
+        elif user_settings.llm_provider == "MistralDirect":
+            if not user_settings.mistral_api_key:
+                raise HTTPException(status_code=500, detail="Mistral API key is missing.")
+            provider = "mistral"
+            model = user_settings.selected_llm_model
+            api_key = user_settings.mistral_api_key
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported LLM provider.")
+    
+    if not api_key:
+        raise HTTPException(status_code=500, detail="Primary LLM API key is missing.")
+    if not model:
+        raise HTTPException(status_code=500, detail="Primary LLM model is missing.")
     
     # Process the user message through preprocessing
     preprocessing_service = MessagePreprocessingService()
@@ -225,7 +245,7 @@ async def generate_variant_for_message(message_id: str, db: Session = Depends(ge
         "reranked_lore_entries": [],  # Skip RAG for variants to focus on pure generation variety
         "current_panel_data": current_panel_data,
         "active_events": [],
-        "reasoning_model_available": is_reasoning_capable_model(selected_llm_model),
+        "reasoning_model_available": is_reasoning_capable_model(model),
         "user_prompt_instructions": user_prompt_instructions,
         "get_text_to_embed_from_lore_entry": get_text_to_embed_from_lore_entry,
     }
@@ -259,24 +279,22 @@ Respond helpfully to their OOC request without staying in character."""
     variant_temperature = min(1.0, base_temperature + (next_variant_index * 0.1))
     
     try:
-        call_params = {
-            "llm_client": llm_client,
-            "model": selected_llm_model,
-            "messages": final_llm_messages,
-            "api_key": api_key,
-            "temperature": variant_temperature,  # Vary temperature for different responses
-            "max_tokens": user_settings.max_response_tokens,
-            "top_p": user_settings.top_p
-        }
+        # Use LiteLLM service for variant generation
+        response = await litellm_service.get_completion(
+            provider=provider,
+            model=model,
+            messages=final_llm_messages,
+            api_key=api_key,
+            temperature=variant_temperature,
+            max_tokens=user_settings.max_response_tokens,
+            top_p=user_settings.top_p
+        )
         
-        if user_settings.llm_provider == "OpenRouter":
-            ai_response_data = await robust_llm_call(**call_params)
-            if isinstance(ai_response_data, dict):
-                ai_response_content = ai_response_data.get("content", "")
-            else:
-                ai_response_content = ai_response_data
+        # Extract content from LiteLLM response
+        if isinstance(response, dict) and "choices" in response:
+            ai_response_content = response["choices"][0]["message"]["content"]
         else:
-            ai_response_content = await robust_llm_call(**call_params)
+            ai_response_content = str(response)
         
         if not ai_response_content:
             raise Exception("Empty response from LLM")

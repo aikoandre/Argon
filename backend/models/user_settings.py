@@ -4,19 +4,38 @@ from backend.database import Base
 class UserSettings(Base):
     __tablename__ = "user_settings"
 
-    id = Column(Integer, primary_key=True, default=1) # Assuming a single global settings row
+    id = Column(Integer, primary_key=True, default=1) # Assuming a single global settings row    # LLM Configuration (Legacy)
+    llm_provider = Column(String, nullable=True, default="openrouter")
+    selected_llm_model = Column(String, nullable=True, default="gpt-4o")
 
-    # LLM Configuration
-    llm_provider = Column(String, nullable=True, default="OpenRouter")
-    selected_llm_model = Column(String, nullable=True, default="gpt-4o") # Or your preferred default
-
-    # API Key - Stored in plaintext as per user decision
+    # API Keys (Legacy)
     primary_llm_api_key = Column(String, nullable=True)
     extraction_llm_api_key = Column(String, nullable=True)
     analysis_llm_api_key = Column(String, nullable=True)
     mistral_api_key = Column(String, nullable=True)
     extraction_llm_model = Column(String, nullable=True, default="mistral/mistral-large-latest")
     analysis_llm_model = Column(String, nullable=True, default="mistral/mistral-large-latest")
+
+    # New LiteLLM Provider Configurations
+    # Primary LLM (Generation Service)
+    primary_llm_provider = Column(String, nullable=True, default="openrouter")
+    primary_llm_model = Column(String, nullable=True, default="gpt-4o")
+    primary_llm_api_key_new = Column(String, nullable=True)
+    
+    # Analysis LLM (Analysis & Knowledge Extraction)
+    analysis_llm_provider = Column(String, nullable=True, default="openrouter")
+    analysis_llm_model_new = Column(String, nullable=True, default="gpt-4o")
+    analysis_llm_api_key_new = Column(String, nullable=True)
+    
+    # Maintenance LLM (Background Tasks)
+    maintenance_llm_provider = Column(String, nullable=True, default="openrouter")
+    maintenance_llm_model = Column(String, nullable=True, default="gpt-4o")
+    maintenance_llm_api_key = Column(String, nullable=True)
+    
+    # Embedding LLM (Vector Embeddings)
+    embedding_llm_provider = Column(String, nullable=True, default="mistral")
+    embedding_llm_model = Column(String, nullable=True, default="mistral-embed")
+    embedding_llm_api_key = Column(String, nullable=True)
 
     # Prompt Configuration
     generation_prompt_template = Column(Text, nullable=True, default=(

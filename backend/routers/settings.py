@@ -18,20 +18,33 @@ async def read_user_settings(db: Session = Depends(get_db)):
     If settings do not exist, they are created with default values.
     """
     db_settings = db.query(UserSettingsModel).filter(UserSettingsModel.id == USER_SETTINGS_ID).first()
-    if db_settings is None:
-        # Create settings with default values from the model definition
+    if db_settings is None:        # Create settings with default values from the model definition
         db_settings = UserSettingsModel(
             id=USER_SETTINGS_ID,
             llm_provider="OpenRouter",
             selected_llm_model="gpt-4o",
             primary_llm_api_key="",
-            planning_llm_api_key="",
-            extraction_llm_api_key="",
             analysis_llm_api_key="",
             mistral_api_key="",
-            extraction_llm_model="mistral/mistral-large-latest",
-            planning_llm_model="deepseek-ai/deepseek-coder-v2-instruct",
             analysis_llm_model="mistral/mistral-large-latest",
+            
+            # New LiteLLM Provider Configurations
+            primary_llm_provider="openrouter",
+            primary_llm_model="gpt-4o",
+            primary_llm_api_key_new="",
+            
+            analysis_llm_provider="openrouter", 
+            analysis_llm_model_new="gpt-4o",
+            analysis_llm_api_key_new="",
+            
+            maintenance_llm_provider="openrouter",
+            maintenance_llm_model="gpt-4o", 
+            maintenance_llm_api_key="",
+            
+            embedding_llm_provider="mistral",
+            embedding_llm_model="mistral-embed",
+            embedding_llm_api_key="",
+            
             generation_prompt_template=(
                 "You are {{ai_instructions.name}}, {{ai_instructions.description}}. "
                 "Your instructions on how to act are: {{ai_instructions.instructions}}.\n"

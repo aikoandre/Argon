@@ -5,8 +5,8 @@ from sqlalchemy import or_, and_, cast, String # Import or_, and_, cast, String 
 from typing import List, Dict
 import json # Import json for parsing the data string
 import os # Import os for path manipulation
-from backend.services.mistral_client import add_embedding_task, MistralClient # New import for embedding tasks, and MistralClient
 from backend.services.faiss_service import get_faiss_index # New import for FAISS
+from backend.services.litellm_service import litellm_service # LiteLLM service for embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -80,19 +80,48 @@ async def create_lore_entry( # Renamed for clarity
     db.commit()
     db.refresh(db_lore_entry)
 
-    # Generate text for embedding and add to queue
+    # Generate text for embedding and add to FAISS
     text_to_embed = get_text_to_embed_from_lore_entry(db_lore_entry)
     
-    print(f"LoreEntry '{db_lore_entry.name}' (ID: {db_lore_entry.id}) created. Adding embedding task to queue...")
+    print(f"LoreEntry '{db_lore_entry.name}' (ID: {db_lore_entry.id}) created. Generating embedding...")
     try:
-        await add_embedding_task({
-            "id": str(db_lore_entry.id),
-            "type": "lore_entry",
-            "text": text_to_embed
-        })
-        print(f"Embedding task added for LoreEntry '{db_lore_entry.name}'.")
+        # Get user settings for embedding generation
+        db_settings = db.query(UserSettingsModel).filter(UserSettingsModel.id == USER_SETTINGS_ID).first()
+        if db_settings:
+            user_settings_dict = {
+                "embedding_llm_provider": getattr(db_settings, "embedding_llm_provider", "mistral"),
+                "embedding_llm_model": getattr(db_settings, "embedding_llm_model", "mistral-embed"),
+                "embedding_llm_api_key": getattr(db_settings, "embedding_llm_api_key", None) or db_settings.mistral_api_key,
+            }
+            
+            # Generate embedding using LiteLLM service
+            embeddings = await litellm_service.get_service_completion(
+                service_type="embedding",
+                messages=[],  # Not used for embedding
+                user_settings=user_settings_dict,
+                input_text=text_to_embed
+            )
+            
+            if embeddings and len(embeddings) > 0:
+                embedding_vector = embeddings[0]
+                
+                # Store embedding in database
+                db_lore_entry.embedding_vector = embedding_vector
+                db.add(db_lore_entry)
+                db.commit()
+                db.refresh(db_lore_entry)
+                
+                # Add to FAISS index
+                faiss_index = get_faiss_index()
+                await faiss_index.add_embedding(str(db_lore_entry.id), embedding_vector)
+                
+                print(f"Embedding generated and added to FAISS for LoreEntry '{db_lore_entry.name}'.")
+            else:
+                print(f"Failed to generate embedding for LoreEntry '{db_lore_entry.name}'.")
+        else:
+            print(f"User settings not found. Skipping embedding for LoreEntry '{db_lore_entry.name}'.")
     except Exception as e:
-        print(f"Error adding embedding task for new LoreEntry '{db_lore_entry.name}': {e}")
+        print(f"Error generating embedding for new LoreEntry '{db_lore_entry.name}': {e}")
         # For now, we'll let the LoreEntry be created without its embedding in case of error.
 
     return db_lore_entry
@@ -144,16 +173,45 @@ async def update_lore_entry( # Renamed for clarity
 
     if text_content_changed:
         text_to_embed = get_text_to_embed_from_lore_entry(db_lore_entry)
-        print(f"LoreEntry '{db_lore_entry.name}' (ID: {db_lore_entry.id}) updated with text changes. Adding embedding task to queue...")
+        print(f"LoreEntry '{db_lore_entry.name}' (ID: {db_lore_entry.id}) updated with text changes. Generating embedding...")
         try:
-            await add_embedding_task({
-                "id": str(db_lore_entry.id),
-                "type": "lore_entry",
-                "text": text_to_embed
-            })
-            print(f"Embedding task added for updated LoreEntry '{db_lore_entry.name}'.")
+            # Get user settings for embedding generation
+            db_settings = db.query(UserSettingsModel).filter(UserSettingsModel.id == USER_SETTINGS_ID).first()
+            if db_settings:
+                user_settings_dict = {
+                    "embedding_llm_provider": getattr(db_settings, "embedding_llm_provider", "mistral"),
+                    "embedding_llm_model": getattr(db_settings, "embedding_llm_model", "mistral-embed"),
+                    "embedding_llm_api_key": getattr(db_settings, "embedding_llm_api_key", None) or db_settings.mistral_api_key,
+                }
+                
+                # Generate embedding using LiteLLM service
+                embeddings = await litellm_service.get_service_completion(
+                    service_type="embedding",
+                    messages=[],  # Not used for embedding
+                    user_settings=user_settings_dict,
+                    input_text=text_to_embed
+                )
+                
+                if embeddings and len(embeddings) > 0:
+                    embedding_vector = embeddings[0]
+                    
+                    # Store embedding in database
+                    db_lore_entry.embedding_vector = embedding_vector
+                    db.add(db_lore_entry)
+                    db.commit()
+                    db.refresh(db_lore_entry)
+                    
+                    # Update in FAISS index
+                    faiss_index = get_faiss_index()
+                    await faiss_index.update_embedding(str(db_lore_entry.id), embedding_vector)
+                    
+                    print(f"Embedding updated in FAISS for LoreEntry '{db_lore_entry.name}'.")
+                else:
+                    print(f"Failed to generate embedding for updated LoreEntry '{db_lore_entry.name}'.")
+            else:
+                print(f"User settings not found. Skipping embedding for updated LoreEntry '{db_lore_entry.name}'.")
         except Exception as e:
-            print(f"Error adding embedding task for updated LoreEntry '{db_lore_entry.name}': {e}")
+            print(f"Error generating embedding for updated LoreEntry '{db_lore_entry.name}': {e}")
     else:
         print(f"LoreEntry '{db_lore_entry.name}' updated. Skipping embedding regeneration.")
 
@@ -191,14 +249,27 @@ async def search_lore_entries(
     if not query_text:
         raise HTTPException(status_code=400, detail="Query text is required for search.")
 
-    # Get Mistral API key from user settings
+    # Get user settings for embedding generation
     db_settings = db.query(UserSettingsModel).filter(UserSettingsModel.id == USER_SETTINGS_ID).first()
-    if not db_settings or not db_settings.mistral_api_key:
-        raise HTTPException(status_code=500, detail="Mistral API key not configured in user settings.")
+    if not db_settings:
+        raise HTTPException(status_code=500, detail="User settings not configured.")
 
-    # Generate embedding for the query
-    mistral_client = MistralClient()
-    query_embeddings = mistral_client.create_embeddings([query_text], api_key=db_settings.mistral_api_key)
+    # Generate embedding for the query using LiteLLM service
+    user_settings_dict = {
+        "embedding_llm_provider": getattr(db_settings, "embedding_llm_provider", "mistral"),
+        "embedding_llm_model": getattr(db_settings, "embedding_llm_model", "mistral-embed"),
+        "embedding_llm_api_key": getattr(db_settings, "embedding_llm_api_key", None) or db_settings.mistral_api_key,
+    }
+    
+    try:
+        query_embeddings = await litellm_service.get_service_completion(
+            service_type="embedding",
+            messages=[],  # Not used for embedding
+            user_settings=user_settings_dict,
+            input_text=query_text
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate embedding for the query: {str(e)}")
     
     if not query_embeddings:
         raise HTTPException(status_code=500, detail="Failed to generate embedding for the query.")

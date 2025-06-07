@@ -21,7 +21,8 @@ async def embedding_worker():
     This worker continuously checks the embedding_queue for new embedding requests
     and processes them using the Mistral client.
     """
-    from backend.services.mistral_client import embedding_queue, MistralClient
+    from backend.services.mistral_client import embedding_queue  # Keep only the queue
+    # MistralClient removed - now using LiteLLM service for embeddings
     from backend.database import get_db
     from backend.models.lore_entry import LoreEntry as LoreEntryModel
     from backend.models.extracted_knowledge import ExtractedKnowledge as ExtractedKnowledgeModel
@@ -29,7 +30,7 @@ async def embedding_worker():
     
     logger.info("Starting embedding worker...")
     
-    mistral_client = MistralClient()
+    # mistral_client removed - now using LiteLLM service for embeddings
     faiss_index = get_faiss_index()
 
     while True:
@@ -67,20 +68,33 @@ async def embedding_worker():
             from backend.models.user_settings import UserSettings as UserSettingsModel
             user_settings = db.query(UserSettingsModel).first() # Assuming a single user or default settings
             mistral_api_key = user_settings.mistral_api_key if user_settings else None
-            openrouter_api_key = user_settings.extraction_llm_api_key if user_settings else None # Only use extraction_llm_api_key
 
             if not mistral_api_key:
                 logger.error(f"Mistral API key not found for embedding {item_type} ID: {item_id}. Skipping embedding.")
                 embedding_queue.task_done()
                 continue
 
-            if not openrouter_api_key:
-                logger.error("OpenRouter extraction_llm_api_key not found. Skipping analysis.")
-                embedding_queue.task_done()
-                continue
 
-
-            embeddings = await asyncio.to_thread(mistral_client.create_embeddings, [text_to_embed], api_key=mistral_api_key)
+            # Generate embeddings using LiteLLM service
+            from backend.services.litellm_service import litellm_service
+            
+            # Convert user settings to dictionary format for LiteLLM
+            user_settings_dict = {
+                "embedding_llm_provider": getattr(user_settings, "embedding_llm_provider", "mistral"),
+                "embedding_llm_model": getattr(user_settings, "embedding_llm_model", "mistral-embed"),
+                "embedding_llm_api_key": getattr(user_settings, "embedding_llm_api_key", None) or mistral_api_key,
+            }
+            
+            try:
+                embeddings = await litellm_service.get_service_completion(
+                    service_type="embedding",
+                    messages=[],  # Not used for embedding
+                    user_settings=user_settings_dict,
+                    input_text=text_to_embed
+                )
+            except Exception as e:
+                logger.error(f"Failed to generate embedding using LiteLLM service: {e}")
+                embeddings = None
             
             if embeddings and len(embeddings) > 0:
                 embedding_vector = embeddings[0]
@@ -143,7 +157,7 @@ async def embedding_worker():
 
 from backend.services.interaction_analysis_service import InteractionAnalysisService
 from backend.schemas.ai_analysis_result import InteractionAnalysisResult
-from backend.services.openrouter_client import OpenRouterClient
+# OpenRouterClient import removed - now using LiteLLM service
 
 async def run_full_interaction_analysis(
     db, # Pass the SQLAlchemy session directly
@@ -155,8 +169,8 @@ async def run_full_interaction_analysis(
     ai_persona_card_data: Dict[str, Any],
     user_persona_data: Dict[str, Any],
     active_event_details: Optional[Dict[str, Any]],
-    analysis_llm_api_key: str, # Renamed from openrouter_api_key
-    analysis_llm_model: str # Renamed from extraction_llm_model
+    analysis_llm_api_key: str, # Kept for backward compatibility but will be extracted from user_settings
+    analysis_llm_model: str # Kept for backward compatibility but will be extracted from user_settings
 ):
     """
     Runs the full interaction analysis LLM and updates session state synchronously.
@@ -194,10 +208,31 @@ async def run_full_interaction_analysis(
             logger.error(f"{db_chat_session.card_type.capitalize()} card not found for session {chat_id} during full analysis.")
             return
 
-        openrouter_client = OpenRouterClient() # Assuming OpenRouterClient is used for analysis LLM
-        analysis_service = InteractionAnalysisService(openrouter_client)
+        # Get user settings for LiteLLM service
+        from backend.models.user_settings import UserSettings
+        USER_SETTINGS_ID = 1  # Global ID for the single settings row
+        user_settings_obj = db.query(UserSettings).filter(UserSettings.id == USER_SETTINGS_ID).first()
+        
+        if not user_settings_obj:
+            logger.error("User settings not found for full interaction analysis. Skipping analysis.")
+            return
+            
+        # Convert to dictionary for LiteLLM service
+        user_settings = {
+            # Analysis LLM configuration
+            "analysis_llm_provider": getattr(user_settings_obj, "analysis_llm_provider", "openrouter"),
+            "analysis_llm_model": getattr(user_settings_obj, "analysis_llm_model_new", None) or getattr(user_settings_obj, "analysis_llm_model", analysis_llm_model),
+            "analysis_llm_api_key": getattr(user_settings_obj, "analysis_llm_api_key_new", None) or getattr(user_settings_obj, "analysis_llm_api_key", analysis_llm_api_key),
+            "analysis_llm_model_new": getattr(user_settings_obj, "analysis_llm_model_new", None),
+            "analysis_llm_api_key_new": getattr(user_settings_obj, "analysis_llm_api_key_new", None),
+        }
+
+        # Use updated InteractionAnalysisService with LiteLLM
+        analysis_service = InteractionAnalysisService()
         
         context = {
+            "user_message": user_message,
+            "ai_response": ai_response,
             "rag_results": rag_results,
             "ai_plan": ai_plan,
             "ai_persona_card": {
@@ -212,12 +247,9 @@ async def run_full_interaction_analysis(
             "active_event_details": active_event_details,
         }
         
-        analysis_result = await analysis_service.analyze_interaction(
-            user_message=user_message,
-            ai_response=ai_response,
+        analysis_result = await analysis_service.perform_full_analysis(
             context=context,
-            api_key=analysis_llm_api_key,
-            extraction_llm_model=analysis_llm_model # This parameter name is used by the service, but it's the analysis model
+            user_settings=user_settings
         )
         
         from backend.services.session_state_update_service import SessionStateUpdateService

@@ -4,7 +4,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
 import os
 import json
 
-from backend.services.openrouter_client import OpenRouterClient
+from backend.services.litellm_service import litellm_service
 from backend.schemas.ai_analysis_result import InteractionAnalysisResult
 from backend.utils.reasoning_utils import is_reasoning_capable_model
 
@@ -23,8 +23,8 @@ def replace_jinja_undefined(obj):
     return obj
 
 class InteractionAnalysisService:
-    def __init__(self, openrouter_client: OpenRouterClient):
-        self.openrouter_client = openrouter_client
+    def __init__(self):
+        self.litellm_service = litellm_service
         template_dir = os.path.join(os.path.dirname(__file__), '../templates')
         self.env = Environment(
             loader=FileSystemLoader(template_dir),
@@ -35,20 +35,25 @@ class InteractionAnalysisService:
     async def perform_full_analysis(
         self,
         context: Dict[str, Any],
-        model: str,
-        api_key: str,
+        user_settings: Dict[str, Any],
         reasoning_mode: Optional[str] = None,
         reasoning_effort: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Performs full analysis after AI response to update session state
         """
-        from backend.routers.chat import robust_llm_call
-        
         try:
+            # Extract analysis LLM configuration from user settings
+            analysis_provider = user_settings.get('analysis_llm_provider', 'openrouter')
+            analysis_model = user_settings.get('analysis_llm_model_new') or user_settings.get('analysis_llm_model', 'gpt-4o')
+            analysis_api_key = user_settings.get('analysis_llm_api_key_new') or user_settings.get('analysis_llm_api_key')
+            
+            if not analysis_api_key:
+                raise ValueError("Analysis LLM API key not configured")
+            
             # Add reasoning model capability to context
             context_with_reasoning = context.copy()
-            context_with_reasoning['reasoning_model_available'] = is_reasoning_capable_model(model)
+            context_with_reasoning['reasoning_model_available'] = is_reasoning_capable_model(analysis_model)
 
             # Replace any undefined values to prevent template errors
             context_with_reasoning = replace_jinja_undefined(context_with_reasoning)
@@ -96,22 +101,27 @@ CRITICAL REQUIREMENTS:
                 "user_persona_session_updates", "triggered_event_ids_candidates"
             ]
             
-            result = await robust_llm_call(
-                llm_client=self.openrouter_client,
-                model=model,
+            # Use LiteLLM service for completion
+            response = await self.litellm_service.get_completion(
+                provider=analysis_provider,
+                model=analysis_model,
                 messages=messages,
-                api_key=api_key,
-                max_retries=3,
-                fallback_response=None,
-                expected_json_keys=expected_keys,
-                json_extraction_context="full analysis for session state updates",
+                api_key=analysis_api_key,
                 temperature=0.2,
                 max_tokens=1024,
-                response_format={"type": "json_object"},
-                reasoning_mode=reasoning_mode,
-                reasoning_effort=reasoning_effort,
-                reasoning_exclude_tokens=True
+                response_format={"type": "json_object"} if analysis_provider in ["openrouter", "openai"] else None
             )
+            
+            # Extract content from response
+            if 'choices' in response and response['choices']:
+                content = response['choices'][0]['message']['content']
+                try:
+                    result = json.loads(content)
+                except json.JSONDecodeError:
+                    logger.warning("Failed to parse JSON response from analysis LLM")
+                    result = None
+            else:
+                result = None
 
             # Handle the response
             if isinstance(result, dict) and all(key in result for key in expected_keys):
@@ -146,8 +156,7 @@ CRITICAL REQUIREMENTS:
         user_message: str,
         ai_response: str,
         context: Dict[str, Any],
-        api_key: str,
-        extraction_llm_model: str,
+        user_settings: Dict[str, Any],
         reasoning_mode: Optional[str] = None,
         reasoning_effort: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -163,8 +172,7 @@ CRITICAL REQUIREMENTS:
             # Use the full analysis method which is designed for comprehensive interaction analysis
             return await self.perform_full_analysis(
                 context=enhanced_context,
-                model=extraction_llm_model,
-                api_key=api_key,
+                user_settings=user_settings,
                 reasoning_mode=reasoning_mode,
                 reasoning_effort=reasoning_effort
             )
