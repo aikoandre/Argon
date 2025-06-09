@@ -50,10 +50,34 @@
   visibility: visible; /* Show the thumb on hover */
 }
 
+/* Always visible scrollbar for chat container */
+.chat-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-track {
+  background: rgba(55, 65, 81, 0.3);
+  border-radius: 3px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.6);
+  border-radius: 3px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.8);
+}
+
 /* For Firefox */
 .custom-scrollbar {
   scrollbar-width: thin; /* Make the scrollbar thin */
   scrollbar-color: rgba(128, 128, 128, 0.5) transparent; /* thumb color track color */
+}
+
+.chat-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.6) rgba(55, 65, 81, 0.3);
 }
 
 /* For Edge and IE */

@@ -1,7 +1,7 @@
 // frontend/src/pages/ChatPage.tsx
-import React, { useState, useEffect, type FormEvent, useRef } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
-import axios from "axios"; // Import axios
+import axios from "axios";
 import {
   getChatSessionMessages,
   getChatSessionDetails,
@@ -19,18 +19,55 @@ import { type ChatMessageData } from "../types/chat"; // Only import ChatMessage
 const DEFAULT_USER_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'%3E%3C/path%3E%3Ccircle cx='12' cy='7' r='4'%3E%3C/circle%3E%3C/svg%3E";
 const DEFAULT_BOT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'%3E%3C/circle%3E%3Cpath d='M8 9.05v-.1'%3E%3C/path%3E%3Cpath d='M16 9.05v-.1'%3E%3C/path%3E%3Cpath d='M12 13a4 4 0 0 1-4 4'%3E%3C/path%3E%3Cpath d='M12 13a4 4 0 0 0 4 4'%3E%3C/path%3E%3C/svg%3E";
 
-const iconBaseClass = "material-icons-outlined text-2xl flex-shrink-0";
+// Modern Material Icons components using TailwindCSS
+const MaterialIcon = ({ icon, className = "", onClick, disabled = false }: {
+  icon: string;
+  className?: string;
+  onClick?: () => void;
+  disabled?: boolean;
+}) => (
+  <span 
+    className={`
+      material-icons-outlined text-2xl select-none
+      ${onClick ? 'cursor-pointer' : ''}
+      ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+      ${className}
+    `}
+    onClick={disabled ? undefined : onClick}
+  >
+    {icon}
+  </span>
+);
+
+// Icon components using the new MaterialIcon
 const SendIcon = ({ className }: { className?: string }) => (
-  <span className={`${iconBaseClass} ${className || ''}`.trim()}>send</span>
+  <MaterialIcon icon="send" className={className} />
 );
 
-
-const ArrowBackIcon = ({ className, onClick, disabled }: { className?: string; onClick: () => void; disabled?: boolean }) => (
-  <span className={`${iconBaseClass} ${className || ''} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`} onClick={disabled ? undefined : onClick}>arrow_back_ios</span>
+const ArrowBackIcon = ({ className, onClick, disabled }: { 
+  className?: string; 
+  onClick: () => void; 
+  disabled?: boolean 
+}) => (
+  <MaterialIcon 
+    icon="arrow_back_ios" 
+    className={className} 
+    onClick={onClick} 
+    disabled={disabled} 
+  />
 );
 
-const ArrowForwardIcon = ({ className, onClick, disabled }: { className?: string; onClick: () => void; disabled?: boolean }) => (
-  <span className={`${iconBaseClass} ${className || ''} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`} onClick={disabled ? undefined : onClick}>arrow_forward_ios</span>
+const ArrowForwardIcon = ({ className, onClick, disabled }: { 
+  className?: string; 
+  onClick: () => void; 
+  disabled?: boolean 
+}) => (
+  <MaterialIcon 
+    icon="arrow_forward_ios" 
+    className={className} 
+    onClick={onClick} 
+    disabled={disabled} 
+  />
 );
 
 // Helper function to get proper image URL for persona images
@@ -54,7 +91,7 @@ const getImageUrl = (imageUrl: string | null) => {
   return `/static/images/${cleanedPath}`;
 };
 
-const ChatPage: React.FC = () => {
+const ChatPage = () => {
   const { chatId } = useParams<{ chatId: string }>();
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [sessionDetails, setSessionDetails] = useState<ChatSessionData | null>(
@@ -426,33 +463,48 @@ const ChatPage: React.FC = () => {
     }
   };
 
+  // Modern loading state component
   if (isLoadingMessages) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center text-gray-400 p-10 animate-pulse">
-          <div className="w-8 h-8 rounded-full animate-spin mx-auto mb-4"></div>
-          <p>Loading chat...</p>
+      <div className="flex items-center justify-center h-screen bg-app-bg">
+        <div className="text-center text-app-text-secondary p-10">
+          <div className="w-8 h-8 border-2 border-app-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-lg font-medium">Loading chat...</p>
         </div>
       </div>
     );
   }
 
+  // Modern error state component
   if (error) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-900">
-        <p className="text-center text-red-500 p-10 rounded-lg bg-gray-800 shadow-lg">
-          {error}
-        </p>
+      <div className="flex items-center justify-center h-screen bg-app-bg">
+        <div className="text-center p-10 max-w-md">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <MaterialIcon icon="error_outline" className="text-red-600 text-3xl" />
+          </div>
+          <h2 className="text-xl font-semibold text-app-text mb-2">Error</h2>
+          <p className="text-red-400 bg-app-surface p-4 rounded-xl shadow-lg">
+            {error}
+          </p>
+        </div>
       </div>
     );
   }
 
+  // Modern not found state component
   if (!sessionDetails) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-900">
-        <p className="text-center text-gray-400 p-10 rounded-lg bg-gray-800 shadow-lg">
-          Chat session not found.
-        </p>
+      <div className="flex items-center justify-center h-screen bg-app-bg">
+        <div className="text-center p-10 max-w-md">
+          <div className="w-16 h-16 bg-app-surface rounded-full flex items-center justify-center mx-auto mb-4">
+            <MaterialIcon icon="chat_bubble_outline" className="text-app-text-secondary text-3xl" />
+          </div>
+          <h2 className="text-xl font-semibold text-app-text mb-2">Chat Not Found</h2>
+          <p className="text-app-text-secondary bg-app-surface p-4 rounded-xl shadow-lg">
+            The chat session you're looking for doesn't exist or has been removed.
+          </p>
+        </div>
       </div>
     );
   }
@@ -460,18 +512,20 @@ const ChatPage: React.FC = () => {
   return (
     <div className="flex flex-col h-[calc(100vh-56px)] overflow-hidden bg-app-bg">
       {/* Chat messages section */}
-      <div className="flex-1 min-h-0">
-        {/* Remove max-w-xl lg:max-w-2xl mx-auto to make chat area full width */}
-        <div className="w-full h-full flex flex-col">
-          <div className="flex-1 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-app-accent scrollbar-track-app-surface/30 rounded-xl min-h-0 px-4 py-2">
+      <div className="flex-1 min-h-0 flex justify-center">
+        <div className="w-full max-w-2xl lg:max-w-3xl h-full flex flex-col">
+          <div className="flex-1 overflow-y-scroll chat-scrollbar space-y-3 rounded-xl min-h-0 px-4 pt-2 pb-0">
             {messages.length === 0 && (
-              <div className="flex justify-center pb-4">
+              <div className="flex justify-center items-center h-full">
                 <div className="text-center">
-                  <p className="text-xl text-gray-500">No messages yet. Send a message!</p>
+                  <MaterialIcon icon="chat_bubble_outline" className="text-6xl text-app-text-secondary mb-4" />
+                  <p className="text-xl text-app-text-secondary font-medium">No messages yet</p>
+                  <p className="text-app-border text-sm mt-2">Start a conversation!</p>
                 </div>
               </div>
             )}
-            {/* Regular messages */}
+            
+            {/* Messages */}
             {[...messages]
               .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
               .map((msg) => {
@@ -484,8 +538,6 @@ const ChatPage: React.FC = () => {
                   } else if (!aiName && sessionDetails?.card_type === 'scenario' && sessionDetails.card_id) {
                     aiName = (window as any).__scenarioCardNameCache?.[sessionDetails.card_id];
                   }
-                  // Never fallback to 'Assistant' for AI
-                  // For image, use card image if persona image is missing
                   if (!aiImageUrl && sessionDetails?.card_type === 'character' && sessionDetails.card_id) {
                     aiImageUrl = (window as any).__characterCardImageCache?.[sessionDetails.card_id] ?? null;
                   } else if (!aiImageUrl && sessionDetails?.card_type === 'scenario' && sessionDetails.card_id) {
@@ -493,16 +545,17 @@ const ChatPage: React.FC = () => {
                   }
                 }
                 const processedAiAvatarSrc = getImageUrl(aiImageUrl ?? null) || DEFAULT_BOT_AVATAR;
-              return (
-                <div key={msg.id}>
-                  <div
-                    className={`rounded-2xl ${
-                      msg.sender_type === "USER"
-                        ? "bg-app-surface text-white"
-                        : "bg-app-surface text-gray-100"
-                    } relative`}
-                  >
-                    <div className="p-3 flex">
+                
+                return (
+                  <div key={msg.id} className="group">
+                    <div className={`
+                      rounded-2xl p-4 relative transition-all duration-200
+                      ${msg.sender_type === "USER" 
+                        ? "bg-app-surface text-white shadow-md hover:shadow-lg" 
+                        : "bg-app-surface text-gray-100 shadow-md hover:shadow-lg"
+                      }
+                    `}>
+                    <div className="flex">
                       <div className="flex-shrink-0 w-20 mr-3">
                         <img
                           src={msg.sender_type === "USER"
@@ -561,7 +614,7 @@ const ChatPage: React.FC = () => {
                             } else {
                               // Inline text, apply custom formatting for quoted and italic text
                               let formatted = part
-                                .replace(/"([^"]+)"/g, '<span class="text-app-chat">$1</span>')
+                                .replace(/"([^"]+)"/g, '<span class="text-app-primary">$1</span>')
                                 .replace(/\*([^*]+)\*/g, '<em>$1</em>');
                               // Remove top margin for the first inline text
                               return <span key={idx} style={idx === 0 ? { marginTop: 0 } : {}} dangerouslySetInnerHTML={{ __html: formatted }} />;
@@ -622,9 +675,9 @@ const ChatPage: React.FC = () => {
       {/* Input area */}
       <div
         ref={inputAreaRef}
-        className="flex justify-center px-4 bg-app-bg" // removed border-t to fix white line
+        className="flex justify-center bg-app-bg"
       >
-        <div className="w-full py-2">
+        <div className="w-full max-w-2xl lg:max-w-3xl">
           <form onSubmit={handleSendMessage} className="relative">
             <textarea
               rows={1}
@@ -644,8 +697,7 @@ const ChatPage: React.FC = () => {
                   handleSendMessage(e as any);
                 }
               }}
-              className="w-full p-4 pr-14 bg-app-surface rounded-2xl text-white placeholder-gray-400 outline-none resize-none"
-              style={{overflow: 'hidden', minHeight: '48px', maxHeight: '200px'}}
+              className="w-full p-4 pr-14 bg-app-surface rounded-2xl text-white placeholder-gray-400 outline-none resize-none overflow-hidden min-h-[48px] max-h-[200px]"
             />
             <button
               type="submit"
@@ -663,6 +715,6 @@ const ChatPage: React.FC = () => {
       </div>
     </div>
   );
-}
+};
 
 export default ChatPage;

@@ -30,9 +30,8 @@ const HomePage: React.FC = () => {
   return (
     <div className="container mx-auto py-8 px-4 text-center max-w-prose text-white">
       <h1 className="text-7xl mb-4 font-bold font-quintessential">Argon</h1>
-      <p>{healthStatus}</p>
-      {error && (
-        <p style={{ color: "red" }}>
+      <p>{healthStatus}</p>      {error && (
+        <p className="text-red-500">
           {error}
         </p>
       )}

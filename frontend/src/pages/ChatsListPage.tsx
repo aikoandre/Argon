@@ -98,10 +98,10 @@ const ChatsListPage: React.FC = () => {
                 
                 <div className="flex-1" onClick={() => navigate(`/chat/${session.id}`)}> {/* Make content clickable */}
                   <div className="flex items-center gap-2 mb-1">
-                    <h2 className="text-xl font-semibold text-app-accent">
+                    <h2 className="text-xl font-semibold text-app-text">
                       {session.title || `Chat ${session.id.substring(0, 8)}`}
                     </h2>
-                    <span className="text-xs px-2 py-1 rounded-full bg-app-accent-2 text-app-surface">
+                    <span className="text-xs px-2 py-1 rounded-full bg-app-text-2 text-app-surface">
                       {isCharacter ? 'Character' : 'Scenario'}
                     </span>
                   </div>

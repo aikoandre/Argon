@@ -334,7 +334,7 @@ const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState
             type="button"
             className={`py-2 px-4 text-sm font-medium ${
               activeTab === "primary"
-                ? "border-b-2 border-app-accent-2 text-app-accent-2"
+                ? "border-b-2 border-app-text-2 text-app-text-2"
                 : "text-gray-400 hover:text-white"
             }`}
             onClick={() => setActiveTab("primary")}
@@ -345,7 +345,7 @@ const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState
             type="button"
             className={`py-2 px-4 text-sm font-medium ${
               activeTab === "analysis"
-                ? "border-b-2 border-app-accent-2 text-app-accent-2"
+                ? "border-b-2 border-app-text-2 text-app-text-2"
                 : "text-gray-400 hover:text-white"
             }`}
             onClick={() => setActiveTab("analysis")}
@@ -356,7 +356,7 @@ const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState
             type="button"
             className={`py-2 px-4 text-sm font-medium ${
               activeTab === "maintenance"
-                ? "border-b-2 border-app-accent-2 text-app-accent-2"
+                ? "border-b-2 border-app-text-2 text-app-text-2"
                 : "text-gray-400 hover:text-white"
             }`}
             onClick={() => setActiveTab("maintenance")}
@@ -367,7 +367,7 @@ const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState
             type="button"
             className={`py-2 px-4 text-sm font-medium ${
               activeTab === "embedding"
-                ? "border-b-2 border-app-accent-2 text-app-accent-2"
+                ? "border-b-2 border-app-text-2 text-app-text-2"
                 : "text-gray-400 hover:text-white"
             }`}
             onClick={() => setActiveTab("embedding")}
@@ -379,7 +379,7 @@ const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState
             <div>
               <label
                 htmlFor="primary_llm_provider_input"
-                className="block text-sm font-medium text-app-accent-2 mb-1"
+                className="block text-sm font-medium text-app-text-2 mb-1"
               >
                 Primary LLM Provider:
               </label>
@@ -439,7 +439,7 @@ const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState
             <div>
               <label
                 htmlFor="primary_llm_model_input"
-                className="block text-sm font-medium text-app-accent-2 mb-1"
+                className="block text-sm font-medium text-app-text-2 mb-1"
               >
                 Primary LLM Model:
               </label>
@@ -512,7 +512,7 @@ const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState
             <div>
               <label
                 htmlFor="primary_llm_api_key_new"
-                className="block text-sm font-medium text-app-accent-2 mb-1"
+                className="block text-sm font-medium text-app-text-2 mb-1"
               >
                 Primary LLM API Key:
               </label>
@@ -547,7 +547,7 @@ const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState
             <div>
               <label
                 htmlFor="analysis_llm_provider_input"
-                className="block text-sm font-medium text-app-accent-2 mb-1"
+                className="block text-sm font-medium text-app-text-2 mb-1"
               >
                 Analysis LLM Provider:
               </label>
@@ -607,7 +607,7 @@ const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState
             <div>
               <label
                 htmlFor="analysis_llm_model_input"
-                className="block text-sm font-medium text-app-accent-2 mb-1"
+                className="block text-sm font-medium text-app-text-2 mb-1"
               >
                 Analysis LLM Model:
               </label>
@@ -675,7 +675,7 @@ const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState
             <div>
               <label
                 htmlFor="analysis_llm_api_key_new"
-                className="block text-sm font-medium text-app-accent-2 mb-1"
+                className="block text-sm font-medium text-app-text-2 mb-1"
               >
                 Analysis LLM API Key:
               </label>
@@ -710,7 +710,7 @@ const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState
             <div>
               <label
                 htmlFor="maintenance_llm_provider_input"
-                className="block text-sm font-medium text-app-accent-2 mb-1"
+                className="block text-sm font-medium text-app-text-2 mb-1"
               >
                 Maintenance LLM Provider:
               </label>
@@ -770,7 +770,7 @@ const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState
             <div>
               <label
                 htmlFor="maintenance_llm_model_input"
-                className="block text-sm font-medium text-app-accent-2 mb-1"
+                className="block text-sm font-medium text-app-text-2 mb-1"
               >
                 Maintenance LLM Model:
               </label>
@@ -838,7 +838,7 @@ const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState
             <div>
               <label
                 htmlFor="maintenance_llm_api_key"
-                className="block text-sm font-medium text-app-accent-2 mb-1"
+                className="block text-sm font-medium text-app-text-2 mb-1"
               >
                 Maintenance LLM API Key:
               </label>
@@ -872,7 +872,7 @@ const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState
             <div>
               <label
                 htmlFor="embedding_llm_provider_input"
-                className="block text-sm font-medium text-app-accent-2 mb-1"
+                className="block text-sm font-medium text-app-text-2 mb-1"
               >
                 Embedding LLM Provider:
               </label>
@@ -932,7 +932,7 @@ const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState
             <div>
               <label
                 htmlFor="embedding_llm_model_input"
-                className="block text-sm font-medium text-app-accent-2 mb-1"
+                className="block text-sm font-medium text-app-text-2 mb-1"
               >
                 Embedding LLM Model:
               </label>
@@ -1000,7 +1000,7 @@ const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState
             <div>
               <label
                 htmlFor="embedding_llm_api_key"
-                className="block text-sm font-medium text-app-accent-2 mb-1"
+                className="block text-sm font-medium text-app-text-2 mb-1"
               >
                 Embedding LLM API Key:
               </label>
@@ -1034,7 +1034,7 @@ const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState
         <button
           type="submit"
           disabled={isSubmitting || isLoading}
-          className="w-full mt-2 px-4 py-2.5 text-sm text-app-surface bg-app-accent-2 hover:bg-app-accent-3 rounded-md font-medium disabled:bg-gray-700 disabled:opacity-70 transition-colors"
+          className="w-full mt-2 px-4 py-2.5 text-sm text-app-surface bg-app-text-2 hover:bg-app-text-3 rounded-md font-medium disabled:bg-gray-700 disabled:opacity-70 transition-colors"
         >
           {isSubmitting ? "Saving..." : "Save Settings"}
         </button>

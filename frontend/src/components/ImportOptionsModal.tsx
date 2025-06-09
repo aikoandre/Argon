@@ -60,7 +60,7 @@ const ImportOptionsModal: React.FC<ImportOptionsModalProps> = ({
               checked={options.importCard}
               onChange={(e) => setOptions(prev => ({ ...prev, importCard: e.target.checked }))}
               disabled={!hasCard}
-              className="rounded border-app-surface bg-app-surface text-app-accent"
+              className="rounded border-app-surface bg-app-surface text-app-text"
             />
             <span className={hasCard ? "text-white" : "text-gray-500"}>
               {cardTypeName} Card
@@ -75,7 +75,7 @@ const ImportOptionsModal: React.FC<ImportOptionsModalProps> = ({
               checked={options.importMasterWorld}
               onChange={(e) => setOptions(prev => ({ ...prev, importMasterWorld: e.target.checked }))}
               disabled={!hasMasterWorld}
-              className="rounded border-app-surface bg-app-surface text-app-accent"
+              className="rounded border-app-surface bg-app-surface text-app-text"
             />
             <span className={hasMasterWorld ? "text-white" : "text-gray-500"}>
               Master World
@@ -90,7 +90,7 @@ const ImportOptionsModal: React.FC<ImportOptionsModalProps> = ({
               checked={options.importLoreEntries}
               onChange={(e) => setOptions(prev => ({ ...prev, importLoreEntries: e.target.checked }))}
               disabled={!hasLoreEntries}
-              className="rounded border-app-surface bg-app-surface text-app-accent"
+              className="rounded border-app-surface bg-app-surface text-app-text"
             />
             <span className={hasLoreEntries ? "text-white" : "text-gray-500"}>
               Lore Entries
@@ -101,7 +101,7 @@ const ImportOptionsModal: React.FC<ImportOptionsModalProps> = ({
 
         {/* Warning for no selections */}
         {!options.importCard && !options.importMasterWorld && !options.importLoreEntries && (
-          <div className="mb-4 p-3 bg-app-accent-2 rounded text-app-bg text-sm">
+          <div className="mb-4 p-3 bg-app-text-2 rounded text-app-bg text-sm">
             Please select at least one item to import.
           </div>
         )}
@@ -111,7 +111,7 @@ const ImportOptionsModal: React.FC<ImportOptionsModalProps> = ({
           <button
             onClick={handleImport}
             disabled={!options.importCard && !options.importMasterWorld && !options.importLoreEntries}
-            className="flex-1 bg-app-chat hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded transition-colors"
+            className="flex-1 bg-app-primary hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded transition-colors"
           >
             Import Selected
           </button>

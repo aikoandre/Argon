@@ -112,7 +112,7 @@ export const VariantArrows: React.FC<VariantArrowsProps> = ({
       
       {/* Counter: positioned at bottom center */}
       {showCounter && (
-        <span className="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-xs text-app-accent-3 whitespace-nowrap pointer-events-none px-2 py-1 rounded">
+        <span className="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-xs text-app-text-3 whitespace-nowrap pointer-events-none px-2 py-1 rounded">
           {showBlank ? variants.length + 1 : currentIdx + 1}/{Math.max(1, variants.length + (showBlank ? 1 : 0))}
         </span>
       )}

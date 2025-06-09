@@ -105,7 +105,7 @@ const ExportButton: React.FC<ExportButtonProps> = ({
           transition-colors duration-200
           ${disabled || isExporting
             ? 'bg-gray-600 text-gray-400 cursor-not-allowed px-4 py-2 text-sm font-medium rounded-md'
-            : className || 'bg-app-chat hover:bg-app-chat-2 text-app-accent font-semibold px-2 rounded-lg shadow-md'
+            : className || 'bg-app-primary hover:bg-app-primary-darker text-app-text font-semibold px-2 rounded-lg shadow-md'
           }
         `}
         title={`Export as ${masterWorld ? 'ZIP' : 'PNG'} with embedded data`}

@@ -5,6 +5,14 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: true, // Enable access from any host
+    port: 5173,
+    hmr: {
+      overlay: true, // Show error overlay
+    },
+    watch: {
+      usePolling: true, // Use polling for file watching (helpful in some environments)
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:7000', // Your backend server address

@@ -2,80 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom scrollbar for Webkit browsers (Chrome, Safari) */
-body::-webkit-scrollbar {
-  display: none; /* Hide document scrollbar */
-}
-
-/* Keep these for other elements that need scrollbars */
-.scrollable::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.scrollable::-webkit-scrollbar-track {
-  background: rgba(222, 226, 230, 0.1); /* app-accent-2 with translucency */
-  border-radius: 10px;
-}
-
-.scrollable::-webkit-scrollbar-thumb {
-  background-color: rgba(248, 249, 250, 0.4); /* app-accent with translucency */
-  border-radius: 10px;
-  border: 2px solid transparent; /* Creates padding around the thumb */
-  background-clip: content-box; /* Ensures border doesn't obscure transparency */
-}
-
-.scrollable::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(248, 249, 250, 0.6); /* app-accent, slightly less transparent on hover */
-}
-
-/* Custom scrollbar for Firefox */
-html, body {
-  height: 100%;
-  overflow: hidden; /* Hide document scrollbar */
-}
-
-html {
-  scrollbar-width: none; /* Hide scrollbar for Firefox */
-}
-
-/* Thin, transparent scrollbar for chat area */
-.scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
-  background: transparent;
-}
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(248, 249, 250, 0.4);
-  border-radius: 6px;
-}
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: transparent;
-}
-.scrollbar-thin {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(248, 249, 250, 0.4) transparent;
-}
-
-/* Tailwind scrollbar utilities support */
-.scrollbar-thumb-app-accent::-webkit-scrollbar-thumb {
-  background-color: rgba(248, 249, 250, 0.4);
-}
-.scrollbar-track-app-surface\/30::-webkit-scrollbar-track {
-  background-color: rgba(222, 226, 230, 0.3);
-}
-
-@keyframes modalShow {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
+@layer base {
+  html, body {
+    height: 100%;
+    @apply bg-app-bg text-app-text;
   }
-  to {
-    opacity: 1;
-    transform: scale(1);
+  
+  #root {
+    @apply min-h-screen flex flex-col bg-app-bg text-app-text;
   }
-}
-
-.animate-modalShow {
-  animation: modalShow 0.3s ease-out forwards;
+  
+  /* Hide main document scrollbar */
+  body::-webkit-scrollbar {
+    display: none;
+  }
+  
+  html {
+    scrollbar-width: none;
+  }
 }
 
