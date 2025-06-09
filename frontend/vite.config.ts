@@ -7,12 +7,12 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:8000', // Your backend server address
+        target: 'http://localhost:7000', // Your backend server address
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '/api'), // Keep /api in the path
       },
       '/static': { // Add proxy for static files
-        target: 'http://localhost:8000',
+        target: 'http://localhost:7000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/static/, '/static'), // Keep /static in the path
       },

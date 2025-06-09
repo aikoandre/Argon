@@ -7,7 +7,7 @@ import type {
 import type { PanelData } from "../types/chat";
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api",
+  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:7000/api",
   timeout: 120000, // Increased timeout to 120 seconds (2 minutes) for long LLM calls
   headers: {
     "Content-Type": "application/json",

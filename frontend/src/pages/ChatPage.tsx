@@ -458,38 +458,41 @@ const ChatPage: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-app-bg">
-      <div className="w-full max-w-xl lg:max-w-2xl mx-auto pt-16 pb-4 flex-1 flex flex-col min-h-0">
-        <div className="flex-1 overflow-y-auto pr-2 space-y-2 scrollbar-thin scrollbar-thumb-app-accent scrollbar-track-app-surface/30 rounded-xl min-h-0">
-          {messages.length === 0 && (
-            <div className="flex justify-center pb-4">
-              <div className="text-center">
-                <p className="text-xl text-gray-500">No messages yet. Send a message!</p>
+    <div className="flex flex-col h-[calc(100vh-56px)] overflow-hidden bg-app-bg">
+      {/* Chat messages section */}
+      <div className="flex-1 min-h-0">
+        {/* Remove max-w-xl lg:max-w-2xl mx-auto to make chat area full width */}
+        <div className="w-full h-full flex flex-col">
+          <div className="flex-1 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-app-accent scrollbar-track-app-surface/30 rounded-xl min-h-0 px-4 py-2">
+            {messages.length === 0 && (
+              <div className="flex justify-center pb-4">
+                <div className="text-center">
+                  <p className="text-xl text-gray-500">No messages yet. Send a message!</p>
+                </div>
               </div>
-            </div>
-          )}
-          {/* Regular messages */}
-          {[...messages]
-            .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-            .map((msg) => {
-              // For AI messages, always use card name/image if persona fields are missing
-              let aiName = msg.active_persona_name;
-              let aiImageUrl = msg.active_persona_image_url;
-              if (msg.sender_type === "AI") {
-                if (!aiName && sessionDetails?.card_type === 'character' && sessionDetails.card_id) {
-                  aiName = (window as any).__characterCardNameCache?.[sessionDetails.card_id];
-                } else if (!aiName && sessionDetails?.card_type === 'scenario' && sessionDetails.card_id) {
-                  aiName = (window as any).__scenarioCardNameCache?.[sessionDetails.card_id];
+            )}
+            {/* Regular messages */}
+            {[...messages]
+              .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+              .map((msg) => {
+                // For AI messages, always use card name/image if persona fields are missing
+                let aiName = msg.active_persona_name;
+                let aiImageUrl = msg.active_persona_image_url;
+                if (msg.sender_type === "AI") {
+                  if (!aiName && sessionDetails?.card_type === 'character' && sessionDetails.card_id) {
+                    aiName = (window as any).__characterCardNameCache?.[sessionDetails.card_id];
+                  } else if (!aiName && sessionDetails?.card_type === 'scenario' && sessionDetails.card_id) {
+                    aiName = (window as any).__scenarioCardNameCache?.[sessionDetails.card_id];
+                  }
+                  // Never fallback to 'Assistant' for AI
+                  // For image, use card image if persona image is missing
+                  if (!aiImageUrl && sessionDetails?.card_type === 'character' && sessionDetails.card_id) {
+                    aiImageUrl = (window as any).__characterCardImageCache?.[sessionDetails.card_id] ?? null;
+                  } else if (!aiImageUrl && sessionDetails?.card_type === 'scenario' && sessionDetails.card_id) {
+                    aiImageUrl = (window as any).__scenarioCardImageCache?.[sessionDetails.card_id] ?? null;
+                  }
                 }
-                // Never fallback to 'Assistant' for AI
-                // For image, use card image if persona image is missing
-                if (!aiImageUrl && sessionDetails?.card_type === 'character' && sessionDetails.card_id) {
-                  aiImageUrl = (window as any).__characterCardImageCache?.[sessionDetails.card_id] ?? null;
-                } else if (!aiImageUrl && sessionDetails?.card_type === 'scenario' && sessionDetails.card_id) {
-                  aiImageUrl = (window as any).__scenarioCardImageCache?.[sessionDetails.card_id] ?? null;
-                }
-              }
-              const processedAiAvatarSrc = getImageUrl(aiImageUrl ?? null) || DEFAULT_BOT_AVATAR;
+                const processedAiAvatarSrc = getImageUrl(aiImageUrl ?? null) || DEFAULT_BOT_AVATAR;
               return (
                 <div key={msg.id}>
                   <div
@@ -611,16 +614,17 @@ const ChatPage: React.FC = () => {
                 </div>
               );
             })}
-          {/* End of messages map */}
-          <div ref={messagesEndRef} />
+            {/* End of messages map */}
+            <div ref={messagesEndRef} />
+          </div>
         </div>
       </div>
       {/* Input area */}
       <div
         ref={inputAreaRef}
-        className="flex justify-center p-4 bg-app-bg"
+        className="flex justify-center px-4 bg-app-bg" // removed border-t to fix white line
       >
-        <div className="w-full max-w-xl lg:max-w-2xl mx-auto">
+        <div className="w-full py-2">
           <form onSubmit={handleSendMessage} className="relative">
             <textarea
               rows={1}

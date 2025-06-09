@@ -10,3 +10,4 @@ from .lore_entry import LoreEntry
 from .session_cache_fact import SessionCacheFact
 from .session_relationship import SessionRelationship
 from .session_lore_modification import SessionLoreModification
+from .maintenance_queue import MaintenanceQueue

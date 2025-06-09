@@ -45,64 +45,64 @@ function AppWrapper() {
       {/* Combined Fixed Header */}
       <header className="fixed top-0 left-0 right-0 h-[56px] flex justify-center items-center z-50 mt-1">
         {/* Navigation Header */}
-        <div className="w-full max-w-xl lg:max-w-2xl mx-auto bg-app-surface shadow-lg rounded-2xl p-2 flex items-center justify-evenly">
-        <Link
-          to="/"
-          className={`px-2 rounded-full transition-colors ${
-            location.pathname === "/" ? "text-app-accent" : "text-app-flat"
-          } hover:bg-app-surface/50`}
-        >
-          <HomeIcon />
-        </Link>
-        <Link
-          to="/chats"
-          className={`px-2 rounded-full transition-colors ${
-            location.pathname.startsWith("/chat") ? "text-app-accent" : "text-app-flat"
-          } hover:bg-app-surface/50`}
-        >
-          <ChatsIcon />
-        </Link>
-        <Link
-          to="/characters"
-          className={`px-2 rounded-full transition-colors ${
-            location.pathname === "/characters" ? "text-app-accent" : "text-app-flat"
-          } hover:bg-app-surface/50`}
-        >
-          <CharactersIcon />
-        </Link>
-        <Link
-          to="/scenarios"
-          className={`px-2 rounded-full transition-colors ${
-            location.pathname === "/scenarios" ? "text-app-accent" : "text-app-flat"
-          } hover:bg-app-surface/50`}
-        >
-          <ScenariosIcon />
-        </Link>
-        <Link
-          to="/world-lore"
-          className={`px-2 rounded-full transition-colors ${
-            location.pathname.startsWith("/world-lore") ? "text-app-accent" : "text-app-flat"
-          } hover:bg-app-surface/50`}
-          title="Master Worlds"
-        >
-          <WorldsIcon />
-        </Link>
-        <Link
-          to="/personas"
-          className={`px-2 rounded-full transition-colors ${
-            location.pathname === "/personas" ? "text-app-accent" : "text-app-flat"
-          } hover:bg-app-surface/50`}
-        >
-          <PersonasIcon />
-        </Link>
-        <Link
-          to="/settings"
-          className={`px-2 rounded-full transition-colors ${
-            location.pathname === "/settings" ? "text-app-accent" : "text-app-flat"
-          } hover:bg-app-surface/50`}
-        >
-          <SettingsIcon />
-        </Link>
+        <div className="w-full max-w-2xl lg:max-w-3xl mx-auto bg-app-surface shadow-lg rounded-2xl p-2 flex items-center justify-evenly">
+          <Link
+            to="/"
+            className={`px-2 rounded-full transition-colors ${
+              location.pathname === "/" ? "text-app-accent" : "text-app-flat"
+            } hover:bg-app-surface/50`}
+          >
+            <HomeIcon />
+          </Link>
+          <Link
+            to="/chats"
+            className={`px-2 rounded-full transition-colors ${
+              location.pathname.startsWith("/chat") ? "text-app-accent" : "text-app-flat"
+            } hover:bg-app-surface/50`}
+          >
+            <ChatsIcon />
+          </Link>
+          <Link
+            to="/characters"
+            className={`px-2 rounded-full transition-colors ${
+              location.pathname === "/characters" ? "text-app-accent" : "text-app-flat"
+            } hover:bg-app-surface/50`}
+          >
+            <CharactersIcon />
+          </Link>
+          <Link
+            to="/scenarios"
+            className={`px-2 rounded-full transition-colors ${
+              location.pathname === "/scenarios" ? "text-app-accent" : "text-app-flat"
+            } hover:bg-app-surface/50`}
+          >
+            <ScenariosIcon />
+          </Link>
+          <Link
+            to="/world-lore"
+            className={`px-2 rounded-full transition-colors ${
+              location.pathname.startsWith("/world-lore") ? "text-app-accent" : "text-app-flat"
+            } hover:bg-app-surface/50`}
+            title="Master Worlds"
+          >
+            <WorldsIcon />
+          </Link>
+          <Link
+            to="/personas"
+            className={`px-2 rounded-full transition-colors ${
+              location.pathname === "/personas" ? "text-app-accent" : "text-app-flat"
+            } hover:bg-app-surface/50`}
+          >
+            <PersonasIcon />
+          </Link>
+          <Link
+            to="/settings"
+            className={`px-2 rounded-full transition-colors ${
+              location.pathname === "/settings" ? "text-app-accent" : "text-app-flat"
+            } hover:bg-app-surface/50`}
+          >
+            <SettingsIcon />
+          </Link>
         </div>
       </header>
       {/* Spacer to push content below fixed header */}

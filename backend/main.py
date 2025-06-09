@@ -46,6 +46,8 @@ from backend.routers.characters import router as characters_router
 from backend.routers.master_worlds import router as master_worlds_router
 from backend.routers.settings import router as settings_router
 from backend.routers.llm_providers import router as llm_providers_router
+from backend.routers.maintenance import router as maintenance_router
+from backend.routers.faiss_management import router as faiss_management_router
 from backend import database
 from sqlalchemy.orm import Session # Import Session
 from backend.database import get_db # Import get_db
@@ -60,6 +62,7 @@ from backend.models.chat_session import ChatSession
 from backend.models.lore_entry import LoreEntry
 from backend.models.session_relationship import SessionRelationship # Import the new model
 from backend.models.user_settings import UserSettings
+from backend.models.maintenance_queue import MaintenanceQueue
 from fastapi.responses import StreamingResponse
 
 app = FastAPI(title="Advanced Roleplay Engine API")
@@ -187,6 +190,13 @@ async def startup_event():
     # O worker acessa a fila internamente
     background_worker_task = loop.create_task(embedding_worker())
     print("Worker de embedding agendado para execução.")
+    
+    # 4. Start the maintenance worker for the Unified LLM Services Architecture
+    print("Starting maintenance worker...")
+    from backend.services.maintenance_worker import get_maintenance_worker
+    maintenance_worker = get_maintenance_worker()
+    loop.create_task(maintenance_worker.start())
+    print("Maintenance worker started.")
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -221,6 +231,12 @@ async def health_check():
     """
     return {"status": "ok", "message": "API is healthy"}
 
+# --- Favicon Handler ---
+@app.get("/favicon.ico")
+async def favicon():
+    """Handle favicon requests to prevent 404 errors."""
+    return {"status": "ok", "message": "No favicon configured"}
+
 @app.get("/test-serve-image")
 async def test_serve_image():
     """TEMPORARY: Test serving a specific image file using FileResponse."""
@@ -243,6 +259,8 @@ app.include_router(characters_router)
 app.include_router(master_worlds_router)
 app.include_router(settings_router, prefix="/api")
 app.include_router(llm_providers_router)
+app.include_router(maintenance_router, prefix="/api")
+app.include_router(faiss_management_router, prefix="/api")
 
 def create_default_user_persona(db: Session):
     """
@@ -265,3 +283,8 @@ def create_default_user_persona(db: Session):
         print(f"Default user persona '{default_persona_name}' created with ID: {new_persona.id}")
     else:
         print(f"Default user persona '{default_persona_name}' already exists with ID: {default_persona.id}")
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 7000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
