@@ -13,8 +13,8 @@ import {
   type MasterWorldData,
 } from '../services/api';
 import { useLayout } from '../contexts/LayoutContext';
-import LoreEntryEditPanel from '../components/Editing/LoreEntryEditPanel';
 import { useInstantAutoSave } from '../hooks/useInstantAutoSave';
+import LoreEntryEditPanel from '../components/Editing/LoreEntryEditPanel';
 
 const iconBaseClass = "material-icons-outlined text-2xl flex-shrink-0";
 const DeleteIcon = ({ className }: { className?: string }) => (
@@ -67,26 +67,6 @@ const MasterWorldPageContext: React.FC = () => {
   // UI states
   const [error, setError] = useState<string | null>(null);
   const [newWorldName, setNewWorldName] = useState<string>("");
-
-  // Auto-save functionality
-  const { saveStatus, error: autoSaveError, retry } = useInstantAutoSave(
-    editingEntry || {} as LoreEntryData,
-    async (data: LoreEntryData) => {
-      if (data && data.id && selectedMasterWorld?.value) {
-        await updateLoreEntry(selectedMasterWorld.value, data.id, {
-          name: data.name,
-          entry_type: data.entry_type,
-          description: data.description,
-          tags: data.tags,
-          aliases: data.aliases,
-          faction_id: data.entry_type === "CHARACTER_LORE" ? data.faction_id : null
-        });
-      }
-    },
-    { 
-      debounceMs: 300
-    }
-  );
 
   // Create entry type options for the dropdown
   const entryTypeOptions: SelectOption[] = VALID_ENTRY_TYPES.map(type => ({
@@ -180,6 +160,17 @@ const MasterWorldPageContext: React.FC = () => {
     }
   }, [selectedMasterWorld, isLoadingWorlds, masterWorlds]);
 
+  // Auto-save functionality - only for existing lore entries
+  useInstantAutoSave(
+    editingEntry || {} as LoreEntryData,
+    async (data: LoreEntryData) => {
+      if (data && data.id && data.master_world_id) {
+        await updateLoreEntry(data.master_world_id, data.id, data);
+      }
+    },
+    { debounceMs: 300 }
+  );
+
   // Handle editing lore entry
   const handleEditEntry = (entry: LoreEntryData) => {
     setEditingEntry(entry);
@@ -204,11 +195,6 @@ const MasterWorldPageContext: React.FC = () => {
           onExport={() => {}}
           onExpressions={() => {}}
           onImageChange={() => {}}
-          autoSaveStatus={saveStatus}
-          disabled={saveStatus === 'saving'}
-          onRetryAutoSave={retry}
-          lastSaved={null}
-          error={autoSaveError}
         />
       );
     } else {

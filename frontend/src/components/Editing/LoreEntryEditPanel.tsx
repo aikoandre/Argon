@@ -1,8 +1,6 @@
 import React from 'react';
 import { IconActionBar } from '../Layout';
-import SaveIndicator from '../UI/SaveIndicator';
 import type { LoreEntryData, MasterWorldData } from '../../services/api';
-import type { SaveStatus } from '../../hooks/useInstantAutoSave';
 
 interface SelectOption {
   value: string;
@@ -20,12 +18,7 @@ interface LoreEntryEditPanelProps {
   onExport: () => void;
   onExpressions: () => void;
   onImageChange: () => void;
-  autoSaveStatus?: SaveStatus;
   disabled?: boolean;
-  onRetryAutoSave?: () => void;
-  onResolveConflict?: () => void;
-  lastSaved?: Date | null;
-  error?: Error | null;
 }
 
 const LoreEntryEditPanel: React.FC<LoreEntryEditPanelProps> = ({
@@ -39,15 +32,10 @@ const LoreEntryEditPanel: React.FC<LoreEntryEditPanelProps> = ({
   onExport,
   onExpressions,
   onImageChange,
-  autoSaveStatus = 'saved',
-  disabled,
-  onRetryAutoSave,
-  onResolveConflict,
-  lastSaved,
-  error
+  disabled
 }) => {
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className="flex flex-col h-full w-full bg-app-surface">
       <IconActionBar
         onDelete={onDelete}
         onImport={onImport}
@@ -56,15 +44,8 @@ const LoreEntryEditPanel: React.FC<LoreEntryEditPanelProps> = ({
         onImageChange={onImageChange}
         disabled={disabled}
       />
-      <div className="flex justify-between items-center p-2 border-b border-app-border">
+      <div className="flex justify-between items-center p-2 border-b border-app-border bg-app-surface">
         <h3 className="text-sm font-semibold">Edit Lore Entry</h3>
-        <SaveIndicator
-          status={autoSaveStatus}
-          lastSaved={lastSaved || undefined}
-          onRetry={onRetryAutoSave}
-          onResolveConflict={onResolveConflict}
-          error={error}
-        />
       </div>
       <form className="flex flex-col gap-4 p-4 flex-1 overflow-y-auto">
         <label className="font-semibold text-sm">Name

@@ -22,14 +22,14 @@ const MaterialIcon = ({ icon, className = "" }: { icon: string; className?: stri
 );
 
 const IconActionBar: React.FC<IconActionBarProps> = (props) => (
-  <div className="flex flex-row items-center gap-2 p-2 border-b border-app-border bg-app-panel">
+  <div className="flex flex-row items-center justify-center gap-2 p-2 border-b border-app-border bg-app-surface">
     {icons.map(({ key, icon, label, onClick }) => (
       <button
         key={key}
-        className="p-2 rounded-full hover:bg-app-surface/60 focus:outline-none focus:ring-2 focus:ring-app-primary"
+        className="px-1 rounded-lg border-2 border-app-bg hover:bg-app-bg/60 focus:outline-none focus:ring-2 focus:ring-app-primary"
         title={label}
         aria-label={label}
-        onClick={props[onClick]}
+        onClick={props[onClick as keyof IconActionBarProps] as (() => void) | undefined}
         disabled={props.disabled}
         type="button"
       >

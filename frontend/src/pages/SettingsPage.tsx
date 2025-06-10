@@ -315,7 +315,7 @@ const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState
   }
 
   return (
-    <div className="container p-4 md:p-8 text-white">
+    <div className="text-white">
       <h1 className="text-4xl font-bold text-white font-quintessential mb-8">
         Application Settings
       </h1>

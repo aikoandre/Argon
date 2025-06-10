@@ -1,8 +1,6 @@
 import React from 'react';
 import { IconActionBar } from '../Layout';
-import SaveIndicator from '../UI/SaveIndicator';
 import type { CharacterCardData } from '../../services/api';
-import type { SaveStatus } from '../../hooks/useInstantAutoSave';
 
 interface CharacterEditPanelProps {
   character: CharacterCardData;
@@ -12,12 +10,7 @@ interface CharacterEditPanelProps {
   onExport: () => void;
   onExpressions: () => void;
   onImageChange: () => void;
-  autoSaveStatus?: SaveStatus;
   disabled?: boolean;
-  onRetryAutoSave?: () => void;
-  onResolveConflict?: () => void;
-  lastSaved?: Date | null;
-  error?: Error | null;
 }
 
 const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
@@ -28,15 +21,10 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
   onExport,
   onExpressions,
   onImageChange,
-  autoSaveStatus = 'saved',
-  disabled,
-  onRetryAutoSave,
-  onResolveConflict,
-  lastSaved,
-  error
+  disabled
 }) => {
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className="flex flex-col h-full w-full bg-app-surface">
       <IconActionBar
         onDelete={onDelete}
         onImport={onImport}
@@ -45,20 +33,13 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
         onImageChange={onImageChange}
         disabled={disabled}
       />
-      <div className="flex justify-between items-center p-2 border-b border-app-border">
+      <div className="flex justify-between items-center p-2 border-b border-app-border bg-app-surface">
         <h3 className="text-sm font-semibold">Edit Character</h3>
-        <SaveIndicator
-          status={autoSaveStatus}
-          lastSaved={lastSaved || undefined}
-          onRetry={onRetryAutoSave}
-          onResolveConflict={onResolveConflict}
-          error={error}
-        />
       </div>
       <form className="flex flex-col gap-4 p-4 flex-1 overflow-y-auto">
         <label className="font-semibold text-sm">Name
           <input
-            className="w-full mt-1 p-2 rounded bg-app-surface border border-app-border"
+            className="w-full mt-1 p-2 rounded bg-app-bg border border-app-border"
             value={character.name}
             onChange={e => onChange('name', e.target.value)}
             disabled={disabled}
@@ -66,20 +47,20 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
         </label>
         <label className="font-semibold text-sm">Description
           <textarea
-            className="w-full mt-1 p-2 rounded bg-app-surface border border-app-border"
+            className="w-full mt-1 p-2 rounded bg-app-bg border border-app-border"
             value={character.description || ''}
             onChange={e => onChange('description', e.target.value)}
             disabled={disabled}
-            rows={3}
+            rows={10}
           />
         </label>
         <label className="font-semibold text-sm">Instructions
           <textarea
-            className="w-full mt-1 p-2 rounded bg-app-surface border border-app-border"
+            className="w-full mt-1 p-2 rounded bg-app-bg border border-app-border"
             value={character.instructions || ''}
             onChange={e => onChange('instructions', e.target.value)}
             disabled={disabled}
-            rows={4}
+            rows={10}
           />
         </label>
       </form>

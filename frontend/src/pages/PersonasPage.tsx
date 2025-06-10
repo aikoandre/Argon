@@ -2,20 +2,21 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   getAllUserPersonas,
-  updateUserPersona,
   deleteUserPersona,
   getUserSettings,
   updateUserSettings,
   getAllMasterWorlds,
+  updateUserPersona,
   type UserPersonaData,
   type MasterWorldData,
 } from "../services/api";
 import { CardImage } from '../components/CardImage';
+import { LeftPanelImage } from '../components/Layout';
 import { createPNGWithEmbeddedData } from '../utils/pngExport';
-import { useLayout } from '../contexts/LayoutContext';
-import PersonaEditPanel from '../components/Editing/PersonaEditPanel';
-import { useInstantAutoSave } from '../hooks/useInstantAutoSave';
 import { personaToFormData } from '../utils/formDataHelpers';
+import { useLayout } from '../contexts/LayoutContext';
+import { useInstantAutoSave } from '../hooks/useInstantAutoSave';
+import PersonaEditPanel from '../components/Editing/PersonaEditPanel';
 
 const PersonasPageContext: React.FC = () => {
   const { setLeftPanelContent, setRightPanelContent } = useLayout();
@@ -30,20 +31,6 @@ const PersonasPageContext: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
-
-  // Auto-save functionality
-  const { saveStatus, error: autoSaveError, retry } = useInstantAutoSave(
-    editingPersona || {} as UserPersonaData,
-    async (data: UserPersonaData) => {
-      if (data && data.id) {
-        const formData = personaToFormData(data);
-        await updateUserPersona(data.id, formData);
-      }
-    },
-    { 
-      debounceMs: 300
-    }
-  );
 
   // Load personas
   const fetchPersonas = async () => {
@@ -91,6 +78,18 @@ const PersonasPageContext: React.FC = () => {
     loadActivePersona();
   }, []);
 
+  // Auto-save functionality - only for existing personas
+  useInstantAutoSave(
+    editingPersona || {} as UserPersonaData,
+    async (data: UserPersonaData) => {
+      if (data && data.id) {
+        const formData = personaToFormData(data);
+        await updateUserPersona(data.id, formData);
+      }
+    },
+    { debounceMs: 300 }
+  );
+
   // Handle editing persona
   const handleEditPersona = (persona: UserPersonaData) => {
     setEditingPersona(persona);
@@ -102,11 +101,9 @@ const PersonasPageContext: React.FC = () => {
       // Left panel: show image if available
       if (persona.image_url) {
         setLeftPanelContent(
-          <img
+          <LeftPanelImage
             src={persona.image_url}
             alt={persona.name}
-            className="w-full h-full object-cover rounded-lg"
-            style={{ aspectRatio: '3/4.5' }}
           />
         );
       } else {
@@ -124,11 +121,6 @@ const PersonasPageContext: React.FC = () => {
           onExport={handleExport}
           onExpressions={() => {}}
           onImageChange={handleEditImageChange}
-          autoSaveStatus={saveStatus}
-          disabled={saveStatus === 'saving'}
-          onRetryAutoSave={retry}
-          lastSaved={null}
-          error={autoSaveError}
         />
       );
     } else {
@@ -220,7 +212,7 @@ const PersonasPageContext: React.FC = () => {
   }
 
   return (
-    <div className="container p-4 md:p-8 h-full">
+    <div className="h-full">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold font-quintessential text-white">Personas</h1>
         <div>

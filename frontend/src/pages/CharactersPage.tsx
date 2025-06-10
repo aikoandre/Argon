@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { deleteCharacterCard, updateCharacterCard, createCharacterCard, getAllCharacterCards, type CharacterCardData } from "../services/api";
 import { useLayout } from '../contexts/LayoutContext';
 import CharacterEditPanel from '../components/Editing/CharacterEditPanel';
+import { LeftPanelImage } from '../components/Layout';
 import { useInstantAutoSave } from '../hooks/useInstantAutoSave';
 import { characterToFormData } from '../utils/formDataHelpers';
 import { CardImage } from '../components/CardImage';
@@ -31,7 +32,7 @@ const CharactersPage: React.FC = () => {
   }, []);
 
   // Auto-save functionality - only for existing characters
-  const { saveStatus, error, retry } = useInstantAutoSave(
+  useInstantAutoSave(
     editingCharacter || {} as CharacterCardData,
     async (data: CharacterCardData) => {
       if (data && data.id) {
@@ -59,11 +60,9 @@ const CharactersPage: React.FC = () => {
           ? `?cb=${encodeURIComponent(character.updated_at)}`
           : `?cb=${character.id}`;
         setLeftPanelContent(
-          <img
+          <LeftPanelImage
             src={`${character.image_url}${cacheBuster}`}
             alt={character.name}
-            className="w-full h-full object-cover rounded-lg"
-            style={{ aspectRatio: '3/4.5' }}
           />
         );
       } else {
@@ -125,22 +124,19 @@ const CharactersPage: React.FC = () => {
           onExport={handleExport}
           onExpressions={handleExpressions}
           onImageChange={handleImageChange}
-          autoSaveStatus={saveStatus}
-          error={error}
-          onRetryAutoSave={retry}
         />
       );
     }
-  }, [editingCharacter, saveStatus, error]);
+  }, [editingCharacter]);
 
   return (
-    <div className="container p-4 md:p-8 h-full">
+    <div className="h-full">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold font-quintessential text-white">Characters</h1>
         <div>
           <button
             onClick={handleImport}
-            className="bg-app-text-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md mr-2"
+            className="bg-app-text text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md mr-2"
           >
             Import
           </button>
@@ -161,7 +157,7 @@ const CharactersPage: React.FC = () => {
                 console.error('Failed to create new character:', error);
               }
             }}
-            className="bg-app-text-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
+            className="bg-app-text text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
           >
             New +
           </button>
@@ -205,16 +201,6 @@ const CharactersPage: React.FC = () => {
                   imageUrl={imageUrl}
                   className="absolute inset-0"
                 />
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(character.id);
-                  }}
-                  className="absolute top-2 right-2 z-20 text-app-text hover:text-red-500 p-1.5 rounded-full transition-colors"
-                  title="Delete Character"
-                >
-                  <span className="material-icons-outlined text-2xl">delete</span>
-                </button>
                 
                 <div className="absolute bottom-0 left-0 w-full">
                   <div className="w-full bg-black/30 backdrop-blur-sm p-3 flex flex-row items-center justify-between rounded-b-lg">

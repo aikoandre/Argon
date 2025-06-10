@@ -1,14 +1,20 @@
 import React from 'react';
 
 const LeftPanel: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
-  // Fixed aspect ratio, hidden if no image/expressions
+  // Full height panel that takes entire width of its container
   return (
     <aside
-      className="hidden md:flex flex-col items-center justify-start bg-app-panel border-r border-app-border min-w-[240px] max-w-[320px] aspect-[3/4.5] overflow-hidden"
-      style={{ minWidth: 240, maxWidth: 320 }}
+      className="w-full h-full flex flex-col rounded-lg bg-app-surface border-4 border-app-border transition-all duration-300 ease-in-out overflow-hidden"
+      style={{ 
+        minHeight: 'calc(100vh - 80px)',
+        maxHeight: 'calc(100vh - 60px)'
+      }}
       data-testid="left-panel"
     >
-      {children}
+      {/* Content container that positions content at bottom */}
+      <div className="w-full h-full flex flex-col justify-end items-center overflow-hidden">
+        {children}
+      </div>
     </aside>
   );
 };

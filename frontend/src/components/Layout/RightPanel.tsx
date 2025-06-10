@@ -1,14 +1,20 @@
 import React from 'react';
 
 const RightPanel: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
-  // Fixed aspect ratio, slides in/out, persistent
+  // Full height panel that takes entire width of its container
   return (
     <aside
-      className="hidden md:flex flex-col items-center justify-start bg-app-panel border-l border-app-border min-w-[240px] max-w-[320px] aspect-[3/4.5] overflow-hidden"
-      style={{ minWidth: 240, maxWidth: 320 }}
+      className="w-full h-full flex flex-col rounded-lg bg-app-surface border-4 border-app-border transition-all duration-300 ease-in-out overflow-hidden"
+      style={{ 
+        minHeight: 'calc(100vh - 80px)',
+        maxHeight: 'calc(100vh - 60px)'
+      }}
       data-testid="right-panel"
     >
-      {children}
+      {/* Content container */}
+      <div className="w-full h-full flex flex-col justify-start items-center overflow-hidden">
+        {children}
+      </div>
     </aside>
   );
 };

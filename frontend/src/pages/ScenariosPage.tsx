@@ -4,18 +4,19 @@ import { useNavigate } from "react-router-dom";
 import { 
   createOrGetCardChat,
   getAllScenarioCards,
-  updateScenarioCard,
   deleteScenarioCard,
   getAllMasterWorlds,
+  updateScenarioCard,
   type MasterWorldData,
   type ScenarioCardData,
 } from "../services/api";
 import { CardImage } from '../components/CardImage';
+import { LeftPanelImage } from '../components/Layout';
 import { createPNGWithEmbeddedData } from '../utils/pngExport';
-import { useLayout } from '../contexts/LayoutContext';
-import ScenarioEditPanel from '../components/Editing/ScenarioEditPanel';
-import { useInstantAutoSave } from '../hooks/useInstantAutoSave';
 import { scenarioToFormData } from '../utils/formDataHelpers';
+import { useLayout } from '../contexts/LayoutContext';
+import { useInstantAutoSave } from '../hooks/useInstantAutoSave';
+import ScenarioEditPanel from '../components/Editing/ScenarioEditPanel';
 
 const ScenariosPageContext: React.FC = () => {
   const navigate = useNavigate();
@@ -29,20 +30,6 @@ const ScenariosPageContext: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
-
-  // Auto-save functionality
-  const { saveStatus, error: autoSaveError, retry } = useInstantAutoSave(
-    editingScenario || {} as ScenarioCardData,
-    async (data: ScenarioCardData) => {
-      if (data && data.id) {
-        const formData = scenarioToFormData(data);
-        await updateScenarioCard(data.id, formData);
-      }
-    },
-    { 
-      debounceMs: 300
-    }
-  );
 
   // Load scenarios
   const fetchScenarios = async () => {
@@ -75,6 +62,18 @@ const ScenariosPageContext: React.FC = () => {
     fetchMasterWorlds();
   }, []);
 
+  // Auto-save functionality - only for existing scenarios
+  useInstantAutoSave(
+    editingScenario || {} as ScenarioCardData,
+    async (data: ScenarioCardData) => {
+      if (data && data.id) {
+        const formData = scenarioToFormData(data);
+        await updateScenarioCard(data.id, formData);
+      }
+    },
+    { debounceMs: 300 }
+  );
+
   // Handle editing scenario
   const handleEditScenario = (scenario: ScenarioCardData) => {
     setEditingScenario(scenario);
@@ -86,11 +85,9 @@ const ScenariosPageContext: React.FC = () => {
       // Left panel: show image if available
       if (scenario.image_url) {
         setLeftPanelContent(
-          <img
+          <LeftPanelImage
             src={scenario.image_url}
             alt={scenario.name}
-            className="w-full h-full object-cover rounded-lg"
-            style={{ aspectRatio: '3/4.5' }}
           />
         );
       } else {
@@ -108,11 +105,6 @@ const ScenariosPageContext: React.FC = () => {
           onExport={handleExport}
           onExpressions={() => {}}
           onImageChange={handleEditImageChange}
-          autoSaveStatus={saveStatus}
-          disabled={saveStatus === 'saving'}
-          onRetryAutoSave={retry}
-          lastSaved={null}
-          error={autoSaveError}
         />
       );
     } else {
@@ -200,7 +192,7 @@ const ScenariosPageContext: React.FC = () => {
   }
 
   return (
-    <div className="container p-4 md:p-8 h-full">
+    <div className="h-full">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold font-quintessential text-white">Scenarios</h1>
         <div>

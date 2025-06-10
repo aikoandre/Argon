@@ -1,10 +1,24 @@
 import React from 'react';
 
-const CenterPanel: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
+interface CenterPanelProps {
+  children?: React.ReactNode;
+  header?: React.ReactNode;
+}
+
+const CenterPanel: React.FC<CenterPanelProps> = ({ children, header }) => {
   return (
-    <main className="flex-1 flex flex-col min-w-0 max-w-full overflow-auto" data-testid="center-panel">
-      <div className="w-full max-w-2xl lg:max-w-3xl mx-auto px-4 py-6">
-        {children}
+    <main className="w-full h-full flex flex-col min-w-0 overflow-hidden rounded-lg bg-app-surface border-4 border-app-border" data-testid="center-panel">
+      {header && (
+        <div className="w-full px-6 flex-shrink-0">
+          <div className="w-full max-w-full">
+            {header}
+          </div>
+        </div>
+      )}
+      <div className="flex-1 w-full py-4 overflow-auto">
+        <div className="w-full px-6">
+          {children}
+        </div>
       </div>
     </main>
   );
