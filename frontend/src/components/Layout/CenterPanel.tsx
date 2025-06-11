@@ -3,20 +3,19 @@ import React from 'react';
 interface CenterPanelProps {
   children?: React.ReactNode;
   header?: React.ReactNode;
+  noPadding?: boolean;
 }
 
-const CenterPanel: React.FC<CenterPanelProps> = ({ children, header }) => {
+const CenterPanel: React.FC<CenterPanelProps> = ({ children, header, noPadding = false }) => {
   return (
     <main className="w-full h-full flex flex-col min-w-0 overflow-hidden rounded-lg bg-app-surface border-4 border-app-border" data-testid="center-panel">
       {header && (
-        <div className="w-full px-6 flex-shrink-0">
-          <div className="w-full max-w-full">
-            {header}
-          </div>
+        <div className="w-full flex-shrink-0">
+          {header}
         </div>
       )}
-      <div className="flex-1 w-full py-4 overflow-auto">
-        <div className="w-full px-6">
+      <div className={`flex-1 w-full overflow-auto ${noPadding ? '' : 'py-4'}`}>
+        <div className={`w-full ${noPadding ? '' : 'px-6'}`}>
           {children}
         </div>
       </div>

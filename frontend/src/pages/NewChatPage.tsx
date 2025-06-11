@@ -2,6 +2,7 @@
 import React, { useState, useEffect, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import Select from "react-select"; // Usaremos react-select para os dropdowns
+import { useLayout } from "../contexts/LayoutContext";
 import {
   getAllScenarioCards,
   getAllCharacterCards,
@@ -22,6 +23,7 @@ interface SelectOption {
 
 const NewChatPage: React.FC = () => {
   const navigate = useNavigate();
+  const { setLeftPanelVisible, setRightPanelVisible } = useLayout();
   const [scenarios, setScenarios] = useState<SelectOption[]>([]);
   const [characters, setCharacters] = useState<SelectOption[]>([]);
   const [personas, setPersonas] = useState<SelectOption[]>([]);
@@ -74,6 +76,12 @@ const NewChatPage: React.FC = () => {
     };
     fetchData();
   }, []);
+
+  // Hide panels for new chat page
+  useEffect(() => {
+    setLeftPanelVisible(false);
+    setRightPanelVisible(false);
+  }, [setLeftPanelVisible, setRightPanelVisible]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

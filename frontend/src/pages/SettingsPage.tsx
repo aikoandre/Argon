@@ -1,6 +1,7 @@
 // frontend/src/pages/SettingsPage.tsx
 import React, { useState, useEffect, useMemo, type FormEvent } from "react";
 import Select, { type SingleValue } from "react-select"; // MultiValue não é necessário aqui
+import { useLayout } from "../contexts/LayoutContext";
 import {
   getUserSettings,
   updateUserSettings,
@@ -16,7 +17,9 @@ interface SelectOption {
   isDisabled?: boolean; // Add isDisabled property
 }
 
-const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState<UserSettingsUpdateData>({
+const SettingsPage: React.FC = () => {
+  const { setLeftPanelVisible, setRightPanelVisible } = useLayout();
+  const [settings, setSettings] = useState<UserSettingsUpdateData>({
     selected_llm_model: "",
     primary_llm_api_key: "",
     analysis_llm_api_key: "",
@@ -179,6 +182,11 @@ const SettingsPage: React.FC = () => {  const [settings, setSettings] = useState
     fetchInitialData();
   }, []);
 
+  // Hide panels for settings page
+  useEffect(() => {
+    setLeftPanelVisible(false);
+    setRightPanelVisible(false);
+  }, [setLeftPanelVisible, setRightPanelVisible]);
 
   // New LiteLLM provider change handlers
   const handlePrimaryProviderChange = (selectedOption: SingleValue<SelectOption>) => {

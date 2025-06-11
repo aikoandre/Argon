@@ -51,7 +51,7 @@ export const getFriendlyEntryTypeName = (entryType: string): string => {
 const MasterWorldPageContext: React.FC = () => {
   const navigate = useNavigate();
   const { masterWorldId } = useParams<{ masterWorldId: string }>();
-  const { setLeftPanelContent, setRightPanelContent } = useLayout();
+  const { setLeftPanelContent, setRightPanelContent, setLeftPanelVisible, setRightPanelVisible } = useLayout();
   
   // Master World states  
   const [masterWorlds, setMasterWorlds] = useState<MasterWorldData[]>([]);
@@ -135,6 +135,12 @@ const MasterWorldPageContext: React.FC = () => {
   useEffect(() => {
     fetchMasterWorlds();
   }, []);
+
+  // Set panels visible when MasterWorldPage loads
+  useEffect(() => {
+    setLeftPanelVisible(true);
+    setRightPanelVisible(true);
+  }, [setLeftPanelVisible, setRightPanelVisible]);
 
   // Set initial selected world based on URL
   useEffect(() => {

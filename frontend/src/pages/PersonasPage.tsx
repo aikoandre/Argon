@@ -19,7 +19,7 @@ import { useInstantAutoSave } from '../hooks/useInstantAutoSave';
 import PersonaEditPanel from '../components/Editing/PersonaEditPanel';
 
 const PersonasPageContext: React.FC = () => {
-  const { setLeftPanelContent, setRightPanelContent } = useLayout();
+  const { setLeftPanelContent, setRightPanelContent, setLeftPanelVisible, setRightPanelVisible } = useLayout();
   
   const [personas, setPersonas] = useState<UserPersonaData[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -77,6 +77,12 @@ const PersonasPageContext: React.FC = () => {
     fetchMasterWorlds();
     loadActivePersona();
   }, []);
+
+  // Set panels visible when PersonasPage loads
+  useEffect(() => {
+    setLeftPanelVisible(true);
+    setRightPanelVisible(true);
+  }, [setLeftPanelVisible, setRightPanelVisible]);
 
   // Auto-save functionality - only for existing personas
   useInstantAutoSave(

@@ -3,9 +3,11 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom"; // useNavigate para redirecionar
 import { getAllChatSessions, deleteChatSession, updateChatSessionTitle } from "../services/api";
 import { CardImage } from "../components/CardImage";
+import { useLayout } from "../contexts/LayoutContext";
 import type { ChatSessionListedData } from "../services/api";
 
 const ChatsListPage: React.FC = () => {
+  const { setLeftPanelVisible, setRightPanelVisible } = useLayout();
   const [chatSessions, setChatSessions] = useState<ChatSessionListedData[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +29,12 @@ const ChatsListPage: React.FC = () => {
     };
     fetchSessions();
   }, []);
+
+  // Hide panels for chats list page
+  useEffect(() => {
+    setLeftPanelVisible(false);
+    setRightPanelVisible(false);
+  }, [setLeftPanelVisible, setRightPanelVisible]);
 
   const handleDeleteSession = async (sessionId: string) => {
     try {

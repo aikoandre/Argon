@@ -1,8 +1,10 @@
 // frontend/src/pages/HomePage.tsx
 import React, { useEffect, useState } from "react";
 import { getApiHealth } from "../services/api";
+import { useLayout } from "../contexts/LayoutContext";
 
 const HomePage: React.FC = () => {
+  const { setLeftPanelVisible, setRightPanelVisible } = useLayout();
   const [healthStatus, setHealthStatus] = useState<string>(
     "Checking API health..."
   );
@@ -25,14 +27,19 @@ const HomePage: React.FC = () => {
       }
     };
     checkHealth();
-  }, []);  return (
+  }, []);
+
+  // Hide panels for home page
+  useEffect(() => {
+    setLeftPanelVisible(false);
+    setRightPanelVisible(false);
+  }, [setLeftPanelVisible, setRightPanelVisible]);
+
+  return (
     <div className="text-center text-white">
       <h1 className="text-7xl mb-4 font-bold font-quintessential">Argon</h1>
-      <p>{healthStatus}</p>      {error && (
-        <p className="text-red-500">
-          {error}
-        </p>
-      )}
+      <p>{healthStatus}</p>
+      {error && <p className="text-red-500">{error}</p>}
     </div>
   );
 };

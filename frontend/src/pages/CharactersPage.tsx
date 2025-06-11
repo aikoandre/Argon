@@ -1,6 +1,7 @@
 // filepath: /home/aikoandre/Archives/VSCode/Argon/frontend/src/pages/CharactersPage.tsx
 import React, { useState, useRef, useEffect } from "react";
-import { deleteCharacterCard, updateCharacterCard, createCharacterCard, getAllCharacterCards, type CharacterCardData } from "../services/api";
+import { useNavigate } from "react-router-dom";
+import { deleteCharacterCard, updateCharacterCard, createCharacterCard, getAllCharacterCards, createOrGetCardChat, type CharacterCardData } from "../services/api";
 import { useLayout } from '../contexts/LayoutContext';
 import CharacterEditPanel from '../components/Editing/CharacterEditPanel';
 import { LeftPanelImage } from '../components/Layout';
@@ -9,12 +10,13 @@ import { characterToFormData } from '../utils/formDataHelpers';
 import { CardImage } from '../components/CardImage';
 
 const CharactersPage: React.FC = () => {
+  const navigate = useNavigate();
   const [editingCharacter, setEditingCharacter] = useState<CharacterCardData | null>(null);
   const [characters, setCharacters] = useState<CharacterCardData[]>([]);
   const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
-  const { setLeftPanelContent, setRightPanelContent } = useLayout();
+  const { setLeftPanelContent, setRightPanelContent, setLeftPanelVisible, setRightPanelVisible } = useLayout();
 
   // Load characters on component mount
   useEffect(() => {
@@ -30,6 +32,12 @@ const CharactersPage: React.FC = () => {
     };
     loadCharacters();
   }, []);
+
+  // Set panels visible when CharactersPage loads
+  useEffect(() => {
+    setLeftPanelVisible(true);
+    setRightPanelVisible(true);
+  }, [setLeftPanelVisible, setRightPanelVisible]);
 
   // Auto-save functionality - only for existing characters
   useInstantAutoSave(
@@ -73,6 +81,26 @@ const CharactersPage: React.FC = () => {
     }
   };
 
+  const handleCharacterCardClick = async (character: CharacterCardData) => {
+    try {
+      // Set the editing character for the right panel
+      setEditingCharacter(character);
+      updateLayoutContent(character);
+      
+      // Create a new chat session with this character
+      const chatSessionId = await createOrGetCardChat(
+        'character',
+        character.id,
+        null // userPersonaId - using null for now, could be enhanced later
+      );
+      
+      // Navigate to the chat page
+      navigate(`/chat/${chatSessionId}`);
+    } catch (error) {
+      console.error('Failed to create chat session:', error);
+    }
+  };
+
   const handleDelete = (characterId: string) => {
     if (window.confirm("Are you sure you want to delete this character? This action cannot be undone.")) {
       try {
@@ -98,17 +126,58 @@ const CharactersPage: React.FC = () => {
 
   const handleExport = () => {
     // Export functionality would go here
-    console.log("Export character:", editingCharacter?.id);
+    // TODO: Implement character export
   };
 
   const handleExpressions = () => {
     // Handle expressions view
-    console.log("View expressions for:", editingCharacter?.id);
+    // TODO: Implement expressions view
   };
 
   const handleImageChange = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
+    }
+  };
+
+  const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    
+    if (!file || !editingCharacter) {
+      return;
+    }
+
+    try {
+      // Create FormData with the selected image
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      // Add character data to the form
+      formData.append('name', editingCharacter.name);
+      formData.append('description', editingCharacter.description || '');
+      formData.append('instructions', editingCharacter.instructions || '');
+
+      // Update the character with the new image
+      const updatedCharacter = await updateCharacterCard(editingCharacter.id, formData);
+      
+      // Update local state
+      setEditingCharacter(updatedCharacter);
+      setCharacters(prev => 
+        prev.map(char => 
+          char.id === updatedCharacter.id ? updatedCharacter : char
+        )
+      );
+      
+      // Update layout with new image
+      updateLayoutContent(updatedCharacter);
+      
+      // Clear the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      console.error('Failed to update character image:', error);
+      // Could add toast notification here for better UX
     }
   };
 
@@ -126,6 +195,9 @@ const CharactersPage: React.FC = () => {
           onImageChange={handleImageChange}
         />
       );
+    } else {
+      // Clear the right panel when no character is being edited
+      setRightPanelContent(null);
     }
   }, [editingCharacter]);
 
@@ -170,6 +242,7 @@ const CharactersPage: React.FC = () => {
         ref={fileInputRef}
         accept="image/*"
         className="hidden"
+        onChange={handleFileInputChange}
       />
       <input
         type="file"
@@ -181,7 +254,7 @@ const CharactersPage: React.FC = () => {
       {loading ? (
         <p className="text-center text-gray-400 p-10">Loading characters...</p>
       ) : (
-        <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 justify-items-start">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 justify-items-start">
           {characters.map((character) => {
             const cacheBuster = character.updated_at 
               ? `?cb=${encodeURIComponent(character.updated_at)}`
@@ -192,10 +265,7 @@ const CharactersPage: React.FC = () => {
               <div
                 key={character.id}
                 className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer group"
-                onClick={() => {
-                  setEditingCharacter(character);
-                  updateLayoutContent(character);
-                }}
+                onClick={() => handleCharacterCardClick(character)}
               >
                 <CardImage
                   imageUrl={imageUrl}

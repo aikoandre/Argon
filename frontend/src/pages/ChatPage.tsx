@@ -1,7 +1,12 @@
 // frontend/src/pages/ChatPage.tsx
 import { useState, useEffect, useRef, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
+import { motion, AnimatePresence } from "motion/react";
 import axios from "axios";
+import { useChatInput } from "../contexts/ChatInputContext";
+import { useLayout } from "../contexts/LayoutContext";
+import { LeftPanelImage } from "../components/Layout";
+import { CharacterEditPanel, ScenarioEditPanel } from "../components/Editing";
 import {
   getChatSessionMessages,
   getChatSessionDetails,
@@ -40,10 +45,6 @@ const MaterialIcon = ({ icon, className = "", onClick, disabled = false }: {
 );
 
 // Icon components using the new MaterialIcon
-const SendIcon = ({ className }: { className?: string }) => (
-  <MaterialIcon icon="send" className={className} />
-);
-
 const ArrowBackIcon = ({ className, onClick, disabled }: { 
   className?: string; 
   onClick: () => void; 
@@ -93,6 +94,8 @@ const getImageUrl = (imageUrl: string | null) => {
 
 const ChatPage = () => {
   const { chatId } = useParams<{ chatId: string }>();
+  const { setSendMessageHandler, setIsSending, setDisabled } = useChatInput();
+  const { setLeftPanelVisible, setRightPanelVisible, setLeftPanelContent, setRightPanelContent } = useLayout();
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [sessionDetails, setSessionDetails] = useState<ChatSessionData | null>(
     null
@@ -101,13 +104,12 @@ const ChatPage = () => {
   const [allBeginningMessages, setAllBeginningMessages] = useState<string[]>([]);
   const [currentBeginningMessageIndex, setCurrentBeginningMessageIndex] = useState<number>(0);
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
-  const [isSending, setIsSending] = useState(false);
+  const [isSending, setIsSendingLocal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activePersonaId, setActivePersonaId] = useState<string | null>(null);
   const [activePersonaName, setActivePersonaName] = useState<string>("User");
   const [activePersonaImageUrl, setActivePersonaImageUrl] = useState<string | null>(null);
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
-  const inputAreaRef = useRef<null | HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
@@ -141,20 +143,23 @@ const ChatPage = () => {
           getChatSessionDetails(chatId),
         ]);
 
-        // Cache card name and image for use in render
+        // Set up panels and cache card data
+        let cachedCharacter = null;
+        let cachedScenario = null;
+        
         if (details) {
           if (details.card_type === 'character' && details.card_id) {
-            const character = await getCharacterCardById(details.card_id);
+            cachedCharacter = await getCharacterCardById(details.card_id);
             (window as any).__characterCardNameCache = (window as any).__characterCardNameCache || {};
-            (window as any).__characterCardNameCache[details.card_id] = character.name;
+            (window as any).__characterCardNameCache[details.card_id] = cachedCharacter.name;
             (window as any).__characterCardImageCache = (window as any).__characterCardImageCache || {};
-            (window as any).__characterCardImageCache[details.card_id] = character.image_url || null;
+            (window as any).__characterCardImageCache[details.card_id] = cachedCharacter.image_url || null;
           } else if (details.card_type === 'scenario' && details.card_id) {
-            const scenario = await getScenarioCardById(details.card_id);
+            cachedScenario = await getScenarioCardById(details.card_id);
             (window as any).__scenarioCardNameCache = (window as any).__scenarioCardNameCache || {};
-            (window as any).__scenarioCardNameCache[details.card_id] = scenario.name;
+            (window as any).__scenarioCardNameCache[details.card_id] = cachedScenario.name;
             (window as any).__scenarioCardImageCache = (window as any).__scenarioCardImageCache || {};
-            (window as any).__scenarioCardImageCache[details.card_id] = scenario.image_url || null;
+            (window as any).__scenarioCardImageCache[details.card_id] = cachedScenario.image_url || null;
           }
         }
 
@@ -173,20 +178,94 @@ const ChatPage = () => {
         }));
         setSessionDetails(details);
 
-        // Populate allBeginningMessages from card details regardless of existing messages
+        // Set up panels with card information and populate beginning messages
         if (details) {
           let fetchedBeginningMessages: string[] = [];
-          if (details.card_type === "character" && details.card_id) {
-            const character = await getCharacterCardById(details.card_id);
-            if (character.beginning_messages && character.beginning_messages.length > 0) {
-              fetchedBeginningMessages = character.beginning_messages;
+          
+          if (details.card_type === "character" && details.card_id && cachedCharacter) {
+            // Set up beginning messages
+            if (cachedCharacter.beginning_messages && cachedCharacter.beginning_messages.length > 0) {
+              fetchedBeginningMessages = cachedCharacter.beginning_messages;
             }
-          } else if (details.card_type === "scenario" && details.card_id) {
-            const scenario = await getScenarioCardById(details.card_id);
-            if (scenario.beginning_message && scenario.beginning_message.length > 0) {
-              fetchedBeginningMessages = scenario.beginning_message;
+            
+            // Left panel: show character image if available
+            if (cachedCharacter.image_url) {
+              const cacheBuster = cachedCharacter.updated_at 
+                ? `?cb=${encodeURIComponent(cachedCharacter.updated_at)}`
+                : `?cb=${cachedCharacter.id}`;
+              console.log('ChatPage: Setting character image in left panel', cachedCharacter.name);
+              setLeftPanelContent(
+                <LeftPanelImage
+                  src={`${cachedCharacter.image_url}${cacheBuster}`}
+                  alt={cachedCharacter.name}
+                />
+              );
+            } else {
+              console.log('ChatPage: No character image available');
+              setLeftPanelContent(null);
             }
+
+            // Right panel: show character edit panel (read-only for chat)
+            console.log('ChatPage: Setting character edit panel in right panel', cachedCharacter.name);
+            setRightPanelContent(
+              <CharacterEditPanel 
+                character={cachedCharacter}
+                onChange={() => {}} // Read-only in chat
+                onDelete={() => {}} // Disabled in chat
+                onImport={() => {}} // Disabled in chat
+                onExport={() => {}} // Disabled in chat
+                onExpressions={() => {}} // Disabled in chat
+                onImageChange={() => {}} // Disabled in chat
+                disabled={true} // Make it read-only
+              />
+            );
+          } else if (details.card_type === "scenario" && details.card_id && cachedScenario) {
+            // Set up beginning messages
+            if (cachedScenario.beginning_message && cachedScenario.beginning_message.length > 0) {
+              fetchedBeginningMessages = cachedScenario.beginning_message;
+            }
+            
+            // Left panel: show scenario image if available
+            if (cachedScenario.image_url) {
+              const cacheBuster = cachedScenario.updated_at 
+                ? `?cb=${encodeURIComponent(cachedScenario.updated_at)}`
+                : `?cb=${cachedScenario.id}`;
+              setLeftPanelContent(
+                <LeftPanelImage
+                  src={`${cachedScenario.image_url}${cacheBuster}`}
+                  alt={cachedScenario.name}
+                />
+              );
+            } else {
+              setLeftPanelContent(null);
+            }
+
+            // Right panel: show scenario edit panel (read-only for chat)
+            setRightPanelContent(
+              <ScenarioEditPanel 
+                scenario={cachedScenario}
+                masterWorlds={[]} // Empty array since not needed in read-only chat view
+                onChange={() => {}} // Read-only in chat
+                onDelete={() => {}} // Disabled in chat
+                onImport={() => {}} // Disabled in chat
+                onExport={() => {}} // Disabled in chat
+                onExpressions={() => {}} // Disabled in chat
+                onImageChange={() => {}} // Disabled in chat
+                disabled={true} // Make it read-only
+              />
+            );
+          } else {
+            // Clear panels if no card info
+            console.log('ChatPage: No card info available, clearing panels');
+            setLeftPanelContent(null);
+            setRightPanelContent(null);
           }
+          
+          // Set panels visible
+          console.log('ChatPage: Final step - setting panels visible in data fetch');
+          setLeftPanelVisible(true);
+          setRightPanelVisible(true);
+          
           setAllBeginningMessages(fetchedBeginningMessages);
           // If the first message is a beginning message, set its index
           if (msgs.length > 0 && msgs[0].is_beginning_message && msgs[0].message_metadata?.current_response_index !== undefined) {
@@ -258,17 +337,48 @@ const ChatPage = () => {
     }
   };
 
-  const handleSendMessage = async (e: FormEvent, regenerateMessageId?: string) => {
+  // Set up chat input integration
+  useEffect(() => {
+    console.log('ChatPage: Setting up chat input integration', {
+      chatId,
+      isLoadingMessages,
+      disabled: isLoadingMessages || !chatId
+    });
+    
+    // Set the message handler for the global chat input
+    setSendMessageHandler((message: string) => {
+      console.log('ChatPage: Received message from chat input:', message);
+      handleSendMessage({ preventDefault: () => {} } as FormEvent, undefined, message);
+    });
+
+    // Enable/disable chat input based on chat state
+    setDisabled(isLoadingMessages || !chatId);
+
+    // Cleanup on unmount
+    return () => {
+      setSendMessageHandler(() => {});
+    };
+  }, [chatId, isLoadingMessages]); // Removed setSendMessageHandler and setDisabled from deps
+
+  // Show panels for chat pages
+  useEffect(() => {
+    console.log('ChatPage: Setting panels visible');
+    setLeftPanelVisible(true);
+    setRightPanelVisible(true);
+  }, [setLeftPanelVisible, setRightPanelVisible]);
+
+  // Sync local sending state with global state
+  useEffect(() => {
+    setIsSending(isSending);
+  }, [isSending, setIsSending]);
+
+  const handleSendMessage = async (e: FormEvent, regenerateMessageId?: string, messageContent?: string) => {
     e.preventDefault();
-    if (!newMessage.trim() && !regenerateMessageId) return;
+    let userMessageContent = messageContent || newMessage.trim();
+    if (!userMessageContent && !regenerateMessageId) return;
 
-    setIsSending(true);
-    // Remove unused streaming state
-    // setIsStreaming(false);
-    // setStreamedAiMessage("");
+    setIsSendingLocal(true);
     setError(null);
-
-    let userMessageContent = newMessage.trim();
 
     if (regenerateMessageId) {
       // Find the user message associated with the AI message to regenerate
@@ -281,12 +391,12 @@ const ChatPage = () => {
           userMessageContent = potentialUserMessage.content; // Use the content of the original user message
         } else {
           setError("Could not find the original user message to regenerate from.");
-          setIsSending(false);
+          setIsSendingLocal(false);
           return;
         }
       } else {
         setError("AI message to regenerate not found.");
-        setIsSending(false);
+        setIsSendingLocal(false);
         return;
       }
     }
@@ -375,7 +485,7 @@ const ChatPage = () => {
       setError("Failed to get AI response.");
       console.error(err);
     } finally {
-      setIsSending(false);
+      setIsSendingLocal(false);
     }
   };
 
@@ -466,7 +576,7 @@ const ChatPage = () => {
   // Modern loading state component
   if (isLoadingMessages) {
     return (
-      <div className="flex items-center justify-center h-screen bg-app-bg">
+      <div className="flex items-center justify-center h-full bg-app-bg">
         <div className="text-center text-app-text-secondary p-10">
           <div className="w-8 h-8 border-2 border-app-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-lg font-medium">Loading chat...</p>
@@ -478,7 +588,7 @@ const ChatPage = () => {
   // Modern error state component
   if (error) {
     return (
-      <div className="flex items-center justify-center h-screen bg-app-bg">
+      <div className="flex items-center justify-center h-full bg-app-bg">
         <div className="text-center p-10 max-w-md">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <MaterialIcon icon="error_outline" className="text-red-600 text-3xl" />
@@ -495,7 +605,7 @@ const ChatPage = () => {
   // Modern not found state component
   if (!sessionDetails) {
     return (
-      <div className="flex items-center justify-center h-screen bg-app-bg">
+      <div className="flex items-center justify-center h-full bg-app-bg">
         <div className="text-center p-10 max-w-md">
           <div className="w-16 h-16 bg-app-surface rounded-full flex items-center justify-center mx-auto mb-4">
             <MaterialIcon icon="chat_bubble_outline" className="text-app-text-secondary text-3xl" />
@@ -510,207 +620,178 @@ const ChatPage = () => {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-56px)] overflow-hidden bg-app-bg">
-      {/* Chat messages section */}
-      <div className="flex-1 min-h-0 flex justify-center">
-        <div className="w-full max-w-2xl lg:max-w-3xl h-full flex flex-col">
-          <div className="flex-1 overflow-y-scroll chat-scrollbar space-y-3 rounded-xl min-h-0 px-4 pt-2 pb-0">
-            {messages.length === 0 && (
-              <div className="flex justify-center items-center h-full">
-                <div className="text-center">
-                  <MaterialIcon icon="chat_bubble_outline" className="text-6xl text-app-text-secondary mb-4" />
-                  <p className="text-xl text-app-text-secondary font-medium">No messages yet</p>
-                  <p className="text-app-border text-sm mt-2">Start a conversation!</p>
-                </div>
-              </div>
-            )}
-            
-            {/* Messages */}
-            {[...messages]
-              .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-              .map((msg) => {
-                // For AI messages, always use card name/image if persona fields are missing
-                let aiName = msg.active_persona_name;
-                let aiImageUrl = msg.active_persona_image_url;
-                if (msg.sender_type === "AI") {
-                  if (!aiName && sessionDetails?.card_type === 'character' && sessionDetails.card_id) {
-                    aiName = (window as any).__characterCardNameCache?.[sessionDetails.card_id];
-                  } else if (!aiName && sessionDetails?.card_type === 'scenario' && sessionDetails.card_id) {
-                    aiName = (window as any).__scenarioCardNameCache?.[sessionDetails.card_id];
-                  }
-                  if (!aiImageUrl && sessionDetails?.card_type === 'character' && sessionDetails.card_id) {
-                    aiImageUrl = (window as any).__characterCardImageCache?.[sessionDetails.card_id] ?? null;
-                  } else if (!aiImageUrl && sessionDetails?.card_type === 'scenario' && sessionDetails.card_id) {
-                    aiImageUrl = (window as any).__scenarioCardImageCache?.[sessionDetails.card_id] ?? null;
-                  }
-                }
-                const processedAiAvatarSrc = getImageUrl(aiImageUrl ?? null) || DEFAULT_BOT_AVATAR;
-                
-                return (
-                  <div key={msg.id} className="group">
-                    <div className={`
-                      rounded-2xl p-4 relative transition-all duration-200
-                      ${msg.sender_type === "USER" 
-                        ? "bg-app-surface text-white shadow-md hover:shadow-lg" 
-                        : "bg-app-surface text-gray-100 shadow-md hover:shadow-lg"
-                      }
-                    `}>
-                    <div className="flex">
-                      <div className="flex-shrink-0 w-20 mr-3">
-                        <img
-                          src={msg.sender_type === "USER"
-                            ? getImageUrl(msg.active_persona_image_url ?? activePersonaImageUrl) || DEFAULT_USER_AVATAR
-                            : processedAiAvatarSrc}
-                          alt={msg.sender_type === "USER" ? "User" : aiName || "AI"}
-                          className="w-full h-auto max-h-32 object-cover rounded-md bg-gray-700"
-                          onError={(e) => {
-                            const fallback =
-                              msg.sender_type === "USER"
-                                ? DEFAULT_USER_AVATAR
-                                : DEFAULT_BOT_AVATAR;
-                            (e.target as HTMLImageElement).src = fallback;
-                            console.error(
-                              `ERROR: Failed to load image for message ${msg.id}. Fallback used. Original URL: ${processedAiAvatarSrc}`
-                            );
-                          }}
-                        />
-                      </div>
-                      {/* Nome, data/hora e mensagem */}
-                      <div className="flex-1 flex flex-col">
-                        <div className="flex items-center mb-1 flex-wrap">
-                          <span className="font-medium text-white mr-2">
-                            {msg.sender_type === "USER"
-                              ? msg.active_persona_name || msg.message_metadata?.active_persona_name || activePersonaName
-                              : aiName}
-                          </span>
-                          <span className="text-xs text-gray-400 mr-2">
-                            {new Date(msg.timestamp).toLocaleDateString()}
-                          </span>
-                          <span className="text-xs text-gray-400">
-                            {formatTime(msg.timestamp)}
-                          </span>
-                        </div>
-                        {/* Message content with custom formatting, no markdown */}
-                        <div className="break-words mt-0">
-                          {msg.content.split(/(```[\s\S]*?```|\n)/g).map((part, idx, arr) => {
-                            // Remove leading line breaks for the first paragraph
-                            if (idx === 0) part = part.replace(/^\n+/, '');
-                            if (part.startsWith('```') && part.endsWith('```')) {
-                              // Code block
-                              const code = part.slice(3, -3).replace(/^\n|\n$/g, '');
-                              // Remove top margin for the first code block
-                              const preClass = idx === 0 ? "bg-black text-white rounded-md p-3 mb-2 overflow-x-auto text-sm" : "bg-black text-white rounded-md p-3 my-2 overflow-x-auto text-sm";
-                              return (
-                                <pre key={idx} className={preClass}>
-                                  <code>{code}</code>
-                                </pre>
-                              );
-                            } else if (part === '\n') {
-                              // Only render <br> if not the first element and previous part is not a code block
-                              if (idx === 0) return null;
-                              const prev = arr[idx - 1] || '';
-                              if (prev.startsWith('```') && prev.endsWith('```')) return null;
-                              return <br key={idx} />;
-                            } else {
-                              // Inline text, apply custom formatting for quoted and italic text
-                              let formatted = part
-                                .replace(/"([^"]+)"/g, '<span class="text-app-primary">$1</span>')
-                                .replace(/\*([^*]+)\*/g, '<em>$1</em>');
-                              // Remove top margin for the first inline text
-                              return <span key={idx} style={idx === 0 ? { marginTop: 0 } : {}} dangerouslySetInnerHTML={{ __html: formatted }} />;
-                            }
-                          })}
-                        </div>
-                      </div>
+    <div className="flex flex-col h-full">
+      {/* Chat messages section - scrollable area */}
+      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-gray-400 hover:scrollbar-thumb-gray-300">
+        <div className="w-full">
+              <AnimatePresence>
+                {messages.length === 0 && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ duration: 0.3 }}
+                    className="flex justify-center items-center h-full"
+                  >
+                    <div className="text-center">
+                      <MaterialIcon icon="chat_bubble_outline" className="text-6xl text-app-text-secondary mb-4" />
+                      <p className="text-xl text-app-text-secondary font-medium">No messages yet</p>
+                      <p className="text-app-border text-sm mt-2">Start a conversation!</p>
                     </div>
-                    {msg.sender_type === "AI" &&
-                      msg.ai_responses &&
-                      msg.ai_responses.length > 0 &&
-                      (msg.is_beginning_message ? (
-                        // For beginning messages: show arrows only if more than one beginning message exists
-                        allBeginningMessages.length > 1 && (
-                          <div className="absolute top-2 right-2 flex items-center space-x-1 text-gray-400 text-sm">
-                            <ArrowBackIcon
-                              className="!text-lg"
-                              onClick={() => handleNavigateBeginningMessage("prev")}
-                              disabled={currentBeginningMessageIndex === 0}
-                            />
-                            <span>{`${currentBeginningMessageIndex + 1}/${allBeginningMessages.length}`}</span>
-                            <ArrowForwardIcon
-                              className="!text-lg"
-                              onClick={() => handleNavigateBeginningMessage('next')}
-                              disabled={currentBeginningMessageIndex === allBeginningMessages.length - 1}
-                            />
+                  </motion.div>
+                )}
+                
+                {/* Messages */}
+                {[...messages]
+                  .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+                  .map((msg, index) => {
+                    // For AI messages, always use card name/image if persona fields are missing
+                    let aiName = msg.active_persona_name;
+                    let aiImageUrl = msg.active_persona_image_url;
+                    if (msg.sender_type === "AI") {
+                      if (!aiName && sessionDetails?.card_type === 'character' && sessionDetails.card_id) {
+                        aiName = (window as any).__characterCardNameCache?.[sessionDetails.card_id];
+                      } else if (!aiName && sessionDetails?.card_type === 'scenario' && sessionDetails.card_id) {
+                        aiName = (window as any).__scenarioCardNameCache?.[sessionDetails.card_id];
+                      }
+                      if (!aiImageUrl && sessionDetails?.card_type === 'character' && sessionDetails.card_id) {
+                        aiImageUrl = (window as any).__characterCardImageCache?.[sessionDetails.card_id] ?? null;
+                      } else if (!aiImageUrl && sessionDetails?.card_type === 'scenario' && sessionDetails.card_id) {
+                        aiImageUrl = (window as any).__scenarioCardImageCache?.[sessionDetails.card_id] ?? null;
+                      }
+                    }
+                    const processedAiAvatarSrc = getImageUrl(aiImageUrl ?? null) || DEFAULT_BOT_AVATAR;
+                    
+                    return (
+                      <motion.div 
+                        key={msg.id} 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.3, delay: index * 0.05 }}
+                        className="group w-full"
+                      >
+                        <div className={`
+                          rounded-2xl p-4 mx-2 relative transition-all duration-200
+                          ${msg.sender_type === "USER" 
+                            ? "bg-app-bg text-app-text shadow-md hover:shadow-lg" 
+                            : "bg-app-bg text-app-text shadow-md hover:shadow-lg"
+                          }
+                        `}>
+                          <div className="flex">
+                            <div className="flex-shrink-0 w-20 mr-3">
+                              <img
+                                src={msg.sender_type === "USER"
+                                  ? getImageUrl(msg.active_persona_image_url ?? activePersonaImageUrl) || DEFAULT_USER_AVATAR
+                                  : processedAiAvatarSrc}
+                                alt={msg.sender_type === "USER" ? "User" : aiName || "AI"}
+                                className="w-full h-auto max-h-32 object-cover rounded-md bg-gray-700"
+                                onError={(e) => {
+                                  const fallback =
+                                    msg.sender_type === "USER"
+                                      ? DEFAULT_USER_AVATAR
+                                      : DEFAULT_BOT_AVATAR;
+                                  (e.target as HTMLImageElement).src = fallback;
+                                  console.error(
+                                    `ERROR: Failed to load image for message ${msg.id}. Fallback used. Original URL: ${processedAiAvatarSrc}`
+                                  );
+                                }}
+                              />
+                            </div>
+                            {/* Nome, data/hora e mensagem */}
+                            <div className="flex-1 flex flex-col">
+                              <div className="flex items-center mb-1 flex-wrap">
+                                <span className="font-medium text-white mr-2">
+                                  {msg.sender_type === "USER"
+                                    ? msg.active_persona_name || msg.message_metadata?.active_persona_name || activePersonaName
+                                    : aiName}
+                                </span>
+                                <span className="text-xs text-gray-400 mr-2">
+                                  {new Date(msg.timestamp).toLocaleDateString()}
+                                </span>
+                                <span className="text-xs text-gray-400">
+                                  {formatTime(msg.timestamp)}
+                                </span>
+                              </div>
+                              {/* Message content with custom formatting, no markdown */}
+                              <div className="break-words mt-0">
+                                {msg.content.split(/(```[\s\S]*?```|\n)/g).map((part, idx, arr) => {
+                                  // Remove leading line breaks for the first paragraph
+                                  if (idx === 0) part = part.replace(/^\n+/, '');
+                                  if (part.startsWith('```') && part.endsWith('```')) {
+                                    // Code block
+                                    const code = part.slice(3, -3).replace(/^\n|\n$/g, '');
+                                    // Remove top margin for the first code block
+                                    const preClass = idx === 0 ? "bg-black text-white rounded-md p-3 mb-2 overflow-x-auto text-sm" : "bg-black text-white rounded-md p-3 my-2 overflow-x-auto text-sm";
+                                    return (
+                                      <pre key={idx} className={preClass}>
+                                        <code>{code}</code>
+                                      </pre>
+                                    );
+                                  } else if (part === '\n') {
+                                    // Only render <br> if not the first element and previous part is not a code block
+                                    if (idx === 0) return null;
+                                    const prev = arr[idx - 1] || '';
+                                    if (prev.startsWith('```') && prev.endsWith('```')) return null;
+                                    return <br key={idx} />;
+                                  } else {
+                                    // Inline text, apply custom formatting for quoted and italic text
+                                    let formatted = part
+                                      .replace(/"([^"]+)"/g, '<span class="text-app-primary">$1</span>')
+                                      .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+                                    // Remove top margin for the first inline text
+                                    return <span key={idx} style={idx === 0 ? { marginTop: 0 } : {}} dangerouslySetInnerHTML={{ __html: formatted }} />;
+                                  }
+                                })}
+                              </div>
+                            </div>
                           </div>
-                        )
-                      ) : (
-                        // For regular AI messages: show arrows if more than one response, allow regeneration
-                        <div className="absolute top-2 right-2 flex items-center space-x-1 text-gray-400 text-sm">
-                          {msg.current_response_index !== 0 && (
-                            <ArrowBackIcon className="!text-lg" onClick={() => handleNavigateResponse(msg.id, 'prev')} />
+                          {msg.sender_type === "AI" &&
+                            msg.ai_responses &&
+                            msg.ai_responses.length > 0 &&
+                            (msg.is_beginning_message ? (
+                              // For beginning messages: show arrows only if more than one beginning message exists
+                              allBeginningMessages.length > 1 && (
+                                <div className="absolute top-2 right-2 flex items-center space-x-1 text-gray-400 text-sm">
+                                  <ArrowBackIcon
+                                    className="!text-lg"
+                                    onClick={() => handleNavigateBeginningMessage("prev")}
+                                    disabled={currentBeginningMessageIndex === 0}
+                                  />
+                                  <span>{`${currentBeginningMessageIndex + 1}/${allBeginningMessages.length}`}</span>
+                                  <ArrowForwardIcon
+                                    className="!text-lg"
+                                    onClick={() => handleNavigateBeginningMessage('next')}
+                                    disabled={currentBeginningMessageIndex === allBeginningMessages.length - 1}
+                                  />
+                                </div>
+                              )
+                            ) : (
+                              // For regular AI messages: show arrows if more than one response, allow regeneration
+                              <div className="absolute top-2 right-2 flex items-center space-x-1 text-gray-400 text-sm">
+                                {msg.current_response_index !== 0 && (
+                                  <ArrowBackIcon className="!text-lg" onClick={() => handleNavigateResponse(msg.id, 'prev')} />
+                                )}
+                                <span>{`${(msg.current_response_index || 0) + 1}/${msg.ai_responses!.length}`}</span>
+                                <ArrowForwardIcon
+                                  className="!text-lg"
+                                  onClick={() => {
+                                    if ((msg.current_response_index || 0) === msg.ai_responses!.length - 1) {
+                                      handleRegenerate(msg.id);
+                                    } else {
+                                      handleNavigateResponse(msg.id, 'next');
+                                    }
+                                  }}
+                                />
+                              </div>
+                            )
                           )}
-                          <span>{`${(msg.current_response_index || 0) + 1}/${msg.ai_responses!.length}`}</span>
-                          <ArrowForwardIcon
-                            className="!text-lg"
-                            onClick={() => {
-                              if ((msg.current_response_index || 0) === msg.ai_responses!.length - 1) {
-                                handleRegenerate(msg.id);
-                              } else {
-                                handleNavigateResponse(msg.id, 'next');
-                              }
-                            }}
-                          />
                         </div>
-                      )
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            {/* End of messages map */}
-            <div ref={messagesEndRef} />
-          </div>
-        </div>
-      </div>
-      {/* Input area */}
-      <div
-        ref={inputAreaRef}
-        className="flex justify-center bg-app-bg"
-      >
-        <div className="w-full max-w-2xl lg:max-w-3xl">
-          <form onSubmit={handleSendMessage} className="relative">
-            <textarea
-              rows={1}
-              value={newMessage}
-              onChange={(e) => {
-                setNewMessage(e.target.value);
-                // Auto-resize logic
-                const ta = e.target as HTMLTextAreaElement;
-                ta.style.height = 'auto';
-                ta.style.height = ta.scrollHeight + 'px';
-              }}
-              placeholder="Type a message..."
-              disabled={isSending}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage(e as any);
-                }
-              }}
-              className="w-full p-4 pr-14 bg-app-surface rounded-2xl text-white placeholder-gray-400 outline-none resize-none overflow-hidden min-h-[48px] max-h-[200px]"
-            />
-            <button
-              type="submit"
-              disabled={isSending || !newMessage.trim()}
-              className="absolute right-3 top-1 transform text-white font-bold p-2 rounded-lg w-10 h-10 flex items-center justify-center"
-            >
-              {isSending ? (
-                <span className="animate-spin">⟳</span>
-              ) : (
-                <SendIcon className="w-5 h-5" />
-              )}
-            </button>
-          </form>
+                      </motion.div>
+                    );
+                  })}
+              </AnimatePresence>
+              <div ref={messagesEndRef} />
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 
 interface LayoutState {
   leftPanelVisible: boolean;
@@ -35,43 +35,43 @@ export const LayoutProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     rightPanelContent: null,
   });
 
-  const setLeftPanelVisible = (visible: boolean) => {
+  const setLeftPanelVisible = useCallback((visible: boolean) => {
     setLayoutState(prev => ({ ...prev, leftPanelVisible: visible }));
-  };
+  }, []);
 
-  const setRightPanelVisible = (visible: boolean) => {
+  const setRightPanelVisible = useCallback((visible: boolean) => {
     setLayoutState(prev => ({ ...prev, rightPanelVisible: visible }));
-  };
+  }, []);
 
-  const setLeftPanelContent = (content: React.ReactNode) => {
+  const setLeftPanelContent = useCallback((content: React.ReactNode) => {
     setLayoutState(prev => ({ 
       ...prev, 
-      leftPanelContent: content,
-      leftPanelVisible: !!content 
+      leftPanelContent: content
+      // Don't automatically change visibility - let it be controlled manually
     }));
-  };
+  }, []);
 
-  const setRightPanelContent = (content: React.ReactNode) => {
+  const setRightPanelContent = useCallback((content: React.ReactNode) => {
     setLayoutState(prev => ({ 
       ...prev, 
-      rightPanelContent: content,
-      rightPanelVisible: !!content 
+      rightPanelContent: content
+      // Don't automatically change visibility - let it be controlled manually
     }));
-  };
+  }, []);
 
-  const toggleLeftPanel = () => {
+  const toggleLeftPanel = useCallback(() => {
     setLayoutState(prev => ({ 
       ...prev, 
       leftPanelVisible: !prev.leftPanelVisible 
     }));
-  };
+  }, []);
 
-  const toggleRightPanel = () => {
+  const toggleRightPanel = useCallback(() => {
     setLayoutState(prev => ({ 
       ...prev, 
       rightPanelVisible: !prev.rightPanelVisible 
     }));
-  };
+  }, []);
 
   return (
     <LayoutContext.Provider

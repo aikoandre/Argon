@@ -20,7 +20,7 @@ import ScenarioEditPanel from '../components/Editing/ScenarioEditPanel';
 
 const ScenariosPageContext: React.FC = () => {
   const navigate = useNavigate();
-  const { setLeftPanelContent, setRightPanelContent } = useLayout();
+  const { setLeftPanelContent, setRightPanelContent, setLeftPanelVisible, setRightPanelVisible } = useLayout();
   
   const [scenarios, setScenarios] = useState<ScenarioCardData[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -61,6 +61,12 @@ const ScenariosPageContext: React.FC = () => {
     fetchScenarios();
     fetchMasterWorlds();
   }, []);
+
+  // Set panels visible when ScenariosPage loads
+  useEffect(() => {
+    setLeftPanelVisible(true);
+    setRightPanelVisible(true);
+  }, [setLeftPanelVisible, setRightPanelVisible]);
 
   // Auto-save functionality - only for existing scenarios
   useInstantAutoSave(

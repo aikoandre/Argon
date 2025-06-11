@@ -14,6 +14,9 @@ class ChatSessionBase(BaseModel):
     scenario_id: Optional[str] = None
     gm_character_id: Optional[str] = None
     user_persona_id: Optional[str] = None
+    # New unified card fields
+    card_type: Optional[str] = None
+    card_id: Optional[str] = None
 
 class ChatSessionCreate(ChatSessionBase):
     pass
