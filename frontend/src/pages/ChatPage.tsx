@@ -16,9 +16,14 @@ import {
   getCharacterCardById, // Import for character card details
   getScenarioCardById, // Import for scenario card details
   addMessageToSession, // Import addMessageToSession for sending messages
+  updateCharacterCard, // Import for updating character cards
+  updateScenarioCard, // Import for updating scenario cards
+  getAllMasterWorlds, // Import for fetching master worlds for scenario editing
 } from "../services/api";
 import { type ChatSessionData } from "../services/api"; // ChatSessionData is from api.ts
 import { type ChatMessageData } from "../types/chat"; // Only import ChatMessageData, remove unused types
+import { replacePlaceholdersForDisplay, getCharacterName } from "../utils/placeholderUtils";
+import { characterToFormData, scenarioToFormData } from "../utils/formDataHelpers";
 
 // Default avatar images - using data URLs to avoid file serving issues for defaults
 const DEFAULT_USER_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'%3E%3C/path%3E%3Ccircle cx='12' cy='7' r='4'%3E%3C/circle%3E%3C/svg%3E";
@@ -111,6 +116,11 @@ const ChatPage = () => {
   const [activePersonaImageUrl, setActivePersonaImageUrl] = useState<string | null>(null);
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
 
+  // State for cached card data and editing
+  const [cachedCharacter, setCachedCharacter] = useState<any>(null);
+  const [cachedScenario, setCachedScenario] = useState<any>(null);
+  const [masterWorlds, setMasterWorlds] = useState<any[]>([]);
+
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -120,6 +130,108 @@ const ChatPage = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]); // Remove streamedAiMessage from dependency
+
+  // Load master worlds for scenario editing
+  useEffect(() => {
+    const fetchMasterWorlds = async () => {
+      try {
+        const worlds = await getAllMasterWorlds();
+        setMasterWorlds(worlds);
+      } catch (error) {
+        console.error('Failed to load master worlds:', error);
+      }
+    };
+    fetchMasterWorlds();
+  }, []);
+
+  // Handler for updating character card fields
+  const handleCharacterFieldChange = async (field: string, value: any) => {
+    if (!cachedCharacter) return;
+    
+    const updatedCharacter = { ...cachedCharacter, [field]: value };
+    setCachedCharacter(updatedCharacter);
+    
+    try {
+      const formData = characterToFormData(updatedCharacter);
+      await updateCharacterCard(updatedCharacter.id, formData);
+      
+      // Update cache
+      (window as any).__characterCardNameCache = (window as any).__characterCardNameCache || {};
+      (window as any).__characterCardNameCache[updatedCharacter.id] = updatedCharacter.name;
+      (window as any).__characterCardImageCache = (window as any).__characterCardImageCache || {};
+      (window as any).__characterCardImageCache[updatedCharacter.id] = updatedCharacter.image_url || null;
+      
+      // Update left panel image if changed
+      if (field === 'image_url' || field === 'name') {
+        updateLeftPanelForCharacter(updatedCharacter);
+      }
+    } catch (error) {
+      console.error('Failed to update character:', error);
+      // Revert the optimistic update on error
+      setCachedCharacter(cachedCharacter);
+    }
+  };
+
+  // Handler for updating scenario card fields
+  const handleScenarioFieldChange = async (field: string, value: any) => {
+    if (!cachedScenario) return;
+    
+    const updatedScenario = { ...cachedScenario, [field]: value };
+    setCachedScenario(updatedScenario);
+    
+    try {
+      const formData = scenarioToFormData(updatedScenario);
+      await updateScenarioCard(updatedScenario.id, formData);
+      
+      // Update cache
+      (window as any).__scenarioCardNameCache = (window as any).__scenarioCardNameCache || {};
+      (window as any).__scenarioCardNameCache[updatedScenario.id] = updatedScenario.name;
+      (window as any).__scenarioCardImageCache = (window as any).__scenarioCardImageCache || {};
+      (window as any).__scenarioCardImageCache[updatedScenario.id] = updatedScenario.image_url || null;
+      
+      // Update left panel image if changed
+      if (field === 'image_url' || field === 'name') {
+        updateLeftPanelForScenario(updatedScenario);
+      }
+    } catch (error) {
+      console.error('Failed to update scenario:', error);
+      // Revert the optimistic update on error
+      setCachedScenario(cachedScenario);
+    }
+  };
+
+  // Helper functions to update left panel
+  const updateLeftPanelForCharacter = (character: any) => {
+    if (character.image_url) {
+      const cacheBuster = character.updated_at 
+        ? `?cb=${encodeURIComponent(character.updated_at)}`
+        : `?cb=${character.id}`;
+      setLeftPanelContent(
+        <LeftPanelImage
+          src={`${character.image_url}${cacheBuster}`}
+          alt={character.name}
+        />
+      );
+    } else {
+      setLeftPanelContent(null);
+    }
+  };
+
+  const updateLeftPanelForScenario = (scenario: any) => {
+    if (scenario.image_url) {
+      const cacheBuster = scenario.updated_at 
+        ? `?cb=${encodeURIComponent(scenario.updated_at)}`
+        : `?cb=${scenario.id}`;
+      setLeftPanelContent(
+        <LeftPanelImage
+          src={`${scenario.image_url}${cacheBuster}`}
+          alt={scenario.name}
+        />
+      );
+    } else {
+      setLeftPanelContent(null);
+    }
+  };
 
   const hasSentBeginningMessageRef = useRef(false); // Ref to track if beginning message has been sent for the current chat
 
@@ -150,12 +262,14 @@ const ChatPage = () => {
         if (details) {
           if (details.card_type === 'character' && details.card_id) {
             cachedCharacter = await getCharacterCardById(details.card_id);
+            setCachedCharacter(cachedCharacter);
             (window as any).__characterCardNameCache = (window as any).__characterCardNameCache || {};
             (window as any).__characterCardNameCache[details.card_id] = cachedCharacter.name;
             (window as any).__characterCardImageCache = (window as any).__characterCardImageCache || {};
             (window as any).__characterCardImageCache[details.card_id] = cachedCharacter.image_url || null;
           } else if (details.card_type === 'scenario' && details.card_id) {
             cachedScenario = await getScenarioCardById(details.card_id);
+            setCachedScenario(cachedScenario);
             (window as any).__scenarioCardNameCache = (window as any).__scenarioCardNameCache || {};
             (window as any).__scenarioCardNameCache[details.card_id] = cachedScenario.name;
             (window as any).__scenarioCardImageCache = (window as any).__scenarioCardImageCache || {};
@@ -189,34 +303,20 @@ const ChatPage = () => {
             }
             
             // Left panel: show character image if available
-            if (cachedCharacter.image_url) {
-              const cacheBuster = cachedCharacter.updated_at 
-                ? `?cb=${encodeURIComponent(cachedCharacter.updated_at)}`
-                : `?cb=${cachedCharacter.id}`;
-              console.log('ChatPage: Setting character image in left panel', cachedCharacter.name);
-              setLeftPanelContent(
-                <LeftPanelImage
-                  src={`${cachedCharacter.image_url}${cacheBuster}`}
-                  alt={cachedCharacter.name}
-                />
-              );
-            } else {
-              console.log('ChatPage: No character image available');
-              setLeftPanelContent(null);
-            }
+            updateLeftPanelForCharacter(cachedCharacter);
 
-            // Right panel: show character edit panel (read-only for chat)
+            // Right panel: show character edit panel (editable in chat)
             console.log('ChatPage: Setting character edit panel in right panel', cachedCharacter.name);
             setRightPanelContent(
               <CharacterEditPanel 
                 character={cachedCharacter}
-                onChange={() => {}} // Read-only in chat
-                onDelete={() => {}} // Disabled in chat
-                onImport={() => {}} // Disabled in chat
+                onChange={handleCharacterFieldChange} // Enable editing
+                onDelete={() => {}} // Disabled in chat (delete available in character page)
+                onImport={() => {}} // Disabled in chat 
                 onExport={() => {}} // Disabled in chat
                 onExpressions={() => {}} // Disabled in chat
-                onImageChange={() => {}} // Disabled in chat
-                disabled={true} // Make it read-only
+                onImageChange={() => {}} // Disabled in chat (can be enhanced later)
+                disabled={false} // Make it editable
               />
             );
           } else if (details.card_type === "scenario" && details.card_id && cachedScenario) {
@@ -226,42 +326,25 @@ const ChatPage = () => {
             }
             
             // Left panel: show scenario image if available
-            if (cachedScenario.image_url) {
-              const cacheBuster = cachedScenario.updated_at 
-                ? `?cb=${encodeURIComponent(cachedScenario.updated_at)}`
-                : `?cb=${cachedScenario.id}`;
-              setLeftPanelContent(
-                <LeftPanelImage
-                  src={`${cachedScenario.image_url}${cacheBuster}`}
-                  alt={cachedScenario.name}
-                />
-              );
-            } else {
-              setLeftPanelContent(null);
-            }
+            updateLeftPanelForScenario(cachedScenario);
 
-            // Right panel: show scenario edit panel (read-only for chat)
+            // Right panel: show scenario edit panel (editable in chat)
             setRightPanelContent(
               <ScenarioEditPanel 
                 scenario={cachedScenario}
-                masterWorlds={[]} // Empty array since not needed in read-only chat view
-                onChange={() => {}} // Read-only in chat
-                onDelete={() => {}} // Disabled in chat
+                masterWorlds={masterWorlds} // Pass master worlds for editing
+                onChange={handleScenarioFieldChange} // Enable editing
+                onDelete={() => {}} // Disabled in chat (delete available in scenario page)
                 onImport={() => {}} // Disabled in chat
                 onExport={() => {}} // Disabled in chat
                 onExpressions={() => {}} // Disabled in chat
-                onImageChange={() => {}} // Disabled in chat
-                disabled={true} // Make it read-only
+                onImageChange={() => {}} // Disabled in chat (can be enhanced later)
+                disabled={false} // Make it editable
               />
             );
-          } else {
-            // Clear panels if no card info
-            console.log('ChatPage: No card info available, clearing panels');
-            setLeftPanelContent(null);
-            setRightPanelContent(null);
           }
           
-          // Set panels visible
+          // Set panels visible only after content is set
           console.log('ChatPage: Final step - setting panels visible in data fetch');
           setLeftPanelVisible(true);
           setRightPanelVisible(true);
@@ -272,6 +355,13 @@ const ChatPage = () => {
             setCurrentBeginningMessageIndex(msgs[0].message_metadata.current_response_index);
           } else {
             setCurrentBeginningMessageIndex(0); // Default to first if not found or not a beginning message
+          }
+        } else {
+          // Only clear panels if there's truly no session details
+          console.log('ChatPage: No session details available, keeping panels but clearing content if no cached data');
+          if (!cachedCharacter && !cachedScenario) {
+            setLeftPanelContent(null);
+            setRightPanelContent(null);
           }
         }
       } catch (err) {
@@ -321,6 +411,19 @@ const ChatPage = () => {
     fetchActivePersona();
   }, [chatId]);
 
+  // Load master worlds for scenario editing
+  useEffect(() => {
+    const fetchMasterWorlds = async () => {
+      try {
+        const worlds = await getAllMasterWorlds();
+        setMasterWorlds(worlds);
+      } catch (error) {
+        console.error('Failed to load master worlds:', error);
+      }
+    };
+    fetchMasterWorlds();
+  }, []);
+
   const updatePersonaCache = (cardType: string | undefined, cardId: string | undefined, name: string | undefined, imageUrl: string | undefined | null) => {
     if (!cardType || !cardId) return;
     
@@ -360,12 +463,69 @@ const ChatPage = () => {
     };
   }, [chatId, isLoadingMessages]); // Removed setSendMessageHandler and setDisabled from deps
 
-  // Show panels for chat pages
+  // Show panels for chat pages - but only set visible after content is ready
   useEffect(() => {
-    console.log('ChatPage: Setting panels visible');
-    setLeftPanelVisible(true);
-    setRightPanelVisible(true);
-  }, [setLeftPanelVisible, setRightPanelVisible]);
+    // Only set panels visible if we have cached data or if they're already visible
+    if (cachedCharacter || cachedScenario || sessionDetails) {
+      console.log('ChatPage: Setting panels visible after content is ready');
+      setLeftPanelVisible(true);
+      setRightPanelVisible(true);
+    }
+  }, [cachedCharacter, cachedScenario, sessionDetails, setLeftPanelVisible, setRightPanelVisible]);
+
+  // Update panels when cached character or scenario changes
+  useEffect(() => {
+    if (cachedCharacter) {
+      console.log('ChatPage: Updating panels for cached character:', cachedCharacter.name);
+      updateLeftPanelForCharacter(cachedCharacter);
+      setRightPanelContent(
+        <CharacterEditPanel 
+          character={cachedCharacter}
+          onChange={handleCharacterFieldChange}
+          onDelete={() => {}}
+          onImport={() => {}}
+          onExport={() => {}}
+          onExpressions={() => {}}
+          onImageChange={() => {}}
+          disabled={false}
+        />
+      );
+      // Set panels visible only after content is set
+      setTimeout(() => {
+        setLeftPanelVisible(true);
+        setRightPanelVisible(true);
+      }, 0);
+    } else if (cachedScenario) {
+      console.log('ChatPage: Updating panels for cached scenario:', cachedScenario.name);
+      updateLeftPanelForScenario(cachedScenario);
+      setRightPanelContent(
+        <ScenarioEditPanel 
+          scenario={cachedScenario}
+          masterWorlds={masterWorlds}
+          onChange={handleScenarioFieldChange}
+          onDelete={() => {}}
+          onImport={() => {}}
+          onExport={() => {}}
+          onExpressions={() => {}}
+          onImageChange={() => {}}
+          disabled={false}
+        />
+      );
+      // Set panels visible only after content is set
+      setTimeout(() => {
+        setLeftPanelVisible(true);
+        setRightPanelVisible(true);
+      }, 0);
+    }
+  }, [cachedCharacter, cachedScenario, masterWorlds]);
+
+  // Cleanup effect to preserve panels when unmounting
+  useEffect(() => {
+    return () => {
+      // Don't clear panel content on unmount - let it persist
+      console.log('ChatPage: Unmounting but preserving panel content');
+    };
+  }, []);
 
   // Sync local sending state with global state
   useEffect(() => {
@@ -672,7 +832,7 @@ const ChatPage = () => {
                         className="group w-full"
                       >
                         <div className={`
-                          rounded-2xl p-4 mx-2 relative transition-all duration-200
+                          rounded-2xl p-4 mx-2 mt-2 relative transition-all duration-200
                           ${msg.sender_type === "USER" 
                             ? "bg-app-bg text-app-text shadow-md hover:shadow-lg" 
                             : "bg-app-bg text-app-text shadow-md hover:shadow-lg"
@@ -715,7 +875,17 @@ const ChatPage = () => {
                               </div>
                               {/* Message content with custom formatting, no markdown */}
                               <div className="break-words mt-0">
-                                {msg.content.split(/(```[\s\S]*?```|\n)/g).map((part, idx, arr) => {
+                                {(() => {
+                                  // Apply placeholder replacement for display
+                                  const charName = getCharacterName(sessionDetails);
+                                  const userName = msg.sender_type === "USER" 
+                                    ? (msg.active_persona_name || msg.message_metadata?.active_persona_name || activePersonaName)
+                                    : activePersonaName;
+                                  const displayContent = replacePlaceholdersForDisplay(msg.content, charName, userName);
+                                  
+                                  return displayContent.split(/(```[\s\S]*?```|\n)/g).map((part, idx, arr) => {
+                                  // Remove leading line breaks for the first paragraph
+                                  if (idx === 0) part = part.replace(/^\n+/, '');
                                   // Remove leading line breaks for the first paragraph
                                   if (idx === 0) part = part.replace(/^\n+/, '');
                                   if (part.startsWith('```') && part.endsWith('```')) {
@@ -742,7 +912,8 @@ const ChatPage = () => {
                                     // Remove top margin for the first inline text
                                     return <span key={idx} style={idx === 0 ? { marginTop: 0 } : {}} dangerouslySetInnerHTML={{ __html: formatted }} />;
                                   }
-                                })}
+                                });
+                                })()}
                               </div>
                             </div>
                           </div>

@@ -1,4 +1,3 @@
-// frontend/src/pages/MasterWorldPageContext.tsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Select, { type SingleValue } from 'react-select';
@@ -203,10 +202,9 @@ const MasterWorldPageContext: React.FC = () => {
           onImageChange={() => {}}
         />
       );
-    } else {
-      setLeftPanelContent(null);
-      setRightPanelContent(null);
     }
+    // Don't clear panels when entry is null
+    // Let it preserve content from other pages until a new lore entry is selected
   };
 
   const handleEditFieldChange = (field: string, value: any) => {
@@ -229,7 +227,9 @@ const MasterWorldPageContext: React.FC = () => {
       await deleteLoreEntry(selectedMasterWorld.value, entryId);
       if (editingEntry?.id === entryId) {
         setEditingEntry(null);
-        updateLayoutContent(null);
+        // Only clear panels if we're deleting the currently edited lore entry
+        setLeftPanelContent(null);
+        setRightPanelContent(null);
       }
       fetchLoreEntries();
     } catch (err) {
@@ -283,14 +283,15 @@ const MasterWorldPageContext: React.FC = () => {
   }
 
   return (
-    <div className="h-full">
-      <div className="mb-8">
+    <div className="flex flex-col h-full min-h-0">
+      {/* Header and controls */}
+      <div className="mb-4 flex-shrink-0">
         <div className="flex justify-between items-center">
           <h1 className="text-4xl font-bold text-white font-quintessential">
             MasterWorld
           </h1>
           {selectedMasterWorld && (
-            <button 
+            <button
               onClick={handleCreateNewEntry}
               className="bg-app-text-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
             >
@@ -301,7 +302,7 @@ const MasterWorldPageContext: React.FC = () => {
       </div>
 
       {/* Master World Dropdown and New World Creation */}
-      <div className="mb-6 space-y-4">
+      <div className="mb-4 space-y-2 flex-shrink-0">
         <div className="flex items-center gap-2">
           <div className="flex-grow">
             <Select<SelectOption>
@@ -316,7 +317,7 @@ const MasterWorldPageContext: React.FC = () => {
               styles={{
                 control: (base, state) => ({
                   ...base,
-                  backgroundColor: "#343a40",
+                  backgroundColor: "#212529",
                   borderColor: state.isFocused ? "#f8f9fa" : "#343a40",
                   boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
                   "&:hover": { borderColor: "#f8f9fa" },
@@ -334,14 +335,12 @@ const MasterWorldPageContext: React.FC = () => {
             />
           </div>
         </div>
-        
-        {/* New World Creation */}
         <div className="flex items-center gap-2">
           <input
             type="text"
             value={newWorldName}
             onChange={(e) => setNewWorldName(e.target.value)}
-            className="flex-1 p-2 bg-app-surface border border-gray-600 rounded-md text-white"
+            className="flex-1 p-2 bg-app-bg border border-gray-600 rounded-md text-white"
             placeholder="Enter new world name..."
           />
           <button
@@ -354,30 +353,32 @@ const MasterWorldPageContext: React.FC = () => {
       </div>
 
       {error && (
-        <p className="bg-red-700 text-white p-3 rounded-md mb-4 text-center">
+        <p className="bg-red-700 text-white p-3 rounded-md mb-2 text-center flex-shrink-0">
           {error}
         </p>
       )}
 
-      {/* Render sections by type */}
-      <div className="space-y-8 pb-20">
+      {/* Scrollable section titles and cards */}
+      <div className="overflow-y-auto flex-1 min-h-0 max-h-[calc(100vh-310px)] space-y-8 pb-4 scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border hover:scrollbar-thumb-app-text">
         {DISPLAY_ENTRY_TYPES_ORDER.map(entryType => {
           const friendlyTypeName = getFriendlyEntryTypeName(entryType);
           const entriesOfType = loreEntries.filter(entry => entry.entry_type === entryType);
 
           return (
             <div key={entryType}>
-              <h3 className="text-2xl font-semibold text-gray-300 mb-4 border-b border-gray-700 pb-2 font-quintessential">
+              <h3 className="text-2xl font-semibold text-app-text mb-2 border-b border-gray-700 pb-2 font-quintessential">
                 {friendlyTypeName}
               </h3>
               {entriesOfType.length === 0 ? (
                 <p className="text-center text-gray-500 py-4">Empty section</p>
               ) : (
-                <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 justify-items-start">
+                <div className="grid gap-6 justify-items-start" style={{
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))'
+                }}>
                   {entriesOfType.map(entry => (
                     <div
                       key={entry.id}
-                      className="bg-app-surface rounded-lg shadow-lg flex flex-col items-start justify-center w-36 h-20 md:w-44 md:h-22 lg:w-52 lg:h-24 p-2 relative overflow-hidden cursor-pointer group transition-transform hover:scale-105"
+                      className="bg-app-surface rounded-lg shadow-lg flex flex-col items-start justify-center w-full h-24 p-3 relative overflow-hidden cursor-pointer group transition-transform hover:scale-105"
                       onClick={() => handleEditEntry(entry)}
                     >
                       <button
@@ -389,10 +390,15 @@ const MasterWorldPageContext: React.FC = () => {
                         <DeleteIcon className="h-5 w-5" />
                       </button>
                       <div className="flex flex-col items-start justify-center w-full h-full p-1">
-                        <h2 className="text-lg font-semibold text-white break-words whitespace-normal leading-tight mb-2 w-full truncate text-left" title={entry.name}>
+                        <h2 className="text-lg font-semibold text-white leading-tight mb-1 w-full text-left overflow-hidden" style={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          wordBreak: 'break-word'
+                        }} title={entry.name}>
                           {entry.name}
                         </h2>
-                        <p className="text-xs px-2 py-0.5 rounded-full font-semibold bg-app-text text-app-bg text-left truncate max-w-full">
+                        <p className="text-xs px-2 py-0.5 rounded-full font-semibold bg-app-text text-app-bg text-left truncate max-w-full mt-auto">
                           {getFriendlyEntryTypeName(entry.entry_type)}
                         </p>
                       </div>
@@ -404,6 +410,7 @@ const MasterWorldPageContext: React.FC = () => {
           );
         })}
       </div>
+
     </div>
   );
 };

@@ -32,8 +32,8 @@ const ChatsListPage: React.FC = () => {
 
   // Hide panels for chats list page
   useEffect(() => {
-    setLeftPanelVisible(false);
-    setRightPanelVisible(false);
+    setLeftPanelVisible(true);
+    setRightPanelVisible(true);
   }, [setLeftPanelVisible, setRightPanelVisible]);
 
   const handleDeleteSession = async (sessionId: string) => {

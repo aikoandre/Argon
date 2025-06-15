@@ -129,10 +129,9 @@ const PersonasPageContext: React.FC = () => {
           onImageChange={handleEditImageChange}
         />
       );
-    } else {
-      setLeftPanelContent(null);
-      setRightPanelContent(null);
     }
+    // Don't clear panels when persona is null
+    // Let it preserve content from other pages until a new persona is selected
   };
 
   const handleEditFieldChange = (field: string, value: any) => {
@@ -150,7 +149,9 @@ const PersonasPageContext: React.FC = () => {
       await deleteUserPersona(personaId);
       if (editingPersona?.id === personaId) {
         setEditingPersona(null);
-        updateLayoutContent(null);
+        // Only clear panels if we're deleting the currently edited persona
+        setLeftPanelContent(null);
+        setRightPanelContent(null);
       }
       fetchPersonas();
     } catch (err) {

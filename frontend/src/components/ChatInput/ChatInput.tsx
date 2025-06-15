@@ -52,7 +52,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = false, 
               ta.style.height = 'auto';
               ta.style.height = ta.scrollHeight + 'px';
             }}
-            placeholder={isChatPage ? "Type a message..." : "Select a chat to start messaging"}
+            placeholder={isChatPage ? "Type a message... (Use {{char}} and {{user}} as placeholders)" : "Select a chat to start messaging"}
             disabled={isSending}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
@@ -61,7 +61,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = false, 
               }
             }}
             className={`
-              w-full p-2 pr-14 bg-app-bg border-4 border-app-border rounded-lg text-app-text 
+              w-full p-2 pr-16 bg-app-bg border-4 border-app-border rounded-lg text-app-text 
               placeholder-gray-400 border-2 border-app-border focus:outline-none resize-none overflow-hidden
             `}
           />

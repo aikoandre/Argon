@@ -113,10 +113,9 @@ const ScenariosPageContext: React.FC = () => {
           onImageChange={handleEditImageChange}
         />
       );
-    } else {
-      setLeftPanelContent(null);
-      setRightPanelContent(null);
     }
+    // Don't clear panels when scenario is null
+    // Let it preserve content from other pages until a new scenario is selected
   };
 
   const handleEditFieldChange = (field: string, value: any) => {
@@ -134,7 +133,9 @@ const ScenariosPageContext: React.FC = () => {
       await deleteScenarioCard(scenarioId);
       if (editingScenario?.id === scenarioId) {
         setEditingScenario(null);
-        updateLayoutContent(null);
+        // Only clear panels if we're deleting the currently edited scenario
+        setLeftPanelContent(null);
+        setRightPanelContent(null);
       }
       fetchScenarios();
     } catch (err) {
@@ -267,16 +268,6 @@ const ScenariosPageContext: React.FC = () => {
                 imageUrl={imageUrl}
                 className="absolute inset-0"
               />
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDelete(scenario.id);
-                }}
-                className="absolute top-2 right-2 z-20 text-app-text hover:text-red-500 p-1.5 rounded-full transition-colors"
-                title="Delete Scenario"
-              >
-                <span className="material-icons-outlined text-2xl">delete</span>
-              </button>
               
               <div className="absolute bottom-0 left-0 w-full">
                 <div className="w-full bg-black/30 backdrop-blur-sm p-3 flex flex-row items-center justify-between rounded-b-lg">

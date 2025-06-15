@@ -76,17 +76,20 @@ const CharactersPage: React.FC = () => {
       } else {
         setLeftPanelContent(null);
       }
-    } else {
-      setLeftPanelContent(null);
     }
+    // Don't clear left panel when character is null
+    // Let it preserve content from other pages until a new character is selected
   };
 
-  const handleCharacterCardClick = async (character: CharacterCardData) => {
+  // Handle editing character (like other pages)
+  const handleEditCharacter = (character: CharacterCardData) => {
+    setEditingCharacter(character);
+    updateLayoutContent(character);
+  };
+
+  // Handle starting a chat session with the character
+  const handleCharacterChat = async (character: CharacterCardData) => {
     try {
-      // Set the editing character for the right panel
-      setEditingCharacter(character);
-      updateLayoutContent(character);
-      
       // Create a new chat session with this character
       const chatSessionId = await createOrGetCardChat(
         'character',
@@ -110,7 +113,9 @@ const CharactersPage: React.FC = () => {
         // Reset editing state if deleting currently edited character
         if (editingCharacter?.id === characterId) {
           setEditingCharacter(null);
-          updateLayoutContent(null);
+          // Only clear panels if we're deleting the currently edited character
+          setLeftPanelContent(null);
+          setRightPanelContent(null);
         }
       } catch (err) {
         console.error("Failed to delete character:", err);
@@ -195,10 +200,9 @@ const CharactersPage: React.FC = () => {
           onImageChange={handleImageChange}
         />
       );
-    } else {
-      // Clear the right panel when no character is being edited
-      setRightPanelContent(null);
     }
+    // Don't clear the right panel when no character is being edited
+    // Let it preserve content from other pages until a new character is selected
   }, [editingCharacter]);
 
   return (
@@ -265,7 +269,7 @@ const CharactersPage: React.FC = () => {
               <div
                 key={character.id}
                 className="bg-app-surface rounded-lg shadow-lg flex flex-col justify-between w-36 h-60 md:w-44 md:h-72 lg:w-52 lg:h-84 p-0 md:p-0 relative overflow-hidden cursor-pointer group"
-                onClick={() => handleCharacterCardClick(character)}
+                onClick={() => handleEditCharacter(character)}
               >
                 <CardImage
                   imageUrl={imageUrl}
@@ -277,6 +281,15 @@ const CharactersPage: React.FC = () => {
                     <div className="font-semibold text-lg text-white drop-shadow-md break-words flex-1" title={character.name}>
                       {character.name}
                     </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCharacterChat(character);
+                      }}
+                      className="bg-app-text text-black px-3 py-1 rounded-2xl text-sm font-semibold ml-2 hover:bg-app-text/80 transition-colors"
+                    >
+                      Chat
+                    </button>
                   </div>
                 </div>
               </div>

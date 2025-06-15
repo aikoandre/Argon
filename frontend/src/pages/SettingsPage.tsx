@@ -184,8 +184,8 @@ const SettingsPage: React.FC = () => {
 
   // Hide panels for settings page
   useEffect(() => {
-    setLeftPanelVisible(false);
-    setRightPanelVisible(false);
+    setLeftPanelVisible(true);
+    setRightPanelVisible(true);
   }, [setLeftPanelVisible, setRightPanelVisible]);
 
   // New LiteLLM provider change handlers
@@ -407,7 +407,7 @@ const SettingsPage: React.FC = () => {
                 styles={{
                   control: (base, state) => ({
                     ...base,
-                    backgroundColor: "#343a40",
+                    backgroundColor: "#212529",
                     borderColor: state.isFocused ? "#f8f9fa" : "#343a40",
                     boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
                     "&:hover": { borderColor: "#f8f9fa" },
@@ -480,7 +480,7 @@ const SettingsPage: React.FC = () => {
                 styles={{
                   control: (base, state) => ({
                     ...base,
-                    backgroundColor: "#343a40",
+                    backgroundColor: "#212529",
                     borderColor: state.isFocused ? "#f8f9fa" : "#343a40",
                     boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
                     "&:hover": { borderColor: "#f8f9fa" },
@@ -534,7 +534,7 @@ const SettingsPage: React.FC = () => {
                   onChange={handlePrimaryApiKeyChangeNew}
                   disabled={isLoading}
                   placeholder="sk-or-... / sk-... / AIz..."
-                  className="w-full p-2.5 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 pr-10"
+                  className="w-full p-2.5 bg-app-bg border border-app-border rounded-md text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 pr-10"
                 />
                 <button
                   type="button"
@@ -575,7 +575,7 @@ const SettingsPage: React.FC = () => {
                 styles={{
                   control: (base, state) => ({
                     ...base,
-                    backgroundColor: "#343a40",
+                    backgroundColor: "#212529",
                     borderColor: state.isFocused ? "#f8f9fa" : "#343a40",
                     boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
                     "&:hover": { borderColor: "#f8f9fa" },
@@ -643,7 +643,7 @@ const SettingsPage: React.FC = () => {
                 styles={{
                   control: (base, state) => ({
                     ...base,
-                    backgroundColor: "#343a40",
+                    backgroundColor: "#212529",
                     borderColor: state.isFocused ? "#f8f9fa" : "#343a40",
                     boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
                     "&:hover": { borderColor: "#f8f9fa" },
@@ -697,7 +697,7 @@ const SettingsPage: React.FC = () => {
                   onChange={handleAnalysisApiKeyChangeNew}
                   disabled={isLoading}
                   placeholder="sk-or-... / sk-... / AIz..."
-                  className="w-full p-2.5 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 pr-10"
+                  className="w-full p-2.5 bg-app-bg border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 pr-10"
                 />
                 <button
                   type="button"
@@ -738,7 +738,7 @@ const SettingsPage: React.FC = () => {
                 styles={{
                   control: (base, state) => ({
                     ...base,
-                    backgroundColor: "#343a40",
+                    backgroundColor: "#212529",
                     borderColor: state.isFocused ? "#f8f9fa" : "#343a40",
                     boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
                     "&:hover": { borderColor: "#f8f9fa" },
@@ -806,7 +806,7 @@ const SettingsPage: React.FC = () => {
                 styles={{
                   control: (base, state) => ({
                     ...base,
-                    backgroundColor: "#343a40",
+                    backgroundColor: "#212529",
                     borderColor: state.isFocused ? "#f8f9fa" : "#343a40",
                     boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
                     "&:hover": { borderColor: "#f8f9fa" },
@@ -860,7 +860,7 @@ const SettingsPage: React.FC = () => {
                   onChange={handleMaintenanceApiKeyChange}
                   disabled={isLoading}
                   placeholder="sk-or-... / sk-... / AIz..."
-                  className="w-full p-2.5 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 pr-10"
+                  className="w-full p-2.5 bg-app-bg border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 pr-10"
                 />
                 <button
                   type="button"
@@ -900,7 +900,7 @@ const SettingsPage: React.FC = () => {
                 styles={{
                   control: (base, state) => ({
                     ...base,
-                    backgroundColor: "#343a40",
+                    backgroundColor: "#212529",
                     borderColor: state.isFocused ? "#f8f9fa" : "#343a40",
                     boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
                     "&:hover": { borderColor: "#f8f9fa" },
@@ -968,7 +968,7 @@ const SettingsPage: React.FC = () => {
                 styles={{
                   control: (base, state) => ({
                     ...base,
-                    backgroundColor: "#343a40",
+                    backgroundColor: "#212529",
                     borderColor: state.isFocused ? "#f8f9fa" : "#343a40",
                     boxShadow: state.isFocused ? "0 0 0 1px #f8f9fa" : "none",
                     "&:hover": { borderColor: "#f8f9fa" },
@@ -1022,7 +1022,7 @@ const SettingsPage: React.FC = () => {
                   onChange={handleEmbeddingApiKeyChange}
                   disabled={isLoading}
                   placeholder="sk-or-... / sk-... / AIz..."
-                  className="w-full p-2.5 bg-app-surface border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 pr-10"
+                  className="w-full p-2.5 bg-app-bg border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 pr-10"
                 />
                 <button
                   type="button"

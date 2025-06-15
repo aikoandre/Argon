@@ -31,8 +31,8 @@ const HomePage: React.FC = () => {
 
   // Hide panels for home page
   useEffect(() => {
-    setLeftPanelVisible(false);
-    setRightPanelVisible(false);
+    setLeftPanelVisible(true);
+    setRightPanelVisible(true);
   }, [setLeftPanelVisible, setRightPanelVisible]);
 
   return (

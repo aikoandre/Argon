@@ -79,8 +79,8 @@ const NewChatPage: React.FC = () => {
 
   // Hide panels for new chat page
   useEffect(() => {
-    setLeftPanelVisible(false);
-    setRightPanelVisible(false);
+    setLeftPanelVisible(true);
+    setRightPanelVisible(true);
   }, [setLeftPanelVisible, setRightPanelVisible]);
 
   const handleSubmit = async (e: FormEvent) => {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { IconActionBar } from '../Layout';
+import PlaceholderHelp from '../PlaceholderHelp';
 import type { UserPersonaData, MasterWorldData } from '../../services/api';
 
 interface PersonaEditPanelProps {
@@ -37,6 +38,7 @@ const PersonaEditPanel: React.FC<PersonaEditPanelProps> = ({
       />
       <div className="flex justify-between items-center p-2 border-b border-app-border bg-app-surface">
         <h3 className="text-sm font-semibold">Edit Persona</h3>
+        <PlaceholderHelp />
       </div>
       <form className="flex flex-col gap-4 p-4 flex-1 overflow-y-auto">
         <label className="font-semibold text-sm">Name
@@ -54,6 +56,7 @@ const PersonaEditPanel: React.FC<PersonaEditPanelProps> = ({
             onChange={e => onChange('description', e.target.value)}
             disabled={disabled}
             rows={4}
+            placeholder="Enter persona description... (Use {{char}} and {{user}} as placeholders)"
           />
         </label>
         <label className="font-semibold text-sm">Master World (Optional)
