@@ -37,13 +37,15 @@ export const scenarioToFormData = (scenario: any): FormData => {
 export const personaToFormData = (persona: any): FormData => {
   const formData = new FormData();
   
-  const dataObj = {
-    name: persona.name || '',
-    description: persona.description || '',
-    instructions: persona.instructions || '',
-  };
+  // Send individual form fields as expected by the backend
+  formData.append('name', persona.name || '');
+  if (persona.description !== null && persona.description !== undefined) {
+    formData.append('description', persona.description);
+  }
+  if (persona.master_world_id !== null && persona.master_world_id !== undefined) {
+    formData.append('master_world_id', persona.master_world_id);
+  }
   
-  formData.append('data', JSON.stringify(dataObj));
   return formData;
 };
 

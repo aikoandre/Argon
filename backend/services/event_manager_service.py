@@ -2,13 +2,11 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from backend.models.lore_entry import LoreEntry
 from backend.models.chat_session import ChatSession
-from backend.models.session_cache_fact import SessionCacheFact
 from backend.models.session_relationship import SessionRelationship
 from backend.models.active_session_event import ActiveSessionEvent
-from backend.models.session_lore_modification import SessionLoreModification
+# Removed SessionCacheFact and SessionLoreModification - replaced by SessionNote system
 from backend.schemas.event import TriggerCondition, Phase, FixedEventData, EventOutcome
 from backend.schemas.active_session_event import ActiveSessionEventCreate, ActiveSessionEventUpdate
-from backend.schemas.session_lore_modification import SessionLoreModificationCreate
 import logging
 import uuid
 
@@ -96,11 +94,11 @@ class EventManagerService:
             logger.error(f"Session {session_id} not found.")
             return {}
 
-        # Fetch SessionCacheFacts
-        cache_facts = db.query(SessionCacheFact).filter(SessionCacheFact.chat_session_id == session_id).all()
-        session_facts = {fact.key: fact.value for fact in cache_facts if fact.key and fact.value}
+        # TODO: Replace with SessionNote system
+        # Temporarily returning minimal session state
+        session_facts = {}
 
-        # Fetch SessionRelationships
+        # Fetch SessionRelationships (still available)
         relationships_raw = db.query(SessionRelationship).filter(SessionRelationship.chat_session_id == session_id).all()
         session_relationships = {}
         for rel in relationships_raw:
@@ -250,41 +248,18 @@ class EventManagerService:
     async def _apply_phase_effects(self, db: Session, session_id: str, effects: Dict[str, Any]):
         """Applies immediate effects of a phase on the session state."""
         logger.info(f"Applying phase effects for session {session_id}: {effects}")
+        
+        # TODO: Replace with SessionNote system
         if "update_session_cache_fact" in effects:
             fact_key = effects["update_session_cache_fact"]["key"]
             fact_value = effects["update_session_cache_fact"]["value"]
-            session_fact = db.query(SessionCacheFact).filter(
-                SessionCacheFact.chat_session_id == session_id,
-                SessionCacheFact.key == fact_key
-            ).first()
-            if session_fact:
-                session_fact.value = fact_value
-                session_fact.text = f"{fact_key}: {fact_value}"
-                db.add(session_fact)
-            else:
-                new_fact = SessionCacheFact(
-                    chat_session_id=session_id, 
-                    key=fact_key, 
-                    value=fact_value,
-                    text=f"{fact_key}: {fact_value}"
-                )
-                db.add(new_fact)
-            db.commit()
-            logger.info(f"Updated/Created SessionCacheFact: {fact_key}={fact_value}")
+            # Temporarily disabled - will be replaced by SessionNote system
+            logger.info(f"Placeholder: Would update session fact {fact_key}={fact_value}")
 
         if "suggest_session_lore_modification" in effects:
             mod_data = effects["suggest_session_lore_modification"]
-            new_modification = SessionLoreModificationCreate(
-                chat_session_id=session_id,
-                base_lore_entry_id=mod_data["base_lore_entry_id"],
-                field_to_update=mod_data["field_to_update"],
-                new_content_segment=mod_data["new_content_segment"],
-                change_reason=mod_data.get("change_reason")
-            )
-            db_modification = SessionLoreModification(**new_modification.model_dump())
-            db.add(db_modification)
-            db.commit()
-            db.refresh(db_modification)
+            # Temporarily disabled - will be replaced by SessionNote system
+            logger.info(f"Placeholder: Would create lore modification for entry {mod_data.get('base_lore_entry_id')}")
             logger.info(f"Suggested SessionLoreModification for session {session_id}: {mod_data}")
 
     async def _resolve_event_outcome(self, db: Session, session_id: str, event_id: str, outcomes: List[EventOutcome], session_state: Dict[str, Any]):

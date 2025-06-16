@@ -32,9 +32,8 @@ class ChatSession(Base):
     user_persona = relationship("UserPersona") # Nome da classe SQLAlchemy
     messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")
     extracted_knowledge = relationship("ExtractedKnowledge", back_populates="chat_session", cascade="all, delete-orphan")
-    session_cache_facts = relationship("SessionCacheFact", back_populates="chat_session", cascade="all, delete-orphan")
     session_relationships = relationship("SessionRelationship", back_populates="chat_session", cascade="all, delete-orphan")
-    session_lore_modifications = relationship("SessionLoreModification", back_populates="chat_session", cascade="all, delete-orphan")
+    session_notes = relationship("SessionNote", back_populates="chat_session", cascade="all, delete-orphan")
     active_events = relationship("ActiveSessionEvent", back_populates="session", cascade="all, delete-orphan")
 
     # Campos para funcionalidades futuras (podem ser adicionados depois via migrações)

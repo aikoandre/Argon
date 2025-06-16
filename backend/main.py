@@ -48,6 +48,7 @@ from backend.routers.settings import router as settings_router
 from backend.routers.llm_providers import router as llm_providers_router
 from backend.routers.maintenance import router as maintenance_router
 from backend.routers.faiss_management import router as faiss_management_router
+from backend.routers.session_notes_api import router as session_notes_router
 from backend import database
 from sqlalchemy.orm import Session # Import Session
 from backend.database import get_db # Import get_db
@@ -261,6 +262,7 @@ app.include_router(settings_router, prefix="/api")
 app.include_router(llm_providers_router)
 app.include_router(maintenance_router, prefix="/api")
 app.include_router(faiss_management_router, prefix="/api")
+app.include_router(session_notes_router, prefix="/api")
 
 def create_default_user_persona(db: Session):
     """

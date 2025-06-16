@@ -7,7 +7,6 @@ from .master_world import MasterWorld
 from .user_settings import UserSettings
 from .extracted_knowledge import ExtractedKnowledge
 from .lore_entry import LoreEntry
-from .session_cache_fact import SessionCacheFact
 from .session_relationship import SessionRelationship
-from .session_lore_modification import SessionLoreModification
+from .session_note import SessionNote
 from .maintenance_queue import MaintenanceQueue

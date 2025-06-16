@@ -5,20 +5,32 @@ import { motion } from "motion/react";
 
 // Material Icon component
 const MaterialIcon = ({ icon, className = "" }: { icon: string; className?: string }) => (
-  <span className={`material-icons-outlined text-2xl select-none ${className}`}>{icon}</span>
+  <span className={`material-icons-outlined text-2xl select-none leading-none ${className}`}>{icon}</span>
 );
 
 const SendIcon = ({ className }: { className?: string }) => (
-  <MaterialIcon icon="send" className={className} />
+  <MaterialIcon icon="send_outlined" className={className} />
+);
+
+const PauseIcon = ({ className }: { className?: string }) => (
+  <MaterialIcon icon="pause_outlined" className={className} />
 );
 
 interface ChatInputProps {
   onSendMessage?: (message: string) => void;
+  onCancelMessage?: () => void;
   disabled?: boolean;
   isSending?: boolean;
+  isProcessingMemory?: boolean;
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = false, isSending = false }) => {
+const ChatInput: React.FC<ChatInputProps> = ({ 
+  onSendMessage, 
+  onCancelMessage, 
+  disabled = false, 
+  isSending = false,
+  isProcessingMemory = false 
+}) => {
   const location = useLocation();
   const [newMessage, setNewMessage] = useState("");
 
@@ -27,7 +39,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = false, 
   
   // Check if we're on a chat page to determine if sending is allowed
   const isChatPage = location.pathname.startsWith('/chat/') && chatId;
-  const canSend = isChatPage && !disabled && !isSending;
+  const canSend = isChatPage && !disabled && !isSending && !isProcessingMemory;
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -35,6 +47,10 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = false, 
     
     onSendMessage?.(newMessage.trim());
     setNewMessage("");
+  };
+
+  const handleCancel = () => {
+    onCancelMessage?.();
   };
 
   // Always render and allow typing, but conditionally allow sending
@@ -52,8 +68,14 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = false, 
               ta.style.height = 'auto';
               ta.style.height = ta.scrollHeight + 'px';
             }}
-            placeholder={isChatPage ? "Type a message... (Use {{char}} and {{user}} as placeholders)" : "Select a chat to start messaging"}
-            disabled={isSending}
+            placeholder={
+              isProcessingMemory 
+                ? "Processing memory updates..." 
+                : isChatPage 
+                  ? "Type a message... (Use {{char}} and {{user}} as placeholders)" 
+                  : "Select a chat to start messaging"
+            }
+            disabled={isSending || isProcessingMemory}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -66,12 +88,13 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = false, 
             `}
           />
           <motion.button
-            type="submit"
-            disabled={!canSend || !newMessage.trim()}
+            type={isProcessingMemory ? "button" : "submit"}
+            onClick={isProcessingMemory ? handleCancel : undefined}
+            disabled={!isChatPage || (!(canSend && newMessage.trim()) && !isProcessingMemory)}
             className={`
-              absolute right-3 top-1/2 transform -translate-y-1/2 text-white font-bold p-2 rounded-lg 
+              absolute right-1 top-1/2 transform -translate-y-6 text-white font-bold p-2 rounded-lg 
               w-10 h-10 flex items-center justify-center transition-colors duration-200
-              ${canSend && newMessage.trim() && !isSending 
+              ${(canSend && newMessage.trim()) || isProcessingMemory
                 ? 'hover:bg-app-primary/20 opacity-100' 
                 : 'opacity-50 cursor-not-allowed'
               }
@@ -81,12 +104,14 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = false, 
               <motion.span 
                 animate={{ rotate: 360 }}
                 transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                className="text-xl"
+                className="text-xl leading-none"
               >
                 ⟳
               </motion.span>
+            ) : isProcessingMemory ? (
+              <PauseIcon className="w-5 h-5 leading-none" />
             ) : (
-              <SendIcon className="w-5 h-5 flex items-center justify-center" />
+              <SendIcon className="w-5 h-5 leading-none" />
             )}
           </motion.button>
         </form>

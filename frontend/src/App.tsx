@@ -11,11 +11,10 @@ import PersonasPageContext from "./pages/PersonasPage";
 import MasterWorldPageContext from "./pages/MasterWorldPage";
 import { ThreeContainerLayout, HeaderNavigationBar } from './components/Layout';
 import { LayoutProvider, useLayout } from './contexts/LayoutContext';
-import { ChatInputProvider, useChatInput } from './contexts/ChatInputContext';
+import { ChatInputProvider } from './contexts/ChatInputContext';
 
 function AppWrapper() {
   const { layoutState, toggleLeftPanel, toggleRightPanel } = useLayout();
-  const { sendMessage, isSending, disabled } = useChatInput();
 
   const headerContent = (
     <HeaderNavigationBar
@@ -32,9 +31,6 @@ function AppWrapper() {
       <main className="flex-grow overflow-hidden transition-all duration-300 ease-in-out flex flex-col">
         <ThreeContainerLayout 
           header={headerContent}
-          onChatSendMessage={sendMessage}
-          chatInputDisabled={disabled}
-          chatInputSending={isSending}
         >
           <Routes>
             <Route path="/" element={<HomePage />} />

@@ -34,7 +34,7 @@ const HeaderNavigationBar: React.FC<HeaderNavigationBarProps> = (props) => {
       (item.key === 'rightPanel' && props.rightPanelVisible);
     
     const className = `px-1 rounded-lg border-2 border-app-bg hover:bg-app-bg/60 focus:outline-none focus:text-app-primary ${
-      isActive || isToggleActive ? 'text-app-text' : 'text-app-text-secondary'
+      isActive || isToggleActive ? 'text-app-primary' : 'text-app-text-secondary'
     }`;
 
     if (item.type === 'button') {

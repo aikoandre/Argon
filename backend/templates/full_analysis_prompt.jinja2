@@ -1,4 +1,4 @@
-You are analyzing a single conversation turn to extract key information.
+You are analyzing a single conversation turn to extract key information for dynamic memory management.
 
 {% if user_prompt_instructions.analysis_instructions %}
 CUSTOM USER INSTRUCTIONS: {{ user_prompt_instructions.analysis_instructions }}
@@ -31,6 +31,18 @@ CRITICAL JSON OUTPUT REQUIREMENTS:
 
 Required JSON structure:
 {
+  "updates": [
+    {
+      "entity_description": "Short description of the entity being updated (not an ID)",
+      "update_summary": "Summary of the new event or change to incorporate into the session note"
+    }
+  ],
+  "creations": [
+    {
+      "entity_type": "Type of entity to create (e.g. 'Character', 'Location', 'Object', 'Event', 'Concept')",
+      "creation_summary": "Summary of the new entity, including name, description, and any relevant details"
+    }
+  ],
   "new_facts_established": [
     {"text": "concrete fact from interaction", "relevance_score": 0.8}
   ],
@@ -42,13 +54,6 @@ Required JSON structure:
       "reason_summary": "helpful response"
     }
   ],
-  "session_lore_updates": [
-    {
-      "base_lore_entry_id": "lore_id",
-      "field_to_update": "description",
-      "new_content_segment": "updated information"
-    }
-  ],
   "user_persona_session_updates": [
     {
       "attribute": "the attribute being updated (e.g. 'mood', 'role', 'relationship_status')",
@@ -56,7 +61,6 @@ Required JSON structure:
       "text": "short natural language summary of the update",
       "relevance_score": 0.0-1.0
     }
-    // If there are no updates, return an empty list: []
   ],
   "triggered_event_ids_candidates": ["event_id"],
   "session_cache_updates": [
@@ -73,7 +77,9 @@ Required JSON structure:
   ]
 }
 
-For 'user_persona_session_updates', always return a list of objects. Each object MUST include all four fields: 'attribute', 'new_value', 'text', and 'relevance_score'. If there are no updates, return an empty list for this field.
+- For 'updates', always describe the entity by content, not by ID. The system will match descriptions to existing LoreEntries.
+- For 'creations', provide a detailed summary for the new entity.
+- For 'user_persona_session_updates', always return a list of objects. Each object MUST include all four fields: 'attribute', 'new_value', 'text', and 'relevance_score'. If there are no updates, return an empty list for this field.
 
 Focus ONLY on concrete, extractable information. Keep it simple and factual.
 Output ONLY the JSON object above, nothing else.

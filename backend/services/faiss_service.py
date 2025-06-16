@@ -46,7 +46,23 @@ class FAISSIndex:
         self.extracted_knowledge_id_to_faiss_id: Dict[str, int] = {} # Maps extracted_knowledge_id (str) to FAISS internal ID (int)
         self.faiss_id_to_type_and_id: Dict[int, tuple] = {}  # Maps FAISS internal ID (int) to (type, id)
         self.lock = threading.Lock() # For thread-safe access to the index and maps
+        self.composite_doc_cache: Dict[str, str] = {}  # lore_entry_id -> composite doc
         self._load_index()
+
+    def cache_composite_document(self, lore_entry_id: str, composite_doc: str):
+        """Cache the composite document for a lore entry."""
+        self.composite_doc_cache[lore_entry_id] = composite_doc
+
+    def get_composite_document(self, lore_entry_id: str) -> Optional[str]:
+        """Retrieve the cached composite document for a lore entry, if available."""
+        return self.composite_doc_cache.get(lore_entry_id)
+
+    def retrieve_rag_context(self, lore_entry_id: str) -> Optional[str]:
+        """
+        Retrieve the composite document for RAG, prioritizing SessionNote content.
+        Returns the cached composite doc if available, else None.
+        """
+        return self.get_composite_document(lore_entry_id)
 
     def _load_index(self):
         """Loads the FAISS index and ID map from disk if they exist."""

@@ -205,7 +205,7 @@ const ScenariosPageContext: React.FC = () => {
         <div>
           <button
             onClick={() => importFileInputRef.current?.click()}
-            className="bg-app-text-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md mr-2"
+            className="bg-app-text text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md mr-2"
           >
             Import
           </button>
@@ -216,7 +216,7 @@ const ScenariosPageContext: React.FC = () => {
               description: 'Enter description...',
               instructions: 'Enter instructions...'
             } as ScenarioCardData)}
-            className="bg-app-text-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
+            className="bg-app-text text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
           >
             New +
           </button>

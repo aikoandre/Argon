@@ -19,6 +19,8 @@ from backend.services.faiss_service import get_faiss_index
 from backend.services.rerank_service import get_auxiliary_rerank_service, get_principal_rerank_service
 from backend.schemas.event import FixedEventData
 from backend.background_tasks import run_full_interaction_analysis
+from backend.services.synchronous_memory_service import SynchronousMemoryService
+from backend.services.composite_document_service import CompositeDocumentService
 
 from backend.services.query_transformation_service import QueryTransformationService
 from backend.services.litellm_service import litellm_service # Import LiteLLM service
@@ -46,10 +48,9 @@ jinja_env = Environment(
 from backend.models.chat_session import ChatSession
 from backend.models.chat_message import ChatMessage
 from backend.models.user_settings import UserSettings
-from backend.models.session_cache_fact import SessionCacheFact
+# Removed SessionCacheFact and SessionLoreModification - replaced by SessionNote system
 from backend.services.event_manager_service import EventManagerService
 from backend.models.session_relationship import SessionRelationship
-from backend.models.session_lore_modification import SessionLoreModification
 from backend.models.user_persona import UserPersona
 from backend.models.character_card import CharacterCard
 from backend.models.scenario_card import ScenarioCard
@@ -70,6 +71,7 @@ faiss_index = get_faiss_index()
 # mistral_client removed - now using LiteLLM service for embeddings
 auxiliary_rerank_service = get_auxiliary_rerank_service()
 principal_rerank_service = get_principal_rerank_service()
+composite_document_service = CompositeDocumentService()
 
 # Helper function for RAG
 def get_text_to_embed_from_lore_entry(lore_entry: LoreEntryModel) -> str:
@@ -474,8 +476,10 @@ User ({{user_persona_details.name}}): {{user_input}}
     main_llm_context["user_persona_details"] = user_persona
     user_persona_name = user_persona.name if user_persona else "User"
     user_persona_description = user_persona.description if user_persona else "A generic user."
-    session_cache_facts = db.query(SessionCacheFact).filter(SessionCacheFact.chat_session_id == chat_id).all()
-    current_panel_data = {fact.key: fact.value for fact in session_cache_facts}
+    
+    # TODO: Replace with SessionNote system - temporary placeholder
+    current_panel_data = {}  # Empty panel data until SessionNote system implemented
+    
     db_user_message = ChatMessage(
         chat_session_id=chat_id,
         sender_type="USER",
@@ -531,7 +535,7 @@ User ({{user_persona_details.name}}): {{user_input}}
     reranker_query_parts.append(optimized_query_text)
     query_text_for_reranker = " ".join(reranker_query_parts)
     logger.info(f"Reranker query text (user only): {query_text_for_reranker}")
-    # --- RAG Pipeline ---
+    # --- RAG Pipeline with Composite Documents (Phase 4) ---
     retrieved_lore_entries_context = ""
     reranked_lore_entries = []
     try:
@@ -550,68 +554,73 @@ User ({{user_persona_details.name}}): {{user_input}}
                 similar_lore_entry_ids_with_distances = faiss_index.search_similar(query_embedding_vector, k=top_n_faiss_candidates)
                 if similar_lore_entry_ids_with_distances:
                     lore_entry_ids = [id for id, _ in similar_lore_entry_ids_with_distances]
-                    candidate_lore_entries = db.query(LoreEntryModel).filter(LoreEntryModel.id.in_(lore_entry_ids)).all()
-                    candidate_lore_entries_map = {str(le.id): le for le in candidate_lore_entries}
-                    session_mods = db.query(SessionLoreModification).filter(SessionLoreModification.chat_session_id == chat_id).all()
-                    mod_map = {}
-                    for mod in session_mods:
-                        if mod.base_lore_entry_id not in mod_map:
-                            mod_map[mod.base_lore_entry_id] = {}
-                        mod_map[mod.base_lore_entry_id][mod.field_to_update] = mod.new_content_segment
-                    ordered_candidate_texts_for_reranking = []
-                    ordered_lore_entries_for_reranking = []
+                    
+                    # Phase 4: Create composite documents with SessionNote priority
+                    logger.info(f"Creating composite documents for {len(lore_entry_ids)} entities with SessionNote integration")
+                    composite_docs = []
+                    
                     for le_id, _ in similar_lore_entry_ids_with_distances:
-                        if str(le_id) in candidate_lore_entries_map:
-                            lore_entry = candidate_lore_entries_map[str(le_id)]
-                            if str(le_id) in mod_map:
-                                for field, new_val in mod_map[str(le_id)].items():
-                                    setattr(lore_entry, field, new_val)
-                            ordered_lore_entries_for_reranking.append(lore_entry)
-                            ordered_candidate_texts_for_reranking.append(get_text_to_embed_from_lore_entry(lore_entry))
-                    if ordered_candidate_texts_for_reranking:
-                        logger.info(f"Calling Auxiliary Reranker with {len(ordered_candidate_texts_for_reranking)} documents for chat_id: {chat_id}")
-                        auxiliary_reranked_results = auxiliary_rerank_service.rerank(
-                            query_text_for_reranker, ordered_candidate_texts_for_reranking, top_n=20
+                        composite_doc = await composite_document_service.create_composite_document(
+                            db=db,
+                            lore_entry_id=str(le_id),
+                            session_id=chat_id
                         )
-                        auxiliary_reranked_lore_entries = []
-                        text_to_lore_entry_map = {get_text_to_embed_from_lore_entry(le): le for le in ordered_lore_entries_for_reranking}
+                        if composite_doc:
+                            composite_docs.append(composite_doc)
+                    
+                    if composite_docs:
+                        # Extract texts from composite documents for reranking
+                        composite_texts_for_reranking = [doc.composite_text for doc in composite_docs]
+                        
+                        logger.info(f"Calling Auxiliary Reranker with {len(composite_texts_for_reranking)} composite documents for chat_id: {chat_id}")
+                        auxiliary_reranked_results = auxiliary_rerank_service.rerank(
+                            query_text_for_reranker, composite_texts_for_reranking, top_n=20
+                        )
+                        
+                        # Map reranked texts back to composite documents
+                        auxiliary_reranked_composite_docs = []
+                        text_to_composite_doc_map = {doc.composite_text: doc for doc in composite_docs}
                         for text, score in auxiliary_reranked_results:
-                            if text in text_to_lore_entry_map:
-                                auxiliary_reranked_lore_entries.append(text_to_lore_entry_map[text])
-                        texts_for_principal_reranker = [
-                            get_text_to_embed_from_lore_entry(le) for le in auxiliary_reranked_lore_entries
-                        ]
+                            if text in text_to_composite_doc_map:
+                                auxiliary_reranked_composite_docs.append(text_to_composite_doc_map[text])
+                        
+                        # Second stage reranking with principal reranker
+                        texts_for_principal_reranker = [doc.composite_text for doc in auxiliary_reranked_composite_docs]
                         if texts_for_principal_reranker:
-                            logger.info(f"Calling Principal Reranker with {len(texts_for_principal_reranker)} documents for chat_id: {chat_id}")
+                            logger.info(f"Calling Principal Reranker with {len(texts_for_principal_reranker)} composite documents for chat_id: {chat_id}")
                             principal_reranked_results = principal_rerank_service.rerank(
                                 query_text_for_reranker, texts_for_principal_reranker
                             )
-                            final_reranked_lore_entries = []
-                            subset_text_to_lore_entry_map = {
-                                get_text_to_embed_from_lore_entry(le): le
-                                for le in auxiliary_reranked_lore_entries
-                            }
+                            
+                            # Get final ranked composite documents
+                            final_reranked_composite_docs = []
+                            subset_text_to_composite_doc_map = {doc.composite_text: doc for doc in auxiliary_reranked_composite_docs}
                             for text, score in principal_reranked_results:
-                                if text in subset_text_to_lore_entry_map:
-                                    final_reranked_lore_entries.append(subset_text_to_lore_entry_map[text])
-                            reranked_lore_entries = final_reranked_lore_entries[:db_user_settings.get("max_lore_entries_for_rag", 5)]
-                            if reranked_lore_entries:
-                                retrieved_lore_entries_context = "\n\nRelevant Lore Entries:\n"
-                                for i, le in enumerate(reranked_lore_entries):
-                                    retrieved_lore_entries_context += f"- Name: {le.name}\n  Description: {le.description or 'N/A'}\n"
-                                    if le.tags:
-                                        retrieved_lore_entries_context += f"  Tags: {', '.join(le.tags)}\n"
-                                    if le.aliases:
-                                        retrieved_lore_entries_context += f"  Aliases: {', '.join(le.aliases)}\n"
-                                    if i < len(reranked_lore_entries) - 1:
-                                        retrieved_lore_entries_context += "---\n"
-                                logger.info(f"Successfully retrieved and reranked {len(reranked_lore_entries)} lore entries using two-stage rereranking.")
+                                if text in subset_text_to_composite_doc_map:
+                                    final_reranked_composite_docs.append(subset_text_to_composite_doc_map[text])
+                            
+                            # Limit to max entries and generate context
+                            max_entries = db_user_settings.get("max_lore_entries_for_rag", 5)
+                            final_composite_docs = final_reranked_composite_docs[:max_entries]
+                            
+                            if final_composite_docs:
+                                # Use CompositeDocumentService to generate optimized RAG context
+                                retrieved_lore_entries_context = composite_document_service.get_rag_context_from_composite_docs(
+                                    final_composite_docs, 
+                                    max_context_length=8000
+                                )
+                                
+                                # Extract LoreEntries for legacy compatibility
+                                reranked_lore_entries = [doc.lore_entry for doc in final_composite_docs]
+                                
+                                logger.info(f"Successfully retrieved {len(final_composite_docs)} composite documents with SessionNote integration.")
+                                logger.info(f"Context generated: {len(retrieved_lore_entries_context)} characters")
                             else:
-                                logger.info("No lore entries selected after principal reranking.")
+                                logger.info("No composite documents selected after principal reranking.")
                         else:
-                            logger.info("No candidate lore entries passed to principal reranker after auxiliary reranking.")
+                            logger.info("No composite documents passed to principal reranker after auxiliary reranking.")
                     else:
-                        logger.info("No candidate lore entries found after FAISS search for auxiliary reranking.")
+                        logger.info("No composite documents created from FAISS search results.")
                 else:
                     logger.info("No similar lore entries found in FAISS for the query.")
             else:
@@ -727,57 +736,47 @@ Respond helpfully to their OOC request without staying in character."""
     db.commit()
     db.refresh(db_ai_message)
 
-    # Trigger full analysis synchronously (blocking response until analysis is complete)
+    # Trigger synchronous memory processing (blocks response until complete)
     try:
-        logger.info(f"[LLM-DEBUG] Triggering full interaction analysis for chat_id: {chat_id} with user_message: {user_message_input.content[:100]}... ai_response: {ai_response_content[:100]}...")
-        if hasattr(user_persona, "name") and hasattr(user_persona, "description"):
-            user_persona_data = {
-                "name": user_persona.name,
-                "description": user_persona.description,
-                "image_url": getattr(user_persona, "image_url", None)
-            }
-        else:
-            user_persona_data = {
-                "name": "User",
-                "description": "A generic user",
-                "image_url": None
-            }
-        last_9_messages = []
-        if len(messages_for_llm_context) > 0:
-            for msg in messages_for_llm_context[-9:-1]:
-                last_9_messages.append({
-                    "sender_type": msg.sender_type,
-                    "content": msg.content,
-                    "active_persona_name": getattr(msg, "active_persona_name", None)
-                })
-            user_msg = messages_for_llm_context[-1]
-            last_9_messages.append({
-                "sender_type": user_msg.sender_type,
-                "content": user_msg.content,
-                "active_persona_name": getattr(user_msg, "active_persona_name", None)
-            })
+        logger.info(f"[SynchronousMemory] Starting memory processing for chat_id: {chat_id}")
         
-        # Call the synchronous full analysis function
-        await run_full_interaction_analysis(
-            db=db, # Pass the current DB session
-            chat_id=str(chat_id),
-            user_message=user_message_input.content,
-            ai_response=ai_response_content,
-            rag_results=[{"text": get_text_to_embed_from_lore_entry(entry)} for entry in reranked_lore_entries], # Pass processed lore entries
-            ai_plan=None, # Removed ai_plan
-            ai_persona_card_data={
-                "id": str(ai_persona_card.id),
-                "name": ai_persona_card.name,
-                "description": ai_persona_card.description,
-                "instructions": getattr(ai_persona_card, 'instructions', None)
-            },
-            user_persona_data=user_persona_data,
-            analysis_llm_api_key=db_user_settings.get("analysis_llm_api_key", None), # Use analysis_llm_api_key
-            analysis_llm_model=db_user_settings.get("analysis_llm_model", "") # Use analysis_llm_model
+        # Initialize synchronous memory service
+        memory_service = SynchronousMemoryService()
+        
+        # Get turn number (count of messages in session)
+        turn_number = db.query(ChatMessage).filter(ChatMessage.chat_session_id == chat_id).count()
+        
+        # Prepare turn context for analysis
+        turn_context = {
+            "user_message": user_message_input.content,
+            "ai_response": ai_response_content,
+            "rag_context": "\n".join([get_text_to_embed_from_lore_entry(entry) for entry in reranked_lore_entries]),
+            "chat_history": [
+                {"sender": msg.sender_type, "content": msg.content}
+                for msg in messages_for_llm_context[-5:]  # Last 5 messages for context
+            ]
+        }
+        
+        # Process memory updates synchronously
+        memory_result = await memory_service.process_turn_memory_updates(
+            db=db,
+            session_id=str(chat_id),
+            turn_number=turn_number,
+            turn_context=turn_context,
+            user_settings=db_user_settings,
+            master_world_id=str(db_chat_session.master_world_id),
+            reasoning_mode=user_message_input.reasoning_mode,
+            reasoning_effort=user_message_input.reasoning_effort
         )
-        logger.info(f"Full interaction analysis completed synchronously for chat_id: {chat_id}")
+        
+        if memory_result.success:
+            logger.info(f"[SynchronousMemory] Completed {memory_result.successful_operations}/{memory_result.total_operations} operations for chat_id: {chat_id}")
+        else:
+            logger.error(f"[SynchronousMemory] Failed: {memory_result.error_message}")
+        
     except Exception as e:
-        logger.error(f"Failed to complete synchronous interaction analysis: {str(e)}")
+        logger.error(f"[SynchronousMemory][ERROR] Failed to complete memory processing: {str(e)}")
+        # Continue with response even if memory processing fails
     
     persona_info = {
         "active_persona_name": persona_name,

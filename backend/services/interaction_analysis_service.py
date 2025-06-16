@@ -97,10 +97,11 @@ CRITICAL REQUIREMENTS:
             ]
             
             expected_keys = [
-                "new_facts_established", "relationship_changes", "session_lore_updates",
-                "user_persona_session_updates", "triggered_event_ids_candidates"
+                "updates", "creations",
+                "new_facts_established", "relationship_changes", "user_persona_session_updates",
+                "triggered_event_ids_candidates"
             ]
-            
+
             # Use LiteLLM service for completion
             response = await self.litellm_service.get_completion(
                 provider=analysis_provider,
@@ -111,7 +112,7 @@ CRITICAL REQUIREMENTS:
                 max_tokens=1024,
                 response_format={"type": "json_object"} if analysis_provider in ["openrouter", "openai"] else None
             )
-            
+
             # Extract content from response
             if 'choices' in response and response['choices']:
                 content = response['choices'][0]['message']['content']
@@ -123,12 +124,14 @@ CRITICAL REQUIREMENTS:
             else:
                 result = None
 
-            # Handle the response
-            if isinstance(result, dict) and all(key in result for key in expected_keys):
+            # Accept result if it has at least updates/creations or legacy keys
+            if isinstance(result, dict) and (
+                ("updates" in result and "creations" in result) or
+                all(key in result for key in expected_keys if key not in ["updates", "creations"])
+            ):
                 logger.info("Full analysis successful")
-                # Validate the response has expected structure
-                analysis_result = InteractionAnalysisResult.model_validate(result)
-                return analysis_result.dict()
+                # Pass through all keys, even if not in legacy schema
+                return result
             else:
                 logger.warning("Full analysis failed, using fallback")
                 return self._get_full_analysis_fallback()

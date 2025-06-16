@@ -283,7 +283,7 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
             onChange={e => onChange('master_world_id', e.target.value || null)}
             disabled={disabled || loadingMasterWorlds}
           >
-            <option value="">Empty</option>
+            <option value="">Choose One</option>
             {masterWorlds.map(world => (
               <option key={world.id} value={world.id}>
                 {world.name}
@@ -310,7 +310,6 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
             onChange={e => onChange('description', e.target.value)}
             disabled={disabled}
             rows={6}
-            placeholder="Enter character description... (Use {{char}} and {{user}} as placeholders)"
           />
         </div>
         

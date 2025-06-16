@@ -38,10 +38,117 @@ class SessionStateUpdateService:
         from backend.models.user_settings import UserSettings as UserSettingsModel
         user_settings = db.query(UserSettingsModel).first()
         mistral_api_key = user_settings.mistral_api_key if user_settings else None
-        
+
         if not mistral_api_key:
             logger.warning("Mistral API key not found. Embedding operations will be skipped.")
-        
+
+        # --- Phase 3: Synchronous Memory Pipeline with LLM Integration ---
+        from backend.services.session_note_service import SessionNoteService
+        session_note_service = SessionNoteService()
+        from backend.models.lore_entry import LoreEntry
+        from backend.models.chat_session import ChatSession
+        from backend.services.unified_llm_service import get_llm_service
+        unified_llm_service = get_llm_service()
+
+        # 0. Handle SessionNote updates (entity matching by description)
+        updates = getattr(analysis_result, "updates", None)
+        if updates:
+            chat_session = db.query(ChatSession).filter(ChatSession.id == str(chat_session_id)).first()
+            for upd in updates:
+                entity_desc = getattr(upd, "entity_description", None)
+                update_summary = getattr(upd, "update_summary", None)
+                if not entity_desc or not update_summary:
+                    continue
+                # Naive entity matching: try exact name match, fallback to first similar
+                lore_entry = db.query(LoreEntry).filter(LoreEntry.title.ilike(f"%{entity_desc}%")).first()
+                if not lore_entry:
+                    # TODO: Replace with semantic similarity search
+                    lore_entry = db.query(LoreEntry).first()
+                if not lore_entry:
+                    logger.warning(f"No LoreEntry found for update entity description: {entity_desc}")
+                    continue
+                # Find or create SessionNote for this LoreEntry and session
+                from backend.schemas.session_note import SessionNoteCreate, SessionNoteUpdate
+                existing_note = db.query(SessionNote).filter(
+                    SessionNote.session_id == str(chat_session_id),
+                    SessionNote.lore_entry_id == lore_entry.id
+                ).first()
+                # Get base lore content and current note
+                base_lore = lore_entry.description or ""
+                current_note = existing_note.note_content if existing_note else ""
+                # Use LLM to rewrite SessionNote
+                llm_result = await unified_llm_service.update_note(
+                    entity_id=str(lore_entry.id),
+                    current_content=current_note,
+                    update_summary=update_summary,
+                    context=base_lore
+                )
+                new_note_content = llm_result.get("content", update_summary).strip() if llm_result.get("success") else update_summary
+                if existing_note:
+                    update_data = SessionNoteUpdate(
+                        note_content=new_note_content
+                    )
+                    session_note_service.update_session_note(
+                        db, existing_note.id, update_data
+                    )
+                    note_id = existing_note.id
+                else:
+                    note_data = SessionNoteCreate(
+                        session_id=str(chat_session_id),
+                        lore_entry_id=lore_entry.id,
+                        note_content=new_note_content
+                    )
+                    result = session_note_service.create_session_note(db, note_data)
+                    note_id = result.session_note_id if result.success else None
+                # Composite document generation and embedding
+                if note_id and lore_entry.description and mistral_api_key:
+                    composite_doc = f"[Base Lore]\n{lore_entry.description}\n\n[Session Notes]\n{new_note_content}"
+                    embedding = await self.embedding_service.create_embedding(composite_doc, mistral_api_key)
+                    lore_entry.embedding_vector = embedding
+                    db.add(lore_entry)
+                    db.commit()
+                    db.refresh(lore_entry)
+                    await self.faiss_service.add_lore_entry_to_index(lore_entry)
+
+        # 0b. Handle SessionNote creations (new entities)
+        creations = getattr(analysis_result, "creations", None)
+        if creations:
+            chat_session = db.query(ChatSession).filter(ChatSession.id == str(chat_session_id)).first()
+            master_world_id = getattr(chat_session, 'master_world_id', None)
+            for cr in creations:
+                entity_type = getattr(cr, "entity_type", None)
+                creation_summary = getattr(cr, "creation_summary", None)
+                if not entity_type or not creation_summary or not master_world_id:
+                    continue
+                # Create new LoreEntry
+                from backend.schemas.lore_entry import LoreEntryCreate
+                lore_entry_data = {
+                    "title": creation_summary.split("named '")[-1].split("'")[0] if "named '" in creation_summary else creation_summary[:32],
+                    "description": creation_summary,
+                    "entry_type": entity_type.upper(),
+                    "master_world_id": master_world_id,
+                    "is_dynamically_generated": True
+                }
+                lore_entry = crud.create_lore_entry(db, lore_entry_data)
+                # Create initial SessionNote (empty, but can be enhanced with LLM if needed)
+                from backend.schemas.session_note import SessionNoteCreate
+                note_data = SessionNoteCreate(
+                    session_id=str(chat_session_id),
+                    lore_entry_id=lore_entry.id,
+                    note_content=""
+                )
+                result = session_note_service.create_session_note(db, note_data)
+                note_id = result.session_note_id if result.success else None
+                # Composite document generation and embedding
+                if note_id and lore_entry.description and mistral_api_key:
+                    composite_doc = f"[Base Lore]\n{lore_entry.description}\n\n[Session Notes]\n"
+                    embedding = await self.embedding_service.create_embedding(composite_doc, mistral_api_key)
+                    lore_entry.embedding_vector = embedding
+                    db.add(lore_entry)
+                    db.commit()
+                    db.refresh(lore_entry)
+                    await self.faiss_service.add_lore_entry_to_index(lore_entry)
+
         # 1. Update SessionCacheFacts
         if analysis_result.new_facts_established:
             for fact in analysis_result.new_facts_established:

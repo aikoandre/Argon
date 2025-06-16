@@ -2,6 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLocation } from 'react-router-dom';
 import { useLayout } from '../../contexts/LayoutContext';
+import { useChatInput } from '../../contexts/ChatInputContext';
 import LeftPanel from './LeftPanel.tsx';
 import CenterPanel from './CenterPanel.tsx';
 import RightPanel from './RightPanel.tsx';
@@ -10,19 +11,14 @@ import { ChatInput } from '../ChatInput';
 interface ThreeContainerLayoutProps {
   children: React.ReactNode;
   header?: React.ReactNode;
-  onChatSendMessage?: (message: string) => void;
-  chatInputDisabled?: boolean;
-  chatInputSending?: boolean;
 }
 
 const ThreeContainerLayout: React.FC<ThreeContainerLayoutProps> = ({ 
   children, 
-  header, 
-  onChatSendMessage,
-  chatInputDisabled = false,
-  chatInputSending = false
+  header
 }) => {
   const { layoutState, setLeftPanelVisible, setRightPanelVisible } = useLayout();
+  const { sendMessage, cancelMessage, isSending, isProcessingMemory, disabled } = useChatInput();
   const location = useLocation();
   
   const leftVisible = layoutState.leftPanelVisible;
@@ -158,9 +154,11 @@ const ThreeContainerLayout: React.FC<ThreeContainerLayoutProps> = ({
             {leftVisible && <div className="w-80 flex-shrink-0" />}
             <div className="flex-1 min-w-0">
               <ChatInput 
-                onSendMessage={onChatSendMessage}
-                disabled={chatInputDisabled}
-                isSending={chatInputSending}
+                onSendMessage={sendMessage}
+                onCancelMessage={cancelMessage}
+                disabled={disabled}
+                isSending={isSending}
+                isProcessingMemory={isProcessingMemory}
               />
             </div>
             {rightVisible && <div className="w-80 flex-shrink-0" />}
@@ -169,9 +167,11 @@ const ThreeContainerLayout: React.FC<ThreeContainerLayoutProps> = ({
         <div className="block lg:hidden">
           {/* Mobile: Full width */}
           <ChatInput 
-            onSendMessage={onChatSendMessage}
-            disabled={chatInputDisabled}
-            isSending={chatInputSending}
+            onSendMessage={sendMessage}
+            onCancelMessage={cancelMessage}
+            disabled={disabled}
+            isSending={isSending}
+            isProcessingMemory={isProcessingMemory}
           />
         </div>
       </div>

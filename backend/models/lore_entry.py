@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Text, JSON, ForeignKey
+from sqlalchemy import Column, String, Text, JSON, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy.sql.sqltypes import TIMESTAMP
@@ -21,3 +21,10 @@ class LoreEntry(Base):
     event_data = Column(JSON, nullable=True) # New column for fixed event data
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), onupdate=func.now())
+    
+    # New fields for dynamic entity creation
+    is_dynamically_generated = Column(Boolean, nullable=False, default=False, index=True)
+    created_in_session_id = Column(String, ForeignKey('chat_sessions.id'), nullable=True)
+    
+    # Relationships  
+    session_notes = relationship("SessionNote", back_populates="lore_entry", cascade="all, delete-orphan")

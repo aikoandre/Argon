@@ -7,6 +7,7 @@ import {
   updateUserSettings,
   getAllMasterWorlds,
   updateUserPersona,
+  createUserPersona,
   type UserPersonaData,
   type MasterWorldData,
 } from "../services/api";
@@ -15,7 +16,6 @@ import { LeftPanelImage } from '../components/Layout';
 import { createPNGWithEmbeddedData } from '../utils/pngExport';
 import { personaToFormData } from '../utils/formDataHelpers';
 import { useLayout } from '../contexts/LayoutContext';
-import { useInstantAutoSave } from '../hooks/useInstantAutoSave';
 import PersonaEditPanel from '../components/Editing/PersonaEditPanel';
 
 const PersonasPageContext: React.FC = () => {
@@ -84,31 +84,58 @@ const PersonasPageContext: React.FC = () => {
     setRightPanelVisible(true);
   }, [setLeftPanelVisible, setRightPanelVisible]);
 
-  // Auto-save functionality - only for existing personas
-  useInstantAutoSave(
-    editingPersona || {} as UserPersonaData,
-    async (data: UserPersonaData) => {
-      if (data && data.id) {
-        const formData = personaToFormData(data);
-        await updateUserPersona(data.id, formData);
-      }
-    },
-    { debounceMs: 300 }
-  );
+  // Right panel content - Persona editor
+  useEffect(() => {
+    if (editingPersona) {
+      updateLayoutContent(editingPersona);
+    }
+    // Don't clear the right panel when no persona is being edited
+    // Let it preserve content from other pages until a new persona is selected
+  }, [editingPersona, masterWorlds]); // Include masterWorlds in dependency array since PersonaEditPanel needs it
+
+  // Auto-save functionality - disabled since we handle saves manually in handleEditFieldChange
+  // useInstantAutoSave(
+  //   editingPersona || {} as UserPersonaData,
+  //   async (data: UserPersonaData) => {
+  //     if (data && data.id) {
+  //       const formData = personaToFormData(data);
+  //       await updateUserPersona(data.id, formData);
+  //     }
+  //   },
+  //   { debounceMs: 300 }
+  // );
 
   // Handle editing persona
   const handleEditPersona = (persona: UserPersonaData) => {
     setEditingPersona(persona);
-    updateLayoutContent(persona);
+  };
+
+  const updateLeftPanelImage = (persona: UserPersonaData) => {
+    if (persona.image_url) {
+      const cacheBuster = persona.updated_at 
+        ? `?cb=${encodeURIComponent(persona.updated_at)}`
+        : `?cb=${Date.now()}`; // Use current timestamp for new images
+      setLeftPanelContent(
+        <LeftPanelImage
+          src={`${persona.image_url}${cacheBuster}`}
+          alt={persona.name}
+        />
+      );
+    } else {
+      setLeftPanelContent(null);
+    }
   };
 
   const updateLayoutContent = (persona: UserPersonaData | null) => {
     if (persona) {
       // Left panel: show image if available
       if (persona.image_url) {
+        const cacheBuster = persona.updated_at 
+          ? `?cb=${encodeURIComponent(persona.updated_at)}`
+          : `?cb=${Date.now()}`; // Use current timestamp for new images
         setLeftPanelContent(
           <LeftPanelImage
-            src={persona.image_url}
+            src={`${persona.image_url}${cacheBuster}`}
             alt={persona.name}
           />
         );
@@ -134,11 +161,34 @@ const PersonasPageContext: React.FC = () => {
     // Let it preserve content from other pages until a new persona is selected
   };
 
-  const handleEditFieldChange = (field: string, value: any) => {
+  // Right panel content - Persona editor
+  useEffect(() => {
+    if (editingPersona) {
+      updateLayoutContent(editingPersona);
+    }
+    // Don't clear the right panel when no persona is being edited
+    // Let it preserve content from other pages until a new persona is selected
+  }, [editingPersona, masterWorlds]); // Include masterWorlds in dependency array since PersonaEditPanel needs it
+
+  const handleEditFieldChange = async (field: string, value: any) => {
     if (editingPersona) {
       const updatedPersona = { ...editingPersona, [field]: value };
       setEditingPersona(updatedPersona);
-      updateLayoutContent(updatedPersona);
+      // DON'T call updateLayoutContent here - it causes infinite re-renders
+      // The PersonaEditPanel will automatically get the updated persona prop
+      
+      // Auto-save changes for existing personas only (not new ones)
+      if (updatedPersona.id && updatedPersona.id !== 'new') {
+        try {
+          const formData = personaToFormData(updatedPersona);
+          await updateUserPersona(updatedPersona.id, formData);
+          // Update the personas list
+          setPersonas(prev => prev.map(p => p.id === updatedPersona.id ? updatedPersona : p));
+        } catch (err) {
+          console.error('Failed to save persona:', err);
+          setError('Failed to save changes.');
+        }
+      }
     }
   };
 
@@ -184,12 +234,40 @@ const PersonasPageContext: React.FC = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && editingPersona) {
-      // TODO: Handle image upload logic
-      console.log('Image change not yet implemented');
+      try {
+        setError(null);
+        
+        // Create FormData with the image and persona data
+        const formData = new FormData();
+        formData.append('image', file);
+        formData.append('name', editingPersona.name);
+        if (editingPersona.description !== null && editingPersona.description !== undefined) {
+          formData.append('description', editingPersona.description);
+        }
+        if (editingPersona.master_world_id !== null && editingPersona.master_world_id !== undefined) {
+          formData.append('master_world_id', editingPersona.master_world_id);
+        }
+        
+        // Update the persona with the new image (only for existing personas)
+        if (editingPersona.id && editingPersona.id !== 'new') {
+          const updatedPersona = await updateUserPersona(editingPersona.id, formData);
+          
+          // Update local state
+          setEditingPersona(updatedPersona);
+          updateLeftPanelImage(updatedPersona); // Only update the left panel image
+          // Update the personas list to show the new image
+          setPersonas(prev => prev.map(p => p.id === updatedPersona.id ? updatedPersona : p));
+        }
+      } catch (err) {
+        setError('Failed to upload image.');
+        console.error(err);
+      }
     }
+    // Clear the file input so the same file can be selected again
+    e.target.value = '';
   };
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -200,7 +278,30 @@ const PersonasPageContext: React.FC = () => {
     console.log('Import not yet implemented');
   };
 
-  const handleSetActivePersona = async (personaId: string) => {
+  const handleCreateNewPersona = async () => {
+    try {
+      setError(null);
+      const newPersonaData = {
+        name: 'New Persona',
+        description: 'Enter description...',
+        master_world_id: null
+      };
+      
+      const formData = personaToFormData(newPersonaData);
+      const createdPersona = await createUserPersona(formData);
+      setPersonas(prev => [...prev, createdPersona]);
+      setEditingPersona(createdPersona);
+    } catch (err: any) {
+      setError('Failed to create new persona.');
+      console.error('Full error details:', err);
+      if (err.response) {
+        console.error('Response data:', err.response.data);
+        console.error('Response status:', err.response.status);
+      }
+    }
+  };
+
+  const handleSetActivePersona = async (personaId: string | null) => {
     try {
       const currentSettings = await getUserSettings();
       await updateUserSettings({
@@ -225,17 +326,13 @@ const PersonasPageContext: React.FC = () => {
         <div>
           <button
             onClick={() => importFileInputRef.current?.click()}
-            className="bg-app-text-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md mr-2"
+            className="bg-app-text text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md mr-2"
           >
             Import
           </button>
           <button
-            onClick={() => handleEditPersona({ 
-              id: 'new', 
-              name: 'New Persona', 
-              description: 'Enter description...'
-            } as UserPersonaData)}
-            className="bg-app-text-2 text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
+            onClick={handleCreateNewPersona}
+            className="bg-app-text text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
           >
             New +
           </button>
@@ -291,42 +388,34 @@ const PersonasPageContext: React.FC = () => {
                 className="absolute inset-0"
               />
               
-              {/* Active indicator */}
-              {isActive && (
-                <div className="absolute top-2 left-2 bg-app-text text-app-bg px-2 py-1 rounded-full text-xs font-semibold">
-                  Active
-                </div>
-              )}
-              
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDelete(persona.id);
-                }}
-                className="absolute top-2 right-2 z-20 text-app-text hover:text-red-500 p-1.5 rounded-full transition-colors"
-                title="Delete Persona"
-              >
-                <span className="material-icons-outlined text-2xl">delete</span>
-              </button>
-              
               <div className="absolute bottom-0 left-0 w-full">
-                <div className="w-full bg-black/30 backdrop-blur-sm p-3 flex flex-row items-center justify-between rounded-b-lg">
-                  <div className="font-semibold text-lg text-white drop-shadow-md break-words flex-1" title={persona.name}>
-                    {persona.name}
+                <div className="w-full bg-black/30 backdrop-blur-sm p-3 flex flex-row items-start justify-between rounded-b-lg">
+                  <div className="flex flex-col gap-1 flex-1">
+                    <div className="font-semibold text-lg text-white drop-shadow-md break-words" title={persona.name}>
+                      {persona.name}
+                    </div>
+                    {persona.master_world_id && (
+                      <div className="text-sm text-white/80 drop-shadow-md break-words line-clamp-2" title={masterWorlds.find(w => w.id === persona.master_world_id)?.name || 'Unknown World'}>
+                        {masterWorlds.find(w => w.id === persona.master_world_id)?.name || 'Unknown World'}
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleSetActivePersona(persona.id);
+                      if (isActive) {
+                        handleSetActivePersona(null); // Deactivate current persona
+                      } else {
+                        handleSetActivePersona(persona.id); // Activate this persona
+                      }
                     }}
-                    className={`px-3 py-1 rounded-2xl text-sm font-semibold ml-2 transition-colors ${
+                    className={`px-3 py-1 rounded-2xl text-sm font-semibold  transition-colors flex-shrink-0 ${
                       isActive 
-                        ? 'bg-gray-500 text-white cursor-default' 
+                        ? 'bg-app-primary text-white hover:bg-app-primary/80' 
                         : 'bg-app-text text-black hover:bg-app-text/80'
                     }`}
-                    disabled={isActive}
                   >
-                    {isActive ? 'Active' : 'Set Active'}
+                    {isActive ? 'Active' : 'Activate'}
                   </button>
                 </div>
               </div>

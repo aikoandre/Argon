@@ -26,10 +26,13 @@ export const getApiHealth = async () => {
 };
 
 // --- Image Upload ---
-export const uploadImage = async (file: File) => {
+export const uploadImage = async (file: File, entityType: string = 'persona', entityName?: string) => {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await apiClient.post('/images/upload', formData, {
+  if (entityName) {
+    formData.append('entity_name', entityName);
+  }
+  const response = await apiClient.post(`/images/upload/${entityType}`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
     }
@@ -642,7 +645,8 @@ export const addMessageToSession = async (
     active_persona_name?: string | null; // New field
     active_persona_image_url?: string | null; // New field
     current_beginning_message_index?: number; // New field for beginning message navigation
-  }
+  },
+  abortSignal?: AbortSignal
 ): Promise<ChatTurnResponse> => { // Changed return type to ChatTurnResponse
   try {
     if (!messageData.content || messageData.content.trim().length === 0) {
@@ -650,7 +654,10 @@ export const addMessageToSession = async (
     }
     const response = await apiClient.post<ChatTurnResponse>( // Changed generic type to ChatTurnResponse
       `/chat/${chatId}/messages`,
-      messageData // Send the entire messageData object
+      messageData, // Send the entire messageData object
+      {
+        signal: abortSignal // Add abort signal support
+      }
     );
     return response.data;
   } catch (error) {

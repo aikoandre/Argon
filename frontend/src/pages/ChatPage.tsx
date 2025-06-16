@@ -56,7 +56,7 @@ const ArrowBackIcon = ({ className, onClick, disabled }: {
   disabled?: boolean 
 }) => (
   <MaterialIcon 
-    icon="arrow_back_ios" 
+    icon="arrow_back_outlined" 
     className={className} 
     onClick={onClick} 
     disabled={disabled} 
@@ -69,7 +69,7 @@ const ArrowForwardIcon = ({ className, onClick, disabled }: {
   disabled?: boolean 
 }) => (
   <MaterialIcon 
-    icon="arrow_forward_ios" 
+    icon="arrow_forward_outlined" 
     className={className} 
     onClick={onClick} 
     disabled={disabled} 
@@ -99,7 +99,13 @@ const getImageUrl = (imageUrl: string | null) => {
 
 const ChatPage = () => {
   const { chatId } = useParams<{ chatId: string }>();
-  const { setSendMessageHandler, setIsSending, setDisabled } = useChatInput();
+  const { 
+    setSendMessageHandler, 
+    setCancelMessageHandler,
+    setIsSending, 
+    setIsProcessingMemory,
+    setDisabled 
+  } = useChatInput();
   const { setLeftPanelVisible, setRightPanelVisible, setLeftPanelContent, setRightPanelContent } = useLayout();
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [sessionDetails, setSessionDetails] = useState<ChatSessionData | null>(
@@ -115,6 +121,7 @@ const ChatPage = () => {
   const [activePersonaName, setActivePersonaName] = useState<string>("User");
   const [activePersonaImageUrl, setActivePersonaImageUrl] = useState<string | null>(null);
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // State for cached card data and editing
   const [cachedCharacter, setCachedCharacter] = useState<any>(null);
@@ -532,10 +539,34 @@ const ChatPage = () => {
     setIsSending(isSending);
   }, [isSending, setIsSending]);
 
+  // Set up message handlers
+  useEffect(() => {
+    setSendMessageHandler((message: string) => {
+      const fakeEvent = { preventDefault: () => {} } as FormEvent;
+      setNewMessage(message);
+      handleSendMessage(fakeEvent, undefined, message);
+    });
+
+    setCancelMessageHandler(() => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+        setIsSendingLocal(false);
+        setIsProcessingMemory(false);
+        // Remove any temporary user message that was added
+        setMessages(prev => prev.filter(msg => !msg.id.startsWith('temp-')));
+      }
+    });
+  }, [setSendMessageHandler, setCancelMessageHandler, setIsProcessingMemory]);
+
   const handleSendMessage = async (e: FormEvent, regenerateMessageId?: string, messageContent?: string) => {
     e.preventDefault();
     let userMessageContent = messageContent || newMessage.trim();
     if (!userMessageContent && !regenerateMessageId) return;
+
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
+    const tempMessageId = `temp-${Date.now()}`;
 
     setIsSendingLocal(true);
     setError(null);
@@ -561,7 +592,6 @@ const ChatPage = () => {
       }
     }
 
-    const tempMessageId = `temp-${Date.now()}`;
     if (!regenerateMessageId) {
       // Only add a new user message if it's not a regeneration
       // Garantir timestamp crescente
@@ -589,7 +619,7 @@ const ChatPage = () => {
     setNewMessage("");
 
     try {
-      // Use addMessageToSession instead of streaming
+      // Phase 1: Generate AI response
       const aiResponse = await addMessageToSession(
         chatId!,
         {
@@ -600,8 +630,25 @@ const ChatPage = () => {
           active_persona_name: activePersonaName,
           active_persona_image_url: activePersonaImageUrl,
           current_beginning_message_index: messages.length === 1 && messages[0].is_beginning_message ? currentBeginningMessageIndex : undefined,
-        }
+        },
+        abortControllerRef.current?.signal
       );
+
+      // Phase 2: Switch to memory processing state (session notes)
+      setIsSendingLocal(false);
+      setIsProcessingMemory(true);
+
+      // TODO: Implement session notes processing when backend is ready
+      // This is where the synchronous memory pipeline from the plan would be called
+      // For now, we'll simulate the processing time
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Check if request was cancelled during memory processing
+      if (abortControllerRef.current?.signal.aborted) {
+        throw new Error('Request was cancelled');
+      }
+
+      // Memory processing complete - add the AI message
       // --- Patch: Ensure card name/image are cached and available for AI messages ---
       if (sessionDetails && sessionDetails.card_type && typeof sessionDetails.card_id === 'string') {
         const cardId = sessionDetails.card_id;
@@ -641,11 +688,23 @@ const ChatPage = () => {
           ...aiResponse.ai_message,
         },
       ]);
-    } catch (err) {
-      setError("Failed to get AI response.");
-      console.error(err);
+    } catch (err: any) {
+      // Handle cancellation gracefully
+      if (err.name === 'AbortError' || err.message === 'Request was cancelled') {
+        console.log('Message sending was cancelled');
+        // Remove temporary user message if it was added
+        if (!regenerateMessageId) {
+          setMessages(prev => prev.filter(msg => msg.id !== tempMessageId));
+        }
+        setNewMessage(userMessageContent); // Restore the message content
+      } else {
+        setError("Failed to get AI response.");
+        console.error(err);
+      }
     } finally {
       setIsSendingLocal(false);
+      setIsProcessingMemory(false);
+      abortControllerRef.current = null;
     }
   };
 
