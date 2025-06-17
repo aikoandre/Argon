@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Select, { type SingleValue } from 'react-select';
 import {
   getAllLoreEntriesForMasterWorld,
-  getAllLoreEntries,
   createLoreEntryForMasterWorld,
   deleteLoreEntry,
   getAllMasterWorlds,
@@ -103,7 +102,7 @@ const MasterWorldPageContext: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      let entriesData: LoreEntryData[];
+      let entriesData: LoreEntryData[] = [];
       let factionsForWorld: LoreEntryData[] = [];
 
       if (selectedMasterWorld?.value) {
@@ -111,14 +110,8 @@ const MasterWorldPageContext: React.FC = () => {
           getAllLoreEntriesForMasterWorld(selectedMasterWorld.value),
           getAllLoreEntriesForMasterWorld(selectedMasterWorld.value, "FACTION")
         ]);
-      } else {
-        entriesData = await getAllLoreEntries();
-        if (masterWorlds.length > 0) {
-          const allFactionsPromises = masterWorlds.map(mw => getAllLoreEntriesForMasterWorld(mw.id, "FACTION"));
-          const allFactionsArrays = await Promise.all(allFactionsPromises);
-          factionsForWorld = allFactionsArrays.flat();
-        }
       }
+      // If no master world is selected, don't load any entries
       
       setLoreEntries(entriesData);
       setFactionsOptions(factionsForWorld.map(f => ({ value: f.id, label: f.name })));
@@ -215,24 +208,7 @@ const MasterWorldPageContext: React.FC = () => {
     // Let it preserve content from other pages until a new lore entry is selected
   };
 
-  const handleEditFieldChange = (field: string, value: any) => {
-    if (editingEntry) {
-      const updatedEntry = { ...editingEntry, [field]: value };
-      setEditingEntry(updatedEntry);
-      
-      // Update the entry in the lore entries list so the card updates in real-time
-      setLoreEntries(prev => prev.map(entry => 
-        entry.id === editingEntry.id ? updatedEntry : entry
-      ));
-      
-      // If this is a new entry and we have enough data, save it
-      if (updatedEntry.id === 'new' && updatedEntry.name && updatedEntry.name !== 'New Lore Entry' && updatedEntry.master_world_id) {
-        handleSaveNewEntry(updatedEntry);
-      }
-    }
-  };
-
-  const handleSaveNewEntry = async (entryData: LoreEntryData) => {
+  const handleSaveNewEntry = useCallback(async (entryData: LoreEntryData) => {
     try {
       const { id, created_at, updated_at, ...createData } = entryData;
       const createdEntry = await createLoreEntryForMasterWorld(entryData.master_world_id, createData);
@@ -258,7 +234,24 @@ const MasterWorldPageContext: React.FC = () => {
       setLeftPanelContent(null);
       setRightPanelContent(null);
     }
-  };
+  }, [setLeftPanelContent, setRightPanelContent]);
+
+  const handleEditFieldChange = useCallback((field: string, value: any) => {
+    if (editingEntry) {
+      const updatedEntry = { ...editingEntry, [field]: value };
+      setEditingEntry(updatedEntry);
+      
+      // Update the entry in the lore entries list so the card updates in real-time
+      setLoreEntries(prev => prev.map(entry => 
+        entry.id === editingEntry.id ? updatedEntry : entry
+      ));
+      
+      // If this is a new entry and we have enough data, save it
+      if (updatedEntry.id === 'new' && updatedEntry.name && updatedEntry.name !== 'New Lore Entry' && updatedEntry.master_world_id) {
+        handleSaveNewEntry(updatedEntry);
+      }
+    }
+  }, [editingEntry, handleSaveNewEntry]);
 
   const handleDelete = async (entryId: string) => {
     // Handle deleting a new entry that hasn't been saved yet
@@ -273,15 +266,17 @@ const MasterWorldPageContext: React.FC = () => {
       return;
     }
     
-    if (!selectedMasterWorld?.value) {
-      setError("Please select a Master World to delete from.");
+    // Find the entry to get its master_world_id
+    const entryToDelete = loreEntries.find(entry => entry.id === entryId);
+    if (!entryToDelete?.master_world_id) {
+      setError("Cannot delete lore entry: missing master world information.");
       return;
     }
     
     if (!window.confirm('Are you sure you want to delete this lore entry?')) return;
     
     try {
-      await deleteLoreEntry(selectedMasterWorld.value, entryId);
+      await deleteLoreEntry(entryToDelete.master_world_id, entryId);
       
       // Remove from the local list
       setLoreEntries(prev => prev.filter(entry => entry.id !== entryId));
@@ -451,47 +446,57 @@ const MasterWorldPageContext: React.FC = () => {
 
       {/* Scrollable section titles and cards */}
       <div className="overflow-y-auto flex-1 min-h-0 max-h-[calc(100vh-310px)] space-y-8 pb-4 scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border hover:scrollbar-thumb-app-text">
-        {DISPLAY_ENTRY_TYPES_ORDER.map(entryType => {
-          const friendlyTypeName = getFriendlyEntryTypeName(entryType);
-          const entriesOfType = loreEntries.filter(entry => entry.entry_type === entryType);
+        {!selectedMasterWorld ? (
+          <div className="flex flex-col items-center justify-center h-full text-center py-20">
+            <span className="material-icons-outlined text-6xl text-gray-500 mb-4">public</span>
+            <h3 className="text-2xl font-semibold text-gray-400 mb-2">No Master World Selected</h3>
+            <p className="text-gray-500 max-w-md">
+              Please select a Master World from the dropdown above to view and manage its lore entries.
+            </p>
+          </div>
+        ) : (
+          DISPLAY_ENTRY_TYPES_ORDER.map(entryType => {
+            const friendlyTypeName = getFriendlyEntryTypeName(entryType);
+            const entriesOfType = loreEntries.filter(entry => entry.entry_type === entryType);
 
-          return (
-            <div key={entryType}>
-              <h3 className="text-2xl font-semibold text-app-text mb-2 border-b border-gray-700 pb-2 font-quintessential">
-                {friendlyTypeName}
-              </h3>
-              {entriesOfType.length === 0 ? (
-                <p className="text-center text-gray-500 py-4">Empty section</p>
-              ) : (
-                <div className="grid gap-6 justify-items-start p-2" style={{
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))'
-                }}>
-                  {entriesOfType.map(entry => (
-                    <div
-                      key={entry.id}
-                      className="bg-app-bg rounded-lg shadow-lg flex flex-col items-start justify-center w-full h-24 p-3 relative overflow-hidden cursor-pointer group transition-transform hover:scale-105"
-                      onClick={() => handleEditEntry(entry)}
-                    >
-                      <div className="flex flex-col items-start justify-center w-full h-full p-1">
-                        <h2 className="text-lg font-semibold text-white leading-tight mb-1 w-full text-left overflow-hidden" style={{
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          wordBreak: 'break-word'
-                        }} title={entry.name}>
-                          {entry.name}
-                        </h2>
-                        <p className="text-xs px-2 py-0.5 rounded-full font-semibold bg-app-text text-app-bg text-left truncate max-w-full mt-auto">
-                          {getFriendlyEntryTypeName(entry.entry_type)}
-                        </p>
+            return (
+              <div key={entryType}>
+                <h3 className="text-2xl font-semibold text-app-text mb-2 border-b border-gray-700 pb-2 font-quintessential">
+                  {friendlyTypeName}
+                </h3>
+                {entriesOfType.length === 0 ? (
+                  <p className="text-center text-gray-500 py-4">Empty section</p>
+                ) : (
+                  <div className="grid gap-6 justify-items-start p-2" style={{
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))'
+                  }}>
+                    {entriesOfType.map(entry => (
+                      <div
+                        key={entry.id}
+                        className="bg-app-bg rounded-lg shadow-lg flex flex-col items-start justify-center w-full h-24 p-3 relative overflow-hidden cursor-pointer group transition-transform hover:scale-105"
+                        onClick={() => handleEditEntry(entry)}
+                      >
+                        <div className="flex flex-col items-start justify-center w-full h-full p-1">
+                          <h2 className="text-lg font-semibold text-white leading-tight mb-1 w-full text-left overflow-hidden" style={{
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            wordBreak: 'break-word'
+                          }} title={entry.name}>
+                            {entry.name}
+                          </h2>
+                          <p className="text-xs px-2 py-0.5 rounded-full font-semibold bg-app-text text-app-bg text-left truncate max-w-full mt-auto">
+                            {getFriendlyEntryTypeName(entry.entry_type)}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* Create World Modal */}

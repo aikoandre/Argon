@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 
 interface FullscreenModalProps {
   isOpen: boolean;
@@ -10,7 +10,7 @@ interface FullscreenModalProps {
   onChange: (value: string) => void;
 }
 
-const FullscreenModal: React.FC<FullscreenModalProps> = ({
+const FullscreenModal: React.FC<FullscreenModalProps> = React.memo(({
   isOpen,
   title,
   value,
@@ -19,6 +19,10 @@ const FullscreenModal: React.FC<FullscreenModalProps> = ({
   onClose,
   onChange
 }) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    onChange(e.target.value);
+  }, [onChange]);
+
   if (!isOpen) return null;
 
   return (
@@ -38,7 +42,7 @@ const FullscreenModal: React.FC<FullscreenModalProps> = ({
           <textarea
             className="w-full h-full p-4 rounded bg-app-bg border-2 border-app-border focus:outline-none focus:border-app-text focus:ring-0 resize-none scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border"
             value={value}
-            onChange={e => onChange(e.target.value)}
+            onChange={handleChange}
             placeholder={placeholder}
             disabled={disabled}
           />
@@ -46,6 +50,6 @@ const FullscreenModal: React.FC<FullscreenModalProps> = ({
       </div>
     </div>
   );
-};
+});
 
 export default FullscreenModal;

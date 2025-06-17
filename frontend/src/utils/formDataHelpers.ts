@@ -37,8 +37,17 @@ export const scenarioToFormData = (scenario: any): FormData => {
 export const personaToFormData = (persona: any): FormData => {
   const formData = new FormData();
   
+  // Validate required fields before creating FormData
+  const name = persona.name?.trim();
+  if (!name || name.length === 0) {
+    throw new Error('Persona name is required and cannot be empty');
+  }
+  if (name.length > 100) {
+    throw new Error('Persona name cannot exceed 100 characters');
+  }
+  
   // Send individual form fields as expected by the backend
-  formData.append('name', persona.name || '');
+  formData.append('name', name);
   if (persona.description !== null && persona.description !== undefined) {
     formData.append('description', persona.description);
   }

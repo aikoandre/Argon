@@ -31,7 +31,7 @@ What happened recently in your conversations:
 ## RELEVANT KNOWLEDGE
 What you remember that might be relevant to this situation:
 {% for lore in reranked_lore_entries %}
-- {{ get_text_to_embed_from_lore_entry(lore) }}
+- {{ lore.text }}
 {% endfor %}
 
 ## CURRENT ENVIRONMENT

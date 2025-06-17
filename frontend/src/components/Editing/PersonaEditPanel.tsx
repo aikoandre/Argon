@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { IconActionBar } from '../Layout';
 import { FullscreenModal } from '../Common';
 import PlaceholderHelp from '../PlaceholderHelp';
@@ -16,7 +16,7 @@ interface PersonaEditPanelProps {
   disabled?: boolean;
 }
 
-const PersonaEditPanel: React.FC<PersonaEditPanelProps> = ({
+const PersonaEditPanel: React.FC<PersonaEditPanelProps> = React.memo(({
   persona,
   masterWorlds,
   onChange,
@@ -27,14 +27,49 @@ const PersonaEditPanel: React.FC<PersonaEditPanelProps> = ({
   onImageChange,
   disabled
 }) => {
+  const [localPersona, setLocalPersona] = useState(persona);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const handleOpenModal = () => {
-    setIsModalOpen(true);
-  };
+  // Sync local state with prop changes (but only for different personas)
+  useEffect(() => {
+    if (persona.id !== localPersona.id) {
+      setLocalPersona(persona);
+    }
+  }, [persona.id, localPersona.id]);
 
-  const handleCloseModal = () => {
+  const handleOpenModal = useCallback(() => {
+    setIsModalOpen(true);
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
+  }, []);
+
+  const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setLocalPersona(prev => ({ ...prev, name: newValue }));
+    onChange('name', newValue);
+  }, [onChange]);
+
+  const handleDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    setLocalPersona(prev => ({ ...prev, description: newValue }));
+    onChange('description', newValue);
+  }, [onChange]);
+
+  const handleMasterWorldChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newValue = e.target.value || null;
+    setLocalPersona(prev => ({ ...prev, master_world_id: newValue }));
+    onChange('master_world_id', newValue);
+  }, [onChange]);
+
+  const handleModalDescriptionChange = useCallback((value: string) => {
+    setLocalPersona(prev => ({ ...prev, description: value }));
+    onChange('description', value);
+  }, [onChange]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
   };
 
   return (
@@ -51,12 +86,12 @@ const PersonaEditPanel: React.FC<PersonaEditPanelProps> = ({
         <h3 className="text-sm font-semibold">Edit Persona</h3>
         <PlaceholderHelp />
       </div>
-      <form className="flex flex-col gap-4 p-4 flex-1 overflow-y-auto scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-4 flex-1 overflow-y-auto scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border">
         <label className="font-semibold text-sm">Name
           <input
             className="w-full mt-1 p-2 rounded bg-app-bg border-2 border-app-border focus:outline-none focus:border-app-text focus:ring-0"
-            value={persona.name}
-            onChange={e => onChange('name', e.target.value)}
+            value={localPersona.name}
+            onChange={handleNameChange}
             disabled={disabled}
           />
         </label>
@@ -74,8 +109,8 @@ const PersonaEditPanel: React.FC<PersonaEditPanelProps> = ({
           </div>
           <textarea
             className="w-full p-2 rounded bg-app-bg border-2 border-app-border focus:outline-none focus:border-app-text focus:ring-0 scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border"
-            value={persona.description || ''}
-            onChange={e => onChange('description', e.target.value)}
+            value={localPersona.description || ''}
+            onChange={handleDescriptionChange}
             disabled={disabled}
             rows={6}
           />
@@ -83,8 +118,8 @@ const PersonaEditPanel: React.FC<PersonaEditPanelProps> = ({
         <label className="font-semibold text-sm">Master World (Optional)
           <select
             className="w-full mt-1 p-2 rounded bg-app-bg border-2 border-app-border focus:outline-none focus:border-app-text focus:ring-0"
-            value={persona.master_world_id || ''}
-            onChange={e => onChange('master_world_id', e.target.value || null)}
+            value={localPersona.master_world_id || ''}
+            onChange={handleMasterWorldChange}
             disabled={disabled}
           >
             <option value="">Choose One</option>
@@ -99,14 +134,16 @@ const PersonaEditPanel: React.FC<PersonaEditPanelProps> = ({
       <FullscreenModal
         isOpen={isModalOpen}
         title="Description"
-        value={persona.description || ''}
+        value={localPersona.description || ''}
         placeholder="Enter persona description... (Use {{char}} and {{user}} as placeholders)"
         disabled={disabled}
         onClose={handleCloseModal}
-        onChange={(value) => onChange('description', value)}
+        onChange={handleModalDescriptionChange}
       />
     </div>
   );
-};
+});
+
+PersonaEditPanel.displayName = 'PersonaEditPanel';
 
 export default PersonaEditPanel;

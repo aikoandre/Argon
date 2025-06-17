@@ -1,5 +1,5 @@
 // frontend/src/pages/SettingsPage.tsx
-import React, { useState, useEffect, useMemo, type FormEvent } from "react";
+import React, { useState, useEffect, useMemo, useCallback, type FormEvent } from "react";
 import Select, { type SingleValue } from "react-select"; // MultiValue não é necessário aqui
 import { useLayout } from "../contexts/LayoutContext";
 import {
@@ -49,6 +49,7 @@ const SettingsPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isAutoSaving, setIsAutoSaving] = useState<boolean>(false);
 
   const [availableModels, setAvailableModels] = useState<LLMModelData[]>([]);
   const [modelsError, setModelsError] = useState<string | null>(null);
@@ -121,7 +122,9 @@ const SettingsPage: React.FC = () => {
         const [settingsData, modelsDataFromApi] = await Promise.all([
           getUserSettings(),
           getLLMModels(),
-        ]);        if (settingsData) {
+        ]);
+        
+        if (settingsData) {
           setSettings({
             selected_llm_model: settingsData.selected_llm_model || "",
             primary_llm_api_key: settingsData.primary_llm_api_key || "",
@@ -145,7 +148,8 @@ const SettingsPage: React.FC = () => {
             embedding_llm_provider: settingsData.embedding_llm_provider || "",
             embedding_llm_model: settingsData.embedding_llm_model || "",
             embedding_llm_api_key: settingsData.embedding_llm_api_key || "",
-          });        } else {
+          });
+        } else {
           setSettings({
             selected_llm_model: "",
             primary_llm_api_key: "",
@@ -188,115 +192,162 @@ const SettingsPage: React.FC = () => {
     setRightPanelVisible(true);
   }, [setLeftPanelVisible, setRightPanelVisible]);
 
+  // Auto-save function
+  const autoSaveSettings = useCallback(async (newSettings: UserSettingsUpdateData) => {
+    if (isAutoSaving || isLoading) return; // Prevent concurrent saves
+    
+    setIsAutoSaving(true);
+    setError(null);
+    setSuccessMessage(null);
+    
+    try {
+      await updateUserSettings(newSettings);
+      // Auto-save silently without showing success message
+    } catch (err) {
+      console.error("Auto-save failed:", err);
+      setError("Auto-save failed. Please try saving manually.");
+      // Clear error message after 5 seconds
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setIsAutoSaving(false);
+    }
+  }, [isAutoSaving, isLoading]);
+
   // New LiteLLM provider change handlers
   const handlePrimaryProviderChange = (selectedOption: SingleValue<SelectOption>) => {
-    setSettings((prev) => ({
-      ...prev,
+    const newSettings = {
+      ...settings,
       primary_llm_provider: selectedOption ? selectedOption.value : "",
       primary_llm_model: "", // Reset model when provider changes
-    }));
+    };
+    setSettings(newSettings);
     setSuccessMessage(null);
     setError(null);
+    autoSaveSettings(newSettings);
   };
 
   const handlePrimaryModelChangeNew = (selectedOption: SingleValue<SelectOption>) => {
-    setSettings((prev) => ({
-      ...prev,
+    const newSettings = {
+      ...settings,
       primary_llm_model: selectedOption ? selectedOption.value : "",
-    }));
+    };
+    setSettings(newSettings);
     setSuccessMessage(null);
     setError(null);
+    autoSaveSettings(newSettings);
   };
 
   const handlePrimaryApiKeyChangeNew = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSettings((prev) => ({
-      ...prev,
+    const newSettings = {
+      ...settings,
       primary_llm_api_key_new: e.target.value,
-    }));
+    };
+    setSettings(newSettings);
     setSuccessMessage(null);
     setError(null);
+    autoSaveSettings(newSettings);
   };
 
   const handleAnalysisProviderChange = (selectedOption: SingleValue<SelectOption>) => {
-    setSettings((prev) => ({
-      ...prev,
+    const newSettings = {
+      ...settings,
       analysis_llm_provider: selectedOption ? selectedOption.value : "",
       analysis_llm_model_new: "", // Reset model when provider changes
-    }));
+    };
+    setSettings(newSettings);
     setSuccessMessage(null);
     setError(null);
+    autoSaveSettings(newSettings);
   };
 
   const handleAnalysisModelChangeNew = (selectedOption: SingleValue<SelectOption>) => {
-    setSettings((prev) => ({
-      ...prev,
+    const newSettings = {
+      ...settings,
       analysis_llm_model_new: selectedOption ? selectedOption.value : "",
-    }));
+    };
+    setSettings(newSettings);
     setSuccessMessage(null);
     setError(null);
+    autoSaveSettings(newSettings);
   };
 
   const handleAnalysisApiKeyChangeNew = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSettings((prev) => ({
-      ...prev,
+    const newSettings = {
+      ...settings,
       analysis_llm_api_key_new: e.target.value,
-    }));
+    };
+    setSettings(newSettings);
     setSuccessMessage(null);
     setError(null);
+    autoSaveSettings(newSettings);
   };
 
   const handleMaintenanceProviderChange = (selectedOption: SingleValue<SelectOption>) => {
-    setSettings((prev) => ({
-      ...prev,
+    const newSettings = {
+      ...settings,
       maintenance_llm_provider: selectedOption ? selectedOption.value : "",
       maintenance_llm_model: "", // Reset model when provider changes
-    }));
+    };
+    setSettings(newSettings);
     setSuccessMessage(null);
     setError(null);
+    autoSaveSettings(newSettings);
   };
 
   const handleMaintenanceModelChange = (selectedOption: SingleValue<SelectOption>) => {
-    setSettings((prev) => ({
-      ...prev,
+    const newSettings = {
+      ...settings,
       maintenance_llm_model: selectedOption ? selectedOption.value : "",
-    }));
+    };
+    setSettings(newSettings);
     setSuccessMessage(null);
     setError(null);
+    autoSaveSettings(newSettings);
   };
 
   const handleMaintenanceApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSettings((prev) => ({
-      ...prev,
+    const newSettings = {
+      ...settings,
       maintenance_llm_api_key: e.target.value,
-    }));
+    };
+    setSettings(newSettings);
     setSuccessMessage(null);
     setError(null);
+    autoSaveSettings(newSettings);
   };
 
   const handleEmbeddingProviderChange = (selectedOption: SingleValue<SelectOption>) => {
-    setSettings((prev) => ({
-      ...prev,
+    const newSettings = {
+      ...settings,
       embedding_llm_provider: selectedOption ? selectedOption.value : "",
       embedding_llm_model: "", // Reset model when provider changes
-    }));
+    };
+    setSettings(newSettings);
     setSuccessMessage(null);
     setError(null);
+    autoSaveSettings(newSettings);
   };
 
   const handleEmbeddingModelChange = (selectedOption: SingleValue<SelectOption>) => {
-    setSettings((prev) => ({
-      ...prev,
+    const newSettings = {
+      ...settings,
       embedding_llm_model: selectedOption ? selectedOption.value : "",
-    }));
+    };
+    setSettings(newSettings);
     setSuccessMessage(null);
     setError(null);
-  };  const handleEmbeddingApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSettings((prev) => ({
-      ...prev,
+    autoSaveSettings(newSettings);
+  };
+  
+  const handleEmbeddingApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newSettings = {
+      ...settings,
       embedding_llm_api_key: e.target.value,
-    }));
+    };
+    setSettings(newSettings);
     setSuccessMessage(null);
     setError(null);
+    autoSaveSettings(newSettings);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -337,7 +388,8 @@ const SettingsPage: React.FC = () => {
           {successMessage}
         </p>
       )}
-      <form onSubmit={handleSubmit} className="space-y-6 w-full max-w-lg mx-auto">        <div className="flex justify-between border-b border-gray-700 mb-6">
+      <form onSubmit={handleSubmit} className="space-y-6 w-full max-w-lg mx-auto">
+        <div className="flex justify-between border-b border-gray-700 mb-6">
           <button
             type="button"
             className={`py-2 px-4 text-sm font-medium ${
@@ -382,7 +434,9 @@ const SettingsPage: React.FC = () => {
           >
             Embedding
           </button>
-        </div>{activeTab === "primary" && (
+        </div>
+        
+        {activeTab === "primary" && (
           <div className="space-y-6">
             <div>
               <label
@@ -548,7 +602,8 @@ const SettingsPage: React.FC = () => {
                 </button>
               </div>
             </div>
-          </div>        )}
+          </div>
+        )}
 
         {activeTab === "analysis" && (
           <div className="space-y-6">
@@ -711,7 +766,8 @@ const SettingsPage: React.FC = () => {
                 </button>
               </div>
             </div>
-          </div>        )}
+          </div>
+        )}
 
         {activeTab === "maintenance" && (
           <div className="space-y-6">
@@ -875,7 +931,9 @@ const SettingsPage: React.FC = () => {
               </div>
             </div>
           </div>
-        )}        {activeTab === "embedding" && (
+        )}
+        
+        {activeTab === "embedding" && (
           <div className="space-y-6">
             <div>
               <label

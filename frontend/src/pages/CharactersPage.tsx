@@ -56,6 +56,14 @@ const CharactersPage: React.FC = () => {
       if (!prev) return prev;
       const updated = { ...prev, [field]: value };
       updateLayoutContent(updated);
+      
+      // Also update the character in the characters array
+      setCharacters(prevCharacters => 
+        prevCharacters.map(char => 
+          char.id === updated.id ? updated : char
+        )
+      );
+      
       return updated;
     });
   };

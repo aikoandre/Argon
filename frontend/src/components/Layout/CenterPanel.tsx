@@ -14,7 +14,7 @@ const CenterPanel: React.FC<CenterPanelProps> = ({ children, header, noPadding =
           {header}
         </div>
       )}
-      <div className={`flex-1 w-full overflow-auto ${noPadding ? '' : 'py-4'}`}>
+      <div className={`flex-1 w-full overflow-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-app-border hover:scrollbar-thumb-app-border/80 ${noPadding ? '' : 'py-4'}`}>
         <div className={`w-full ${noPadding ? '' : 'px-6'}`}>
           {children}
         </div>

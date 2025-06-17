@@ -1,5 +1,5 @@
 // frontend/src/pages/PersonasPageContext.tsx
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   getAllUserPersonas,
   deleteUserPersona,
@@ -31,6 +31,40 @@ const PersonasPageContext: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
+  const saveTimeoutRef = useRef<number | null>(null);
+
+  // Debounced save function to prevent excessive API calls
+  const debouncedSave = useCallback(async (persona: UserPersonaData) => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    saveTimeoutRef.current = window.setTimeout(async () => {
+      if (persona.id && persona.id !== 'new') {
+        try {
+          const formData = personaToFormData(persona);
+          await updateUserPersona(persona.id, formData);
+        } catch (err: any) {
+          console.error('Failed to save persona:', err);
+          if (err.message && err.message.includes('name is required')) {
+            setError('Persona name cannot be empty.');
+          } else if (err.message && err.message.includes('cannot exceed 100 characters')) {
+            setError('Persona name is too long (maximum 100 characters).');
+          } else if (err.response?.status === 422) {
+            const details = err.response.data.detail;
+            if (Array.isArray(details)) {
+              const messages = details.map((e: any) => `${e.loc?.[1] || 'field'}: ${e.msg}`).join(', ');
+              setError(`Validation error: ${messages}`);
+            } else {
+              setError(`Validation error: ${details}`);
+            }
+          } else {
+            setError('Failed to save changes.');
+          }
+        }
+      }
+    }, 500); // 500ms delay
+  }, []);
 
   // Load personas
   const fetchPersonas = async () => {
@@ -76,6 +110,15 @@ const PersonasPageContext: React.FC = () => {
     fetchPersonas();
     fetchMasterWorlds();
     loadActivePersona();
+  }, []);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
   }, []);
 
   // Set panels visible when PersonasPage loads
@@ -164,33 +207,54 @@ const PersonasPageContext: React.FC = () => {
   // Right panel content - Persona editor
   useEffect(() => {
     if (editingPersona) {
-      updateLayoutContent(editingPersona);
+      // Only update the left panel image, not the entire right panel content
+      if (editingPersona.image_url) {
+        const cacheBuster = editingPersona.updated_at 
+          ? `?cb=${encodeURIComponent(editingPersona.updated_at)}`
+          : `?cb=${Date.now()}`;
+        setLeftPanelContent(
+          <LeftPanelImage
+            src={`${editingPersona.image_url}${cacheBuster}`}
+            alt={editingPersona.name}
+          />
+        );
+      } else {
+        setLeftPanelContent(null);
+      }
     }
-    // Don't clear the right panel when no persona is being edited
-    // Let it preserve content from other pages until a new persona is selected
-  }, [editingPersona, masterWorlds]); // Include masterWorlds in dependency array since PersonaEditPanel needs it
+  }, [editingPersona?.image_url, editingPersona?.updated_at, editingPersona?.name]); // Only depend on image-related fields
 
-  const handleEditFieldChange = async (field: string, value: any) => {
+  // Set up the right panel content only once when persona is selected, not on every change
+  useEffect(() => {
+    if (editingPersona) {
+      setRightPanelContent(
+        <PersonaEditPanel
+          persona={editingPersona}
+          masterWorlds={masterWorlds}
+          onChange={handleEditFieldChange}
+          onDelete={() => handleDelete(editingPersona.id)}
+          onImport={() => importFileInputRef.current?.click()}
+          onExport={handleExport}
+          onExpressions={() => {}}
+          onImageChange={handleEditImageChange}
+          disabled={false}
+        />
+      );
+    }
+  }, [editingPersona?.id, masterWorlds]); // Only depend on persona ID and master worlds, not the entire persona object
+
+  const handleEditFieldChange = useCallback(async (field: string, value: any) => {
     if (editingPersona) {
       const updatedPersona = { ...editingPersona, [field]: value };
       setEditingPersona(updatedPersona);
-      // DON'T call updateLayoutContent here - it causes infinite re-renders
-      // The PersonaEditPanel will automatically get the updated persona prop
       
-      // Auto-save changes for existing personas only (not new ones)
-      if (updatedPersona.id && updatedPersona.id !== 'new') {
-        try {
-          const formData = personaToFormData(updatedPersona);
-          await updateUserPersona(updatedPersona.id, formData);
-          // Update the personas list
-          setPersonas(prev => prev.map(p => p.id === updatedPersona.id ? updatedPersona : p));
-        } catch (err) {
-          console.error('Failed to save persona:', err);
-          setError('Failed to save changes.');
-        }
-      }
+      // Update the personas list immediately for UI consistency
+      setPersonas(prev => prev.map(p => p.id === updatedPersona.id ? updatedPersona : p));
+      
+      // Use debounced save to avoid excessive API calls while typing
+      debouncedSave(updatedPersona);
     }
-  };
+  }, [editingPersona, debouncedSave]);
 
   const handleDelete = async (personaId: string) => {
     if (!window.confirm('Are you sure you want to delete this persona?')) return;
@@ -261,9 +325,23 @@ const PersonasPageContext: React.FC = () => {
           // Update the personas list to show the new image
           setPersonas(prev => prev.map(p => p.id === updatedPersona.id ? updatedPersona : p));
         }
-      } catch (err) {
-        setError('Failed to upload image.');
-        console.error(err);
+      } catch (err: any) {
+        console.error('Failed to upload image:', err);
+        if (err.message && err.message.includes('name is required')) {
+          setError('Persona name cannot be empty.');
+        } else if (err.message && err.message.includes('cannot exceed 100 characters')) {
+          setError('Persona name is too long (maximum 100 characters).');
+        } else if (err.response?.status === 422) {
+          const details = err.response.data.detail;
+          if (Array.isArray(details)) {
+            const messages = details.map((e: any) => `${e.loc?.[1] || 'field'}: ${e.msg}`).join(', ');
+            setError(`Validation error: ${messages}`);
+          } else {
+            setError(`Validation error: ${details}`);
+          }
+        } else {
+          setError('Failed to upload image.');
+        }
       }
     }
     // Clear the file input so the same file can be selected again

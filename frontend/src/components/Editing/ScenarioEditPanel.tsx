@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { IconActionBar } from '../Layout';
 import { FullscreenModal } from '../Common';
 import PlaceholderHelp from '../PlaceholderHelp';
@@ -16,7 +16,7 @@ interface ScenarioEditPanelProps {
   disabled?: boolean;
 }
 
-const ScenarioEditPanel: React.FC<ScenarioEditPanelProps> = ({
+const ScenarioEditPanel: React.FC<ScenarioEditPanelProps> = React.memo(({
   scenario,
   masterWorlds,
   onChange,
@@ -27,9 +27,17 @@ const ScenarioEditPanel: React.FC<ScenarioEditPanelProps> = ({
   onImageChange,
   disabled
 }) => {
+  const [localScenario, setLocalScenario] = useState(scenario);
   const [fullscreenField, setFullscreenField] = useState<string | null>(null);
   const [currentDialogueIndex, setCurrentDialogueIndex] = useState(0);
   const [currentBeginningMessageIndex, setCurrentBeginningMessageIndex] = useState(0);
+
+  // Sync local state with prop changes (but only for different scenarios)
+  useEffect(() => {
+    if (scenario.id !== localScenario.id) {
+      setLocalScenario(scenario);
+    }
+  }, [scenario.id, localScenario.id]);
 
   // Initialize arrays if they're empty and manage index bounds
   useEffect(() => {
@@ -37,7 +45,9 @@ const ScenarioEditPanel: React.FC<ScenarioEditPanelProps> = ({
     const messages = getBeginningMessages();
     
     // Only initialize if completely empty (not just containing empty strings)
-    if (!scenario.example_dialogues || (Array.isArray(scenario.example_dialogues) && scenario.example_dialogues.length === 0)) {
+    if (!localScenario.example_dialogues || (Array.isArray(localScenario.example_dialogues) && localScenario.example_dialogues.length === 0)) {
+      const updatedScenario = { ...localScenario, example_dialogues: [''] };
+      setLocalScenario(updatedScenario);
       onChange('example_dialogues', ['']);
       setCurrentDialogueIndex(0);
     } else if (currentDialogueIndex >= dialogues.length) {
@@ -45,13 +55,15 @@ const ScenarioEditPanel: React.FC<ScenarioEditPanelProps> = ({
     }
     
     // Only initialize if completely empty (not just containing empty strings)
-    if (!scenario.beginning_message || (Array.isArray(scenario.beginning_message) && scenario.beginning_message.length === 0)) {
+    if (!localScenario.beginning_message || (Array.isArray(localScenario.beginning_message) && localScenario.beginning_message.length === 0)) {
+      const updatedScenario = { ...localScenario, beginning_message: [''] };
+      setLocalScenario(updatedScenario);
       onChange('beginning_message', ['']);
       setCurrentBeginningMessageIndex(0);
     } else if (currentBeginningMessageIndex >= messages.length) {
       setCurrentBeginningMessageIndex(Math.max(0, messages.length - 1));
     }
-  }, [scenario.example_dialogues, scenario.beginning_message, onChange]);
+  }, [localScenario.example_dialogues, localScenario.beginning_message, onChange, localScenario]);
 
   const openFullscreen = (fieldName: string) => {
     setFullscreenField(fieldName);
@@ -60,6 +72,10 @@ const ScenarioEditPanel: React.FC<ScenarioEditPanelProps> = ({
   const closeFullscreen = () => {
     setFullscreenField(null);
   };
+
+  const handleSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+  }, []);
 
   const getFieldValue = (fieldName: string) => {
     switch (fieldName) {
@@ -247,7 +263,7 @@ const ScenarioEditPanel: React.FC<ScenarioEditPanelProps> = ({
         <h3 className="text-sm font-semibold">Edit Scenario</h3>
         <PlaceholderHelp />
       </div>
-      <form className="flex flex-col gap-4 p-4 flex-1 overflow-y-auto scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-4 flex-1 overflow-y-auto scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border">
         <label className="font-semibold text-sm">Name
           <input
             className="w-full mt-1 p-2 rounded bg-app-bg border-2 border-app-border focus:outline-none focus:border-app-text focus:ring-0"
@@ -458,7 +474,7 @@ const ScenarioEditPanel: React.FC<ScenarioEditPanelProps> = ({
             onChange={e => onChange('master_world_id', e.target.value || null)}
             disabled={disabled}
           >
-            <option value="">Empty</option>
+            <option value="">None</option>
             {masterWorlds.map(world => (
               <option key={world.id} value={world.id}>
                 {world.name}
@@ -480,6 +496,8 @@ const ScenarioEditPanel: React.FC<ScenarioEditPanelProps> = ({
       />
     </div>
   );
-};
+});
+
+ScenarioEditPanel.displayName = 'ScenarioEditPanel';
 
 export default ScenarioEditPanel;

@@ -5,6 +5,7 @@ Synchronous Memory Service for SessionNotes system.
 Orchestrates the complete memory update pipeline synchronously.
 """
 import logging
+import time
 from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError

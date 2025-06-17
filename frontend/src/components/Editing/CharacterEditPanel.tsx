@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { IconActionBar } from '../Layout';
 import { FullscreenModal } from '../Common';
 import PlaceholderHelp from '../PlaceholderHelp';
@@ -16,7 +16,7 @@ interface CharacterEditPanelProps {
   disabled?: boolean;
 }
 
-const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
+const CharacterEditPanel: React.FC<CharacterEditPanelProps> = React.memo(({
   character,
   onChange,
   onDelete,
@@ -26,11 +26,19 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
   onImageChange,
   disabled
 }) => {
+  const [localCharacter, setLocalCharacter] = useState(character);
   const [masterWorlds, setMasterWorlds] = useState<MasterWorldData[]>([]);
   const [loadingMasterWorlds, setLoadingMasterWorlds] = useState(false);
   const [fullscreenField, setFullscreenField] = useState<string | null>(null);
   const [currentDialogueIndex, setCurrentDialogueIndex] = useState(0);
   const [currentBeginningMessageIndex, setCurrentBeginningMessageIndex] = useState(0);
+
+  // Sync local state with prop changes (but only for different characters)
+  useEffect(() => {
+    if (character.id !== localCharacter.id) {
+      setLocalCharacter(character);
+    }
+  }, [character.id, localCharacter.id]);
 
   // Fetch master worlds on component mount
   useEffect(() => {
@@ -55,7 +63,9 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
     const messages = getBeginningMessages();
     
     // Only initialize if completely empty (not just containing empty strings)
-    if (!character.example_dialogues || (Array.isArray(character.example_dialogues) && character.example_dialogues.length === 0)) {
+    if (!localCharacter.example_dialogues || (Array.isArray(localCharacter.example_dialogues) && localCharacter.example_dialogues.length === 0)) {
+      const updatedCharacter = { ...localCharacter, example_dialogues: [''] };
+      setLocalCharacter(updatedCharacter);
       onChange('example_dialogues', ['']);
       setCurrentDialogueIndex(0);
     } else if (currentDialogueIndex >= dialogues.length) {
@@ -63,13 +73,15 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
     }
     
     // Only initialize if completely empty (not just containing empty strings)
-    if (!character.beginning_messages || (Array.isArray(character.beginning_messages) && character.beginning_messages.length === 0)) {
+    if (!localCharacter.beginning_messages || (Array.isArray(localCharacter.beginning_messages) && localCharacter.beginning_messages.length === 0)) {
+      const updatedCharacter = { ...localCharacter, beginning_messages: [''] };
+      setLocalCharacter(updatedCharacter);
       onChange('beginning_messages', ['']);
       setCurrentBeginningMessageIndex(0);
     } else if (currentBeginningMessageIndex >= messages.length) {
       setCurrentBeginningMessageIndex(Math.max(0, messages.length - 1));
     }
-  }, [character.example_dialogues, character.beginning_messages, onChange]);
+  }, [localCharacter.example_dialogues, localCharacter.beginning_messages, onChange, localCharacter]);
 
   const openFullscreen = (fieldName: string) => {
     setFullscreenField(fieldName);
@@ -79,20 +91,24 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
     setFullscreenField(null);
   };
 
+  const handleSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+  }, []);
+
   const getFieldValue = (fieldName: string) => {
     switch (fieldName) {
       case 'description':
-        return character.description || '';
+        return localCharacter.description || '';
       case 'instructions':
-        return character.instructions || '';
+        return localCharacter.instructions || '';
       case 'example_dialogues':
-        return Array.isArray(character.example_dialogues) 
-          ? character.example_dialogues.join('\n---\n') 
-          : (character.example_dialogues || '');
+        return Array.isArray(localCharacter.example_dialogues) 
+          ? localCharacter.example_dialogues.join('\n---\n') 
+          : (localCharacter.example_dialogues || '');
       case 'beginning_messages':
-        return Array.isArray(character.beginning_messages) 
-          ? character.beginning_messages.join('\n') 
-          : (character.beginning_messages || '');
+        return Array.isArray(localCharacter.beginning_messages) 
+          ? localCharacter.beginning_messages.join('\n') 
+          : (localCharacter.beginning_messages || '');
       default:
         return '';
     }
@@ -101,13 +117,17 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
   const handleFullscreenChange = (fieldName: string, value: string) => {
     if (fieldName === 'example_dialogues') {
       const dialogues = value.split('\n---\n');
-      // Don't filter out empty strings to preserve user's structure
+      const updatedCharacter = { ...localCharacter, example_dialogues: dialogues };
+      setLocalCharacter(updatedCharacter);
       onChange('example_dialogues', dialogues);
     } else if (fieldName === 'beginning_messages') {
       const messages = value.split('\n');
-      // Don't filter out empty strings to preserve user's structure
+      const updatedCharacter = { ...localCharacter, beginning_messages: messages };
+      setLocalCharacter(updatedCharacter);
       onChange('beginning_messages', messages);
     } else {
+      const updatedCharacter = { ...localCharacter, [fieldName]: value };
+      setLocalCharacter(updatedCharacter);
       onChange(fieldName, value);
     }
   };
@@ -144,7 +164,7 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
 
   // Helper functions for managing dialogues
   const getDialogues = (): string[] => {
-    const dialogues = character.example_dialogues;
+    const dialogues = localCharacter.example_dialogues;
     if (Array.isArray(dialogues) && dialogues.length > 0) {
       return dialogues.map(d => typeof d === 'string' ? d : '');
     }
@@ -168,6 +188,8 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
   const addDialogue = () => {
     const dialogues = getDialogues();
     const newDialogues = [...dialogues, ''];
+    const updatedCharacter = { ...localCharacter, example_dialogues: newDialogues };
+    setLocalCharacter(updatedCharacter);
     onChange('example_dialogues', newDialogues);
     // Set index to the new item after the state update
     setTimeout(() => {
@@ -179,6 +201,8 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
     const dialogues = getDialogues();
     if (dialogues.length > 1) {
       const newDialogues = dialogues.filter((_, index) => index !== currentDialogueIndex);
+      const updatedCharacter = { ...localCharacter, example_dialogues: newDialogues };
+      setLocalCharacter(updatedCharacter);
       onChange('example_dialogues', newDialogues);
       // Adjust index if it's out of bounds
       const newIndex = currentDialogueIndex >= newDialogues.length 
@@ -194,12 +218,14 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
     const dialogues = getDialogues();
     const newDialogues = [...dialogues];
     newDialogues[currentDialogueIndex] = value;
+    const updatedCharacter = { ...localCharacter, example_dialogues: newDialogues };
+    setLocalCharacter(updatedCharacter);
     onChange('example_dialogues', newDialogues);
   };
 
   // Helper functions for managing beginning messages
   const getBeginningMessages = (): string[] => {
-    const messages = character.beginning_messages;
+    const messages = localCharacter.beginning_messages;
     if (Array.isArray(messages) && messages.length > 0) {
       return messages.map(m => typeof m === 'string' ? m : '');
     }
@@ -223,6 +249,8 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
   const addBeginningMessage = () => {
     const messages = getBeginningMessages();
     const newMessages = [...messages, ''];
+    const updatedCharacter = { ...localCharacter, beginning_messages: newMessages };
+    setLocalCharacter(updatedCharacter);
     onChange('beginning_messages', newMessages);
     // Set index to the new item after the state update
     setTimeout(() => {
@@ -234,6 +262,8 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
     const messages = getBeginningMessages();
     if (messages.length > 1) {
       const newMessages = messages.filter((_, index) => index !== currentBeginningMessageIndex);
+      const updatedCharacter = { ...localCharacter, beginning_messages: newMessages };
+      setLocalCharacter(updatedCharacter);
       onChange('beginning_messages', newMessages);
       // Adjust index if it's out of bounds
       const newIndex = currentBeginningMessageIndex >= newMessages.length 
@@ -249,8 +279,34 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
     const messages = getBeginningMessages();
     const newMessages = [...messages];
     newMessages[currentBeginningMessageIndex] = value;
+    const updatedCharacter = { ...localCharacter, beginning_messages: newMessages };
+    setLocalCharacter(updatedCharacter);
     onChange('beginning_messages', newMessages);
   };
+
+  const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setLocalCharacter(prev => ({ ...prev, name: newValue }));
+    onChange('name', newValue);
+  }, [onChange]);
+
+  const handleMasterWorldChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newValue = e.target.value || null;
+    setLocalCharacter(prev => ({ ...prev, master_world_id: newValue || '' }));
+    onChange('master_world_id', newValue);
+  }, [onChange]);
+
+  const handleDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    setLocalCharacter(prev => ({ ...prev, description: newValue }));
+    onChange('description', newValue);
+  }, [onChange]);
+
+  const handleInstructionsChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    setLocalCharacter(prev => ({ ...prev, instructions: newValue }));
+    onChange('instructions', newValue);
+  }, [onChange]);
 
   return (
     <div className="flex flex-col h-full w-full bg-app-surface">
@@ -266,12 +322,12 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
         <h3 className="text-sm font-semibold">Edit Character</h3>
         <PlaceholderHelp />
       </div>
-      <form className="flex flex-col gap-4 p-4 flex-1 overflow-y-auto scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-4 flex-1 overflow-y-auto scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border">
         <label className="font-semibold text-sm">Name
           <input
             className="w-full mt-1 p-2 rounded bg-app-bg border-2 border-app-border focus:outline-none focus:border-app-text focus:ring-0"
-            value={character.name}
-            onChange={e => onChange('name', e.target.value)}
+            value={localCharacter.name}
+            onChange={handleNameChange}
             disabled={disabled}
           />
         </label>
@@ -279,11 +335,11 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
         <label className="font-semibold text-sm">Master World
           <select
             className="w-full mt-1 p-2 rounded bg-app-bg border-2 border-app-border focus:outline-none focus:border-app-text focus:ring-0"
-            value={character.master_world_id || ''}
-            onChange={e => onChange('master_world_id', e.target.value || null)}
+            value={localCharacter.master_world_id || ''}
+            onChange={handleMasterWorldChange}
             disabled={disabled || loadingMasterWorlds}
           >
-            <option value="">Choose One</option>
+            <option value="">None</option>
             {masterWorlds.map(world => (
               <option key={world.id} value={world.id}>
                 {world.name}
@@ -306,8 +362,8 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
           </div>
           <textarea
             className="w-full p-2 rounded bg-app-bg border-2 border-app-border focus:outline-none focus:border-app-text focus:ring-0 scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border"
-            value={character.description || ''}
-            onChange={e => onChange('description', e.target.value)}
+            value={localCharacter.description || ''}
+            onChange={handleDescriptionChange}
             disabled={disabled}
             rows={6}
           />
@@ -327,8 +383,8 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
           </div>
           <textarea
             className="w-full p-2 rounded bg-app-bg border-2 border-app-border focus:outline-none focus:border-app-text focus:ring-0 scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border"
-            value={character.instructions || ''}
-            onChange={e => onChange('instructions', e.target.value)}
+            value={localCharacter.instructions || ''}
+            onChange={handleInstructionsChange}
             disabled={disabled}
             rows={6}
           />
@@ -497,6 +553,8 @@ const CharacterEditPanel: React.FC<CharacterEditPanelProps> = ({
       />
     </div>
   );
-};
+});
+
+CharacterEditPanel.displayName = 'CharacterEditPanel';
 
 export default CharacterEditPanel;

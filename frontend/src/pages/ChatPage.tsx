@@ -388,6 +388,7 @@ const ChatPage = () => {
         if (settings?.active_persona_id) {
           try {
             const persona = await getUserPersonaById(settings.active_persona_id);
+            console.log('ChatPage: Setting activePersonaName to:', persona.name);
             setActivePersonaName(persona.name || "User");
             const rawPersonaImageUrl = persona.image_url || null;
             const processedPersonaImageUrl = getImageUrl(rawPersonaImageUrl);
@@ -401,10 +402,12 @@ const ChatPage = () => {
               const updatedSettings = await getUserSettings();
               setActivePersonaId(updatedSettings?.active_persona_id || null);
             }
+            console.log('ChatPage: Error occurred, setting activePersonaName to User');
             setActivePersonaName("User");
             setActivePersonaImageUrl(null);
           }
         } else {
+          console.log('ChatPage: No active persona ID, setting activePersonaName to User');
           setActivePersonaName("User");
           setActivePersonaImageUrl(null);
         }
@@ -839,10 +842,14 @@ const ChatPage = () => {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Chat messages section - scrollable area */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-gray-400 hover:scrollbar-thumb-gray-300">
-        <div className="w-full">
+    <div className="w-full" style={{ height: '80vh' }}>
+      <div 
+        className="w-full overflow-y-auto"
+        style={{ 
+          height: '100vh',
+          maxHeight: '100vh'
+        }}
+      >
               <AnimatePresence>
                 {messages.length === 0 && (
                   <motion.div 
@@ -891,13 +898,13 @@ const ChatPage = () => {
                         className="group w-full"
                       >
                         <div className={`
-                          rounded-2xl p-4 mx-2 mt-2 relative transition-all duration-200
+                          rounded-2xl p-4 mx-2 mt-2 relative transition-all duration-200 max-w-full overflow-hidden
                           ${msg.sender_type === "USER" 
                             ? "bg-app-bg text-app-text shadow-md hover:shadow-lg" 
                             : "bg-app-bg text-app-text shadow-md hover:shadow-lg"
                           }
                         `}>
-                          <div className="flex">
+                          <div className="flex min-w-0 max-w-full">
                             <div className="flex-shrink-0 w-20 mr-3">
                               <img
                                 src={msg.sender_type === "USER"
@@ -918,12 +925,23 @@ const ChatPage = () => {
                               />
                             </div>
                             {/* Nome, data/hora e mensagem */}
-                            <div className="flex-1 flex flex-col">
+                            <div className="flex-1 flex flex-col min-w-0 max-w-full overflow-hidden">
                               <div className="flex items-center mb-1 flex-wrap">
                                 <span className="font-medium text-white mr-2">
-                                  {msg.sender_type === "USER"
-                                    ? msg.active_persona_name || msg.message_metadata?.active_persona_name || activePersonaName
-                                    : aiName}
+                                  {(() => {
+                                    if (msg.sender_type === "USER") {
+                                      const displayName = msg.active_persona_name || msg.message_metadata?.active_persona_name || activePersonaName || "User";
+                                      console.log('ChatPage: USER message display name:', {
+                                        msgActivePersonaName: msg.active_persona_name,
+                                        metadataActivePersonaName: msg.message_metadata?.active_persona_name,
+                                        activePersonaName: activePersonaName,
+                                        finalDisplayName: displayName
+                                      });
+                                      return displayName;
+                                    } else {
+                                      return aiName;
+                                    }
+                                  })()}
                                 </span>
                                 <span className="text-xs text-gray-400 mr-2">
                                   {new Date(msg.timestamp).toLocaleDateString()}
@@ -933,8 +951,7 @@ const ChatPage = () => {
                                 </span>
                               </div>
                               {/* Message content with custom formatting, no markdown */}
-                              <div className="break-words mt-0">
-                                {(() => {
+                              <div className="break-words mt-0 overflow-hidden max-w-full">{(() => {
                                   // Apply placeholder replacement for display
                                   const charName = getCharacterName(sessionDetails);
                                   const userName = msg.sender_type === "USER" 
@@ -942,26 +959,51 @@ const ChatPage = () => {
                                     : activePersonaName;
                                   const displayContent = replacePlaceholdersForDisplay(msg.content, charName, userName);
                                   
-                                  return displayContent.split(/(```[\s\S]*?```|\n)/g).map((part, idx, arr) => {
+                                  return displayContent.split(/(```[\s\S]*?```|\n|!\[[^\]]*\]\([^)]+\))/g).map((part, idx, arr) => {
                                   // Remove leading line breaks for the first paragraph
                                   if (idx === 0) part = part.replace(/^\n+/, '');
-                                  // Remove leading line breaks for the first paragraph
-                                  if (idx === 0) part = part.replace(/^\n+/, '');
+                                  
                                   if (part.startsWith('```') && part.endsWith('```')) {
                                     // Code block
                                     const code = part.slice(3, -3).replace(/^\n|\n$/g, '');
                                     // Remove top margin for the first code block
-                                    const preClass = idx === 0 ? "bg-black text-white rounded-md p-3 mb-2 overflow-x-auto text-sm" : "bg-black text-white rounded-md p-3 my-2 overflow-x-auto text-sm";
+                                    const preClass = idx === 0 ? "bg-black text-white rounded-md p-3 mb-2 overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-600 hover:scrollbar-thumb-gray-500 text-sm" : "bg-black text-white rounded-md p-3 my-2 overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-600 hover:scrollbar-thumb-gray-500 text-sm";
                                     return (
                                       <pre key={idx} className={preClass}>
                                         <code>{code}</code>
                                       </pre>
                                     );
+                                  } else if (part.match(/^!\[[^\]]*\]\([^)]+\)$/)) {
+                                    // Markdown image syntax: ![alt](url)
+                                    const match = part.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+                                    if (match) {
+                                      const [, alt, src] = match;
+                                      return (
+                                        <div key={idx} className={`${idx === 0 ? "mb-2" : "my-2"} max-w-full overflow-hidden`}>
+                                          <img 
+                                            src={src} 
+                                            alt={alt} 
+                                            className="max-w-full w-full h-auto max-h-[40rem] object-contain rounded-md shadow-md block"
+                                            style={{
+                                              maxHeight: '40rem', // Force maximum height of 640px regardless of Tailwind class
+                                              width: 'auto',
+                                              height: 'auto'
+                                            }}
+                                            onError={(e) => {
+                                              console.error(`Failed to load image: ${src}`);
+                                              (e.target as HTMLImageElement).style.display = 'none';
+                                            }}
+                                          />
+                                        </div>
+                                      );
+                                    }
+                                    return null;
                                   } else if (part === '\n') {
-                                    // Only render <br> if not the first element and previous part is not a code block
+                                    // Only render <br> if not the first element and previous part is not a code block or image
                                     if (idx === 0) return null;
                                     const prev = arr[idx - 1] || '';
                                     if (prev.startsWith('```') && prev.endsWith('```')) return null;
+                                    if (prev.match(/^!\[[^\]]*\]\([^)]+\)$/)) return null;
                                     return <br key={idx} />;
                                   } else {
                                     // Inline text, apply custom formatting for quoted and italic text
@@ -1022,7 +1064,6 @@ const ChatPage = () => {
                   })}
               </AnimatePresence>
               <div ref={messagesEndRef} />
-        </div>
       </div>
     </div>
   );

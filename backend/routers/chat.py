@@ -27,15 +27,16 @@ from backend.services.litellm_service import litellm_service # Import LiteLLM se
 
 logger = logging.getLogger(__name__)
 
-# Patch json module globally to handle Jinja2 Undefined everywhere
-class PatchedJSONEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, Undefined):
-            return None
-        return super().default(obj)
-
-json._default_encoder = PatchedJSONEncoder()
-json.dumps = lambda *args, **kwargs: PatchedJSONEncoder().encode(args[0]) if len(args) == 1 else PatchedJSONEncoder().encode(args[0])
+# Safe JSON encoding function to handle Jinja2 Undefined objects
+def safe_json_dumps(obj, **kwargs):
+    """Safe JSON encoder that handles Jinja2 Undefined objects"""
+    class SafeJSONEncoder(json.JSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, Undefined):
+                return None
+            return super().default(obj)
+    
+    return SafeJSONEncoder(**kwargs).encode(obj)
 
 # Jinja2 environment for all templates
 jinja_env = Environment(
@@ -90,8 +91,14 @@ def get_text_to_embed_from_lore_entry(lore_entry: LoreEntryModel) -> str:
 # For UserMessageCreate, using a Pydantic model for the body is cleaner
 class UserMessageInput(BaseModel):
     content: str = Field(..., min_length=1)
+    sender_type: Optional[str] = None
     user_persona_id: Optional[str] = None
     current_beginning_message_index: Optional[int] = None
+    reasoning_mode: Optional[str] = None
+    reasoning_effort: Optional[str] = None
+    message_metadata: Optional[dict] = None
+    active_persona_name: Optional[str] = None
+    active_persona_image_url: Optional[str] = None
 
 router = APIRouter(
     tags=["Chat"],
@@ -670,18 +677,37 @@ User ({{user_persona_details.name}}): {{user_input}}
         },
         "user_input": preprocessed_message.content,
         "chat_history_formatted": chat_history_formatted.strip(),
-        "reranked_lore_entries": reranked_lore_entries,
+        "reranked_lore_entries": [
+            {
+                "id": getattr(entry, 'id', ''),
+                "name": getattr(entry, 'name', ''),
+                "description": getattr(entry, 'description', ''),
+                "entry_type": getattr(entry, 'entry_type', ''),
+                "text": get_text_to_embed_from_lore_entry(entry)
+            } for entry in reranked_lore_entries
+        ],
         "current_panel_data": current_panel_data,
         "active_events": active_events,
         "user_prompt_instructions": user_prompt_instructions,
-        "get_text_to_embed_from_lore_entry": get_text_to_embed_from_lore_entry,
+        "reasoning_model_available": False,  # Add this to prevent template errors
     }
     
     main_llm_context = replace_jinja_undefined(main_llm_context)
     
     # Load and render the generation template
-    main_llm_prompt_template = jinja_env.get_template('main_generation_enhanced.jinja2')
-    final_full_prompt = main_llm_prompt_template.render(main_llm_context)
+    try:
+        main_llm_prompt_template = jinja_env.get_template('main_generation_enhanced.jinja2')
+        final_full_prompt = main_llm_prompt_template.render(main_llm_context)
+        logger.info(f"[Template] Successfully rendered template for chat_id: {chat_id}")
+    except Exception as template_error:
+        logger.error(f"[Template] Error rendering template: {template_error}")
+        # Fallback to simple prompt
+        final_full_prompt = f"""You are {ai_persona_card_info.name}.
+Personality: {ai_persona_card_info.description}
+Instructions: {ai_persona_card_info.instructions}
+
+User ({user_persona_name}): {preprocessed_message.content}
+{ai_persona_card_info.name}:"""
     
     # Construct final messages for LLM
     if preprocessed_message.is_ooc:
@@ -702,6 +728,8 @@ Respond helpfully to their OOC request without staying in character."""
     
     # --- MAIN LLM CALL (non-streaming) ---
     try:
+        logger.info(f"[LLM] Starting LLM call for chat_id: {chat_id}")
+        
         # Use LiteLLM service for primary LLM generation
         response = await litellm_service.get_service_completion(
             service_type="primary",
@@ -717,9 +745,15 @@ Respond helpfully to their OOC request without staying in character."""
             ai_response_content = response["choices"][0]["message"]["content"]
         else:
             ai_response_content = str(response)
-        logger.info(f"[LLM-DEBUG] Main LLM RAW RESPONSE for chat_id {chat_id}: {ai_response_content[:200]}...")
+        logger.info(f"[LLM] Successfully generated response for chat_id: {chat_id}")
+    except ImportError as ie:
+        logger.error(f"[LLM] Missing LiteLLM service dependency: {ie}")
+        ai_response_content = "I'm sorry, but the language model service is not available. Please check the system configuration."
+    except AttributeError as ae:
+        logger.error(f"[LLM] LiteLLM service method missing: {ae}")
+        ai_response_content = "I'm sorry, but there was a configuration issue with the language model service."
     except Exception as e:
-        logger.error(f"Main LLM call failed: {e}")
+        logger.error(f"[LLM] Main LLM call failed: {e}")
         ai_response_content = "I'm sorry, but I encountered an error while generating my response."
 
     # Ensure persona name/image always set (fallback to card/scenario or hardcoded default)
@@ -737,6 +771,7 @@ Respond helpfully to their OOC request without staying in character."""
     db.refresh(db_ai_message)
 
     # Trigger synchronous memory processing (blocks response until complete)
+    # Wrap in try-catch to prevent 500 errors if memory processing fails
     try:
         logger.info(f"[SynchronousMemory] Starting memory processing for chat_id: {chat_id}")
         
@@ -757,16 +792,23 @@ Respond helpfully to their OOC request without staying in character."""
             ]
         }
         
-        # Process memory updates synchronously
+        # Get master_world_id from the associated card
+        master_world_id = None
+        if hasattr(db_chat_session, 'master_world_id') and db_chat_session.master_world_id:
+            master_world_id = str(db_chat_session.master_world_id)
+        elif ai_persona_card and hasattr(ai_persona_card, 'master_world_id') and ai_persona_card.master_world_id:
+            master_world_id = str(ai_persona_card.master_world_id)
+        
+        # Process memory updates synchronously (with fallback to continue on failure)
         memory_result = await memory_service.process_turn_memory_updates(
             db=db,
             session_id=str(chat_id),
             turn_number=turn_number,
             turn_context=turn_context,
             user_settings=db_user_settings,
-            master_world_id=str(db_chat_session.master_world_id),
-            reasoning_mode=user_message_input.reasoning_mode,
-            reasoning_effort=user_message_input.reasoning_effort
+            master_world_id=master_world_id,
+            reasoning_mode=user_message_input.reasoning_mode or "default",
+            reasoning_effort=user_message_input.reasoning_effort or "standard"
         )
         
         if memory_result.success:
@@ -774,27 +816,47 @@ Respond helpfully to their OOC request without staying in character."""
         else:
             logger.error(f"[SynchronousMemory] Failed: {memory_result.error_message}")
         
+    except ImportError as ie:
+        logger.warning(f"[SynchronousMemory][IMPORT_ERROR] Memory service dependencies missing: {str(ie)}")
+        logger.info(f"[SynchronousMemory] Continuing without memory processing for chat_id: {chat_id}")
+    except AttributeError as ae:
+        logger.warning(f"[SynchronousMemory][ATTR_ERROR] Memory service method missing: {str(ae)}")
+        logger.info(f"[SynchronousMemory] Continuing without memory processing for chat_id: {chat_id}")
     except Exception as e:
         logger.error(f"[SynchronousMemory][ERROR] Failed to complete memory processing: {str(e)}")
+        logger.info(f"[SynchronousMemory] Continuing with response generation for chat_id: {chat_id}")
         # Continue with response even if memory processing fails
     
-    persona_info = {
-        "active_persona_name": persona_name,
-        "active_persona_image_url": persona_image_url,
-        "message_id": str(db_ai_message.id),
-        "timestamp": db_ai_message.timestamp.isoformat() if hasattr(db_ai_message, 'timestamp') else None,
-        "panel_data_update": None, # Removed panel_data_update
-        "rendered_panel_string": None, # Removed rendered_panel_string
-        "display_panel_in_response": False, # Removed display_panel_in_response
-    }
-    persona_info = replace_jinja_undefined(persona_info)
-    # Return a ChatTurnResponse object
-    return ChatTurnResponse(
-        user_message=ChatMessageInDB.model_validate(db_user_message),
-        ai_message=ChatMessageInDB.model_validate(db_ai_message),
-        ai_plan=None, # Removed ai_plan
-        panel_data_update=persona_info["panel_data_update"],
-        rendered_panel_string=persona_info["rendered_panel_string"],
-        display_panel_in_response=persona_info["display_panel_in_response"],
-        ai_persona_card=ai_persona_card_info
-    )
+    # Return a ChatTurnResponse object with only the fields that exist in the schema
+    try:
+        return ChatTurnResponse(
+            user_message=ChatMessageInDB.model_validate(db_user_message),
+            ai_message=ChatMessageInDB.model_validate(db_ai_message),
+            ai_persona_card=ai_persona_card_info
+        )
+    except Exception as response_error:
+        logger.error(f"[Response] Error creating ChatTurnResponse: {response_error}")
+        # Return a minimal response if validation fails
+        return {
+            "user_message": {
+                "id": str(db_user_message.id),
+                "chat_session_id": str(db_user_message.chat_session_id),
+                "sender_type": db_user_message.sender_type,
+                "content": db_user_message.content,
+                "timestamp": db_user_message.timestamp.isoformat()
+            },
+            "ai_message": {
+                "id": str(db_ai_message.id),
+                "chat_session_id": str(db_ai_message.chat_session_id),
+                "sender_type": db_ai_message.sender_type,
+                "content": ai_response_content,
+                "timestamp": db_ai_message.timestamp.isoformat()
+            },
+            "ai_persona_card": {
+                "id": ai_persona_card_info.id,
+                "name": ai_persona_card_info.name,
+                "image_url": ai_persona_card_info.image_url,
+                "description": ai_persona_card_info.description,
+                "instructions": ai_persona_card_info.instructions
+            }
+        }
