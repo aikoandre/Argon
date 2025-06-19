@@ -16,10 +16,12 @@ import { LeftPanelImage } from '../components/Layout';
 import { createPNGWithEmbeddedData } from '../utils/pngExport';
 import { personaToFormData } from '../utils/formDataHelpers';
 import { useLayout } from '../contexts/LayoutContext';
+import { useActiveCard } from '../contexts/ActiveCardContext';
 import PersonaEditPanel from '../components/Editing/PersonaEditPanel';
 
 const PersonasPageContext: React.FC = () => {
   const { setLeftPanelContent, setRightPanelContent, setLeftPanelVisible, setRightPanelVisible } = useLayout();
+  const { setActiveCard } = useActiveCard();
   
   const [personas, setPersonas] = useState<UserPersonaData[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -151,6 +153,15 @@ const PersonasPageContext: React.FC = () => {
   // Handle editing persona
   const handleEditPersona = (persona: UserPersonaData) => {
     setEditingPersona(persona);
+    
+    // Set active card for left panel image
+    setActiveCard({
+      type: 'persona',
+      id: persona.id,
+      name: persona.name,
+      image: persona.image_url || undefined,
+      description: persona.description || undefined
+    });
   };
 
   const updateLeftPanelImage = (persona: UserPersonaData) => {

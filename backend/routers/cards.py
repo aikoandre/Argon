@@ -7,9 +7,9 @@ from typing import List
 # Use importações absolutas a partir da raiz do pacote 'backend'
 from backend import models as api_models # Pydantic models
 from backend.db import crud, models as db_models # CRUD functions and DB models
-from backend.db.database import get_db # DB session dependency
-from backend.services.litellm_service import litellm_service # LiteLLM service for embeddings
-from backend.services.faiss_service import get_faiss_index # FAISS service for embeddings
+from db.database import get_db # DB session dependency
+from services.litellm_service import litellm_service # LiteLLM service for embeddings
+from services.faiss_service import get_faiss_index # FAISS service for embeddings
 
 router = APIRouter(
     prefix="/api/cards", # Prefixo para todas as rotas neste arquivo
@@ -30,7 +30,7 @@ async def create_new_global_lore(
     # Generate embedding directly using LiteLLM service
     try:
         # Get user settings for embedding generation (assuming ID 1 for global settings)
-        from backend.models.user_settings import UserSettings as UserSettingsModel
+        from models.user_settings import UserSettings as UserSettingsModel
         
         db_settings = db.query(UserSettingsModel).filter(UserSettingsModel.id == 1).first()
         if db_settings:

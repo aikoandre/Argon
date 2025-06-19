@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, FileResponse
-from ..file_storage import save_uploaded_file, delete_image_file
+from file_storage import save_uploaded_file, delete_image_file
 from pathlib import Path
 import os # Add this import for os module
 # Calculate PROJECT_ROOT based on the location of this file
@@ -11,7 +11,7 @@ import os # Add this import for os module
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 STATIC_DIR = PROJECT_ROOT / "static"
 import logging
-from ..db.database import get_db
+from db.database import get_db
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__) # Get a named logger for this module

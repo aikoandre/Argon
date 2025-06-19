@@ -2,7 +2,7 @@ import uuid
 from sqlalchemy import Column, String, DateTime, ForeignKey, Text, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
-from backend.database import Base
+from db.database import Base
 
 class FullAnalysisResult(Base):
     __tablename__ = "full_analysis_results"

@@ -3,12 +3,12 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 import logging
 
-from backend.schemas.ai_analysis_result import InteractionAnalysisResult, NewFact, RelationshipChange, SessionLoreUpdate, UserPersonaSessionUpdate, DynamicallyGeneratedLoreEntry, SuggestedDynamicEvent
+from schemas.ai_analysis_result import InteractionAnalysisResult, NewFact, RelationshipChange, SessionLoreUpdate, UserPersonaSessionUpdate, DynamicallyGeneratedLoreEntry, SuggestedDynamicEvent
 from backend.db import crud
-from backend.services.event_manager_service import EventManagerService
-from backend.services.session_lore_service import SessionLoreService
-from backend.services.embedding_service import EmbeddingService
-from backend.services.faiss_service import FAISSIndex
+from services.event_manager_service import EventManagerService
+from services.session_lore_service import SessionLoreService
+from services.embedding_service import EmbeddingService
+from services.faiss_service import FAISSIndex
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class SessionStateUpdateService:
         Applies the structured updates from InteractionAnalysisResult to the session's global state.
         """
         # Get API key from user settings for embedding operations
-        from backend.models.user_settings import UserSettings as UserSettingsModel
+        from models.user_settings import UserSettings as UserSettingsModel
         user_settings = db.query(UserSettingsModel).first()
         mistral_api_key = user_settings.mistral_api_key if user_settings else None
 
@@ -43,11 +43,11 @@ class SessionStateUpdateService:
             logger.warning("Mistral API key not found. Embedding operations will be skipped.")
 
         # --- Phase 3: Synchronous Memory Pipeline with LLM Integration ---
-        from backend.services.session_note_service import SessionNoteService
+        from services.session_note_service import SessionNoteService
         session_note_service = SessionNoteService()
-        from backend.models.lore_entry import LoreEntry
-        from backend.models.chat_session import ChatSession
-        from backend.services.unified_llm_service import get_llm_service
+        from models.lore_entry import LoreEntry
+        from models.chat_session import ChatSession
+        from services.unified_llm_service import get_llm_service
         unified_llm_service = get_llm_service()
 
         # 0. Handle SessionNote updates (entity matching by description)
@@ -68,7 +68,7 @@ class SessionStateUpdateService:
                     logger.warning(f"No LoreEntry found for update entity description: {entity_desc}")
                     continue
                 # Find or create SessionNote for this LoreEntry and session
-                from backend.schemas.session_note import SessionNoteCreate, SessionNoteUpdate
+                from schemas.session_note import SessionNoteCreate, SessionNoteUpdate
                 existing_note = db.query(SessionNote).filter(
                     SessionNote.session_id == str(chat_session_id),
                     SessionNote.lore_entry_id == lore_entry.id
@@ -121,7 +121,7 @@ class SessionStateUpdateService:
                 if not entity_type or not creation_summary or not master_world_id:
                     continue
                 # Create new LoreEntry
-                from backend.schemas.lore_entry import LoreEntryCreate
+                from schemas.lore_entry import LoreEntryCreate
                 lore_entry_data = {
                     "title": creation_summary.split("named '")[-1].split("'")[0] if "named '" in creation_summary else creation_summary[:32],
                     "description": creation_summary,
@@ -131,7 +131,7 @@ class SessionStateUpdateService:
                 }
                 lore_entry = crud.create_lore_entry(db, lore_entry_data)
                 # Create initial SessionNote (empty, but can be enhanced with LLM if needed)
-                from backend.schemas.session_note import SessionNoteCreate
+                from schemas.session_note import SessionNoteCreate
                 note_data = SessionNoteCreate(
                     session_id=str(chat_session_id),
                     lore_entry_id=lore_entry.id,
@@ -218,7 +218,7 @@ class SessionStateUpdateService:
                     
                     # Apply the update if there are changes
                     if update_data:
-                        from backend.schemas.session_relationship import SessionRelationshipUpdate
+                        from schemas.session_relationship import SessionRelationshipUpdate
                         relationship_update = SessionRelationshipUpdate(**update_data)
                         crud.update_session_relationship(
                             db=db,
@@ -239,7 +239,7 @@ class SessionStateUpdateService:
                     
                     status_tags = list(change.new_status_tags_add) if change.new_status_tags_add else []
                     
-                    from backend.schemas.session_relationship import SessionRelationshipCreate
+                    from schemas.session_relationship import SessionRelationshipCreate
                     new_relationship = SessionRelationshipCreate(
                         chat_session_id=str(chat_session_id),
                         entity1_id=entity1_id,
@@ -256,8 +256,8 @@ class SessionStateUpdateService:
         # 3. Create/Update SessionLoreModifications and route others to SessionCacheFacts
         if analysis_result.session_lore_updates:
             # --- Begin refactor for correct lore/fact routing ---
-            from backend.models.lore_entry import LoreEntry
-            from backend.models.chat_session import ChatSession
+            from models.lore_entry import LoreEntry
+            from models.chat_session import ChatSession
             
             chat_session = db.query(ChatSession).filter(ChatSession.id == str(chat_session_id)).first()
             master_world_id = getattr(chat_session, 'master_world_id', None)
@@ -291,7 +291,7 @@ class SessionStateUpdateService:
         # 4. Update UserPersona specific to the session
         if analysis_result.user_persona_session_updates:
             # First, get the user_persona_id from the chat session
-            from backend.models.chat_session import ChatSession
+            from models.chat_session import ChatSession
             chat_session = db.query(ChatSession).filter(ChatSession.id == str(chat_session_id)).first()
             if not chat_session or not chat_session.user_persona_id:
                 # Log warning but don't fail - some sessions might not have an assigned user persona
@@ -394,7 +394,7 @@ class SessionStateUpdateService:
                         # Persist to ExtractedKnowledge in DB first
                         # For now, we use the current chat_session_id and the latest message as source_message_id
                         # (In production, pass the correct message ID from context)
-                        from backend.models.chat_message import ChatMessage
+                        from models.chat_message import ChatMessage
                         last_message = db.query(ChatMessage).filter(ChatMessage.chat_session_id == str(chat_session_id)).order_by(ChatMessage.timestamp.desc()).first()
                         source_message_id = str(last_message.id) if last_message else str(uuid.uuid4())
                         ek = crud.create_extracted_knowledge(

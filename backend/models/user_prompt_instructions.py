@@ -1,6 +1,6 @@
 # backend/models/user_prompt_instructions.py
 from sqlalchemy import Column, Integer, Text, DateTime, func
-from backend.database import Base
+from db.database import Base
 
 class UserPromptInstructions(Base):
     __tablename__ = "user_prompt_instructions"

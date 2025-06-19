@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, JSON
 from sqlalchemy.sql import func
-from backend.db.database import Base
+from db.database import Base
 from typing import Dict, Any, Optional
 from datetime import datetime
 

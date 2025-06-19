@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, Float, ForeignKey, Boolean
-from backend.database import Base
+from db.database import Base
 
 class UserSettings(Base):
     __tablename__ = "user_settings"
@@ -91,13 +91,39 @@ class UserSettings(Base):
         "Do not return any fields not present in the schema above."
     ))
 
-    # LLM Generation Parameters
+    # LLM Generation Parameters (Legacy - kept for backward compatibility)
     temperature = Column(Float, nullable=True, default=1.0)
     top_p = Column(Float, nullable=True, default=1.0)
     max_response_tokens = Column(Integer, nullable=True, default=2048)
     context_size = Column(Integer, nullable=True, default=164000) # Number of history messages or context tokens
     max_messages_for_context = Column(Integer, nullable=True, default=20) # Max number of messages to include in LLM context
     max_lore_entries_for_rag = Column(Integer, nullable=True, default=3) # Max number of lore entries to include after reranking
+    
+    # Service Enable/Disable Toggles
+    analysis_enabled = Column(Boolean, nullable=True, default=True)
+    maintenance_enabled = Column(Boolean, nullable=True, default=True)
+    embedding_enabled = Column(Boolean, nullable=True, default=True)
+    
+    # Primary LLM Parameters
+    primary_llm_temperature = Column(Float, nullable=True, default=1.0)
+    primary_llm_top_p = Column(Float, nullable=True, default=1.0)
+    primary_llm_max_tokens = Column(Integer, nullable=True)
+    primary_llm_reasoning_effort = Column(String, nullable=True, default="Medium")
+    primary_llm_custom_prompt = Column(Text, nullable=True)
+    
+    # Analysis LLM Parameters (separate from Primary)
+    analysis_llm_temperature = Column(Float, nullable=True, default=1.0)
+    analysis_llm_top_p = Column(Float, nullable=True, default=1.0)
+    analysis_llm_max_tokens = Column(Integer, nullable=True)
+    analysis_llm_reasoning_effort = Column(String, nullable=True, default="Medium")
+    analysis_llm_custom_prompt = Column(Text, nullable=True)
+    
+    # Maintenance LLM Parameters (separate from Primary)
+    maintenance_llm_temperature = Column(Float, nullable=True, default=1.0)
+    maintenance_llm_top_p = Column(Float, nullable=True, default=1.0)
+    maintenance_llm_max_tokens = Column(Integer, nullable=True)
+    maintenance_llm_reasoning_effort = Column(String, nullable=True, default="Medium")
+    maintenance_llm_custom_prompt = Column(Text, nullable=True)
 
     # Panel Configuration
     display_in_message_panel = Column(Boolean, nullable=False, default=False) # Whether to display the panel in the AI's message

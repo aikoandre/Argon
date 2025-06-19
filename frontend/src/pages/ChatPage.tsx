@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "motion/react";
 import axios from "axios";
 import { useChatInput } from "../contexts/ChatInputContext";
 import { useLayout } from "../contexts/LayoutContext";
-import { LeftPanelImage } from "../components/Layout";
+import { useActiveCard } from "../contexts/ActiveCardContext";
 import { CharacterEditPanel, ScenarioEditPanel } from "../components/Editing";
 import {
   getChatSessionMessages,
@@ -106,7 +106,8 @@ const ChatPage = () => {
     setIsProcessingMemory,
     setDisabled 
   } = useChatInput();
-  const { setLeftPanelVisible, setRightPanelVisible, setLeftPanelContent, setRightPanelContent } = useLayout();
+  const { setRightPanelVisible, setRightPanelContent } = useLayout();
+  const { setActiveCard, clearActiveCard } = useActiveCard();
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [sessionDetails, setSessionDetails] = useState<ChatSessionData | null>(
     null
@@ -168,9 +169,9 @@ const ChatPage = () => {
       (window as any).__characterCardImageCache = (window as any).__characterCardImageCache || {};
       (window as any).__characterCardImageCache[updatedCharacter.id] = updatedCharacter.image_url || null;
       
-      // Update left panel image if changed
+      // Update left panel image if changed (now handled by global EnhancedLeftPanel)
       if (field === 'image_url' || field === 'name') {
-        updateLeftPanelForCharacter(updatedCharacter);
+        // Left panel is now global - no need to update manually
       }
     } catch (error) {
       console.error('Failed to update character:', error);
@@ -196,9 +197,9 @@ const ChatPage = () => {
       (window as any).__scenarioCardImageCache = (window as any).__scenarioCardImageCache || {};
       (window as any).__scenarioCardImageCache[updatedScenario.id] = updatedScenario.image_url || null;
       
-      // Update left panel image if changed
+      // Update left panel image if changed (now handled by global EnhancedLeftPanel)
       if (field === 'image_url' || field === 'name') {
-        updateLeftPanelForScenario(updatedScenario);
+        // Left panel is now global - no need to update manually
       }
     } catch (error) {
       console.error('Failed to update scenario:', error);
@@ -207,37 +208,36 @@ const ChatPage = () => {
     }
   };
 
-  // Helper functions to update left panel
-  const updateLeftPanelForCharacter = (character: any) => {
-    if (character.image_url) {
-      const cacheBuster = character.updated_at 
-        ? `?cb=${encodeURIComponent(character.updated_at)}`
-        : `?cb=${character.id}`;
-      setLeftPanelContent(
-        <LeftPanelImage
-          src={`${character.image_url}${cacheBuster}`}
-          alt={character.name}
-        />
-      );
-    } else {
-      setLeftPanelContent(null);
-    }
+  // Helper functions to update right panel for editing
+  const updateRightPanelForCharacter = (character: any) => {
+    setRightPanelContent(
+      <CharacterEditPanel
+        character={character}
+        onChange={handleCharacterFieldChange}
+        onDelete={() => {}}
+        onImport={() => {}}
+        onExport={() => {}}
+        onExpressions={() => {}}
+        onImageChange={() => {}}
+        disabled={false}
+      />
+    );
   };
 
-  const updateLeftPanelForScenario = (scenario: any) => {
-    if (scenario.image_url) {
-      const cacheBuster = scenario.updated_at 
-        ? `?cb=${encodeURIComponent(scenario.updated_at)}`
-        : `?cb=${scenario.id}`;
-      setLeftPanelContent(
-        <LeftPanelImage
-          src={`${scenario.image_url}${cacheBuster}`}
-          alt={scenario.name}
-        />
-      );
-    } else {
-      setLeftPanelContent(null);
-    }
+  const updateRightPanelForScenario = (scenario: any) => {
+    setRightPanelContent(
+      <ScenarioEditPanel
+        scenario={scenario}
+        masterWorlds={masterWorlds || []}
+        onChange={handleScenarioFieldChange}
+        onDelete={() => {}}
+        onImport={() => {}}
+        onExport={() => {}}
+        onExpressions={() => {}}
+        onImageChange={() => {}}
+        disabled={false}
+      />
+    );
   };
 
   const hasSentBeginningMessageRef = useRef(false); // Ref to track if beginning message has been sent for the current chat
@@ -304,56 +304,47 @@ const ChatPage = () => {
           let fetchedBeginningMessages: string[] = [];
           
           if (details.card_type === "character" && details.card_id && cachedCharacter) {
+            // Set active card for left panel
+            setActiveCard({
+              type: 'character',
+              id: details.card_id,
+              name: cachedCharacter.name,
+              image: cachedCharacter.image_url || undefined,
+              description: cachedCharacter.description || undefined
+            });
+            
             // Set up beginning messages
             if (cachedCharacter.beginning_messages && cachedCharacter.beginning_messages.length > 0) {
               fetchedBeginningMessages = cachedCharacter.beginning_messages;
             }
             
-            // Left panel: show character image if available
-            updateLeftPanelForCharacter(cachedCharacter);
-
             // Right panel: show character edit panel (editable in chat)
             console.log('ChatPage: Setting character edit panel in right panel', cachedCharacter.name);
-            setRightPanelContent(
-              <CharacterEditPanel 
-                character={cachedCharacter}
-                onChange={handleCharacterFieldChange} // Enable editing
-                onDelete={() => {}} // Disabled in chat (delete available in character page)
-                onImport={() => {}} // Disabled in chat 
-                onExport={() => {}} // Disabled in chat
-                onExpressions={() => {}} // Disabled in chat
-                onImageChange={() => {}} // Disabled in chat (can be enhanced later)
-                disabled={false} // Make it editable
-              />
-            );
+            updateRightPanelForCharacter(cachedCharacter);
           } else if (details.card_type === "scenario" && details.card_id && cachedScenario) {
+            // Set active card for left panel
+            setActiveCard({
+              type: 'scenario',
+              id: details.card_id,
+              name: cachedScenario.name,
+              image: cachedScenario.image_url || undefined,
+              description: cachedScenario.description || undefined
+            });
+            
             // Set up beginning messages
             if (cachedScenario.beginning_message && cachedScenario.beginning_message.length > 0) {
               fetchedBeginningMessages = cachedScenario.beginning_message;
             }
             
-            // Left panel: show scenario image if available
-            updateLeftPanelForScenario(cachedScenario);
-
             // Right panel: show scenario edit panel (editable in chat)
-            setRightPanelContent(
-              <ScenarioEditPanel 
-                scenario={cachedScenario}
-                masterWorlds={masterWorlds} // Pass master worlds for editing
-                onChange={handleScenarioFieldChange} // Enable editing
-                onDelete={() => {}} // Disabled in chat (delete available in scenario page)
-                onImport={() => {}} // Disabled in chat
-                onExport={() => {}} // Disabled in chat
-                onExpressions={() => {}} // Disabled in chat
-                onImageChange={() => {}} // Disabled in chat (can be enhanced later)
-                disabled={false} // Make it editable
-              />
-            );
+            updateRightPanelForScenario(cachedScenario);
+          } else {
+            // Clear active card when no character or scenario
+            clearActiveCard();
           }
           
-          // Set panels visible only after content is set
-          console.log('ChatPage: Final step - setting panels visible in data fetch');
-          setLeftPanelVisible(true);
+          // Set right panel visible only after content is set
+          console.log('ChatPage: Final step - setting right panel visible in data fetch');
           setRightPanelVisible(true);
           
           setAllBeginningMessages(fetchedBeginningMessages);
@@ -364,12 +355,9 @@ const ChatPage = () => {
             setCurrentBeginningMessageIndex(0); // Default to first if not found or not a beginning message
           }
         } else {
-          // Only clear panels if there's truly no session details
-          console.log('ChatPage: No session details available, keeping panels but clearing content if no cached data');
-          if (!cachedCharacter && !cachedScenario) {
-            setLeftPanelContent(null);
-            setRightPanelContent(null);
-          }
+          // No session details available
+          console.log('ChatPage: No session details available');
+          setRightPanelContent(null);
         }
       } catch (err) {
         setError("Failed to load chat messages or session details.");
@@ -473,59 +461,21 @@ const ChatPage = () => {
     };
   }, [chatId, isLoadingMessages]); // Removed setSendMessageHandler and setDisabled from deps
 
-  // Show panels for chat pages - but only set visible after content is ready
-  useEffect(() => {
-    // Only set panels visible if we have cached data or if they're already visible
-    if (cachedCharacter || cachedScenario || sessionDetails) {
-      console.log('ChatPage: Setting panels visible after content is ready');
-      setLeftPanelVisible(true);
-      setRightPanelVisible(true);
-    }
-  }, [cachedCharacter, cachedScenario, sessionDetails, setLeftPanelVisible, setRightPanelVisible]);
-
   // Update panels when cached character or scenario changes
   useEffect(() => {
     if (cachedCharacter) {
-      console.log('ChatPage: Updating panels for cached character:', cachedCharacter.name);
-      updateLeftPanelForCharacter(cachedCharacter);
-      setRightPanelContent(
-        <CharacterEditPanel 
-          character={cachedCharacter}
-          onChange={handleCharacterFieldChange}
-          onDelete={() => {}}
-          onImport={() => {}}
-          onExport={() => {}}
-          onExpressions={() => {}}
-          onImageChange={() => {}}
-          disabled={false}
-        />
-      );
-      // Set panels visible only after content is set
-      setTimeout(() => {
-        setLeftPanelVisible(true);
-        setRightPanelVisible(true);
-      }, 0);
+      console.log('ChatPage: Updating right panel for cached character:', cachedCharacter.name);
+      updateRightPanelForCharacter(cachedCharacter);
+      setRightPanelVisible(true);
     } else if (cachedScenario) {
-      console.log('ChatPage: Updating panels for cached scenario:', cachedScenario.name);
-      updateLeftPanelForScenario(cachedScenario);
-      setRightPanelContent(
-        <ScenarioEditPanel 
-          scenario={cachedScenario}
-          masterWorlds={masterWorlds}
-          onChange={handleScenarioFieldChange}
-          onDelete={() => {}}
-          onImport={() => {}}
-          onExport={() => {}}
-          onExpressions={() => {}}
-          onImageChange={() => {}}
-          disabled={false}
-        />
-      );
-      // Set panels visible only after content is set
-      setTimeout(() => {
-        setLeftPanelVisible(true);
-        setRightPanelVisible(true);
-      }, 0);
+      console.log('ChatPage: Updating right panel for cached scenario:', cachedScenario.name);
+      updateRightPanelForScenario(cachedScenario);
+      setRightPanelVisible(true);
+    } else {
+      // No character or scenario - hide right panel
+      console.log('ChatPage: No character or scenario cached, hiding right panel');
+      setRightPanelContent(null);
+      setRightPanelVisible(false);
     }
   }, [cachedCharacter, cachedScenario, masterWorlds]);
 
@@ -963,11 +913,15 @@ const ChatPage = () => {
                                   // Remove leading line breaks for the first paragraph
                                   if (idx === 0) part = part.replace(/^\n+/, '');
                                   
+                                  const isLastElement = idx === arr.length - 1 || (idx === arr.length - 2 && arr[arr.length - 1] === '');
+                                  
                                   if (part.startsWith('```') && part.endsWith('```')) {
                                     // Code block
                                     const code = part.slice(3, -3).replace(/^\n|\n$/g, '');
-                                    // Remove top margin for the first code block
-                                    const preClass = idx === 0 ? "bg-black text-white rounded-md p-3 mb-2 overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-600 hover:scrollbar-thumb-gray-500 text-sm" : "bg-black text-white rounded-md p-3 my-2 overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-600 hover:scrollbar-thumb-gray-500 text-sm";
+                                    // Remove top margin for the first code block, remove bottom margin for the last element
+                                    const preClass = idx === 0 
+                                      ? (isLastElement ? "bg-black text-white rounded-md p-3 overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-600 hover:scrollbar-thumb-gray-500 text-sm" : "bg-black text-white rounded-md p-3 mb-2 overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-600 hover:scrollbar-thumb-gray-500 text-sm")
+                                      : (isLastElement ? "bg-black text-white rounded-md p-3 mt-2 overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-600 hover:scrollbar-thumb-gray-500 text-sm" : "bg-black text-white rounded-md p-3 my-2 overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-600 hover:scrollbar-thumb-gray-500 text-sm");
                                     return (
                                       <pre key={idx} className={preClass}>
                                         <code>{code}</code>
@@ -979,7 +933,7 @@ const ChatPage = () => {
                                     if (match) {
                                       const [, alt, src] = match;
                                       return (
-                                        <div key={idx} className={`${idx === 0 ? "mb-2" : "my-2"} max-w-full overflow-hidden`}>
+                                        <div key={idx} className={`${idx === 0 ? (isLastElement ? "" : "mb-2") : (isLastElement ? "mt-2" : "my-2")} max-w-full overflow-hidden`}>
                                           <img 
                                             src={src} 
                                             alt={alt} 

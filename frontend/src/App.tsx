@@ -12,6 +12,7 @@ import MasterWorldPageContext from "./pages/MasterWorldPage";
 import { ThreeContainerLayout, HeaderNavigationBar } from './components/Layout';
 import { LayoutProvider, useLayout } from './contexts/LayoutContext';
 import { ChatInputProvider } from './contexts/ChatInputContext';
+import { ActiveCardProvider } from './contexts/ActiveCardContext';
 
 function AppWrapper() {
   const { layoutState, toggleLeftPanel, toggleRightPanel } = useLayout();
@@ -55,7 +56,9 @@ const App = () => (
   <Router>
     <LayoutProvider>
       <ChatInputProvider>
-        <AppWrapper />
+        <ActiveCardProvider>
+          <AppWrapper />
+        </ActiveCardProvider>
       </ChatInputProvider>
     </LayoutProvider>
   </Router>

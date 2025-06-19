@@ -77,6 +77,32 @@ If no significant relationship change is detected, return an empty list for "rel
     max_messages_for_context: Optional[int] = Field(None, gt=0, description="Maximum number of messages to include in LLM context.")
     display_in_message_panel: Optional[bool] = Field(None, description="Whether to display the panel in the AI's message.")
     active_persona_id: Optional[str] = Field(None, description="ID of the active UserPersona.")
+    
+    # Service Enable/Disable Toggles
+    analysis_enabled: Optional[bool] = Field(None, description="Enable/disable analysis service")
+    maintenance_enabled: Optional[bool] = Field(None, description="Enable/disable maintenance service")
+    embedding_enabled: Optional[bool] = Field(None, description="Enable/disable embedding service")
+    
+    # Primary LLM Parameters
+    primary_llm_temperature: Optional[float] = Field(None, ge=0.0, le=2.0, description="Temperature for Primary LLM")
+    primary_llm_top_p: Optional[float] = Field(None, ge=0.0, le=1.0, description="Top P for Primary LLM")
+    primary_llm_max_tokens: Optional[int] = Field(None, gt=0, description="Max tokens for Primary LLM")
+    primary_llm_reasoning_effort: Optional[str] = Field(None, description="Reasoning effort for Primary LLM (Low/Medium/High)")
+    primary_llm_custom_prompt: Optional[str] = Field(None, description="Custom prompt for Primary LLM")
+    
+    # Analysis LLM Parameters (separate from Primary)
+    analysis_llm_temperature: Optional[float] = Field(None, ge=0.0, le=2.0, description="Temperature for Analysis LLM")
+    analysis_llm_top_p: Optional[float] = Field(None, ge=0.0, le=1.0, description="Top P for Analysis LLM")
+    analysis_llm_max_tokens: Optional[int] = Field(None, gt=0, description="Max tokens for Analysis LLM")
+    analysis_llm_reasoning_effort: Optional[str] = Field(None, description="Reasoning effort for Analysis LLM (Low/Medium/High)")
+    analysis_llm_custom_prompt: Optional[str] = Field(None, description="Custom prompt for Analysis LLM")
+    
+    # Maintenance LLM Parameters (separate from Primary)
+    maintenance_llm_temperature: Optional[float] = Field(None, ge=0.0, le=2.0, description="Temperature for Maintenance LLM")
+    maintenance_llm_top_p: Optional[float] = Field(None, ge=0.0, le=1.0, description="Top P for Maintenance LLM")
+    maintenance_llm_max_tokens: Optional[int] = Field(None, gt=0, description="Max tokens for Maintenance LLM")
+    maintenance_llm_reasoning_effort: Optional[str] = Field(None, description="Reasoning effort for Maintenance LLM (Low/Medium/High)")
+    maintenance_llm_custom_prompt: Optional[str] = Field(None, description="Custom prompt for Maintenance LLM")
 
 class UserSettingsUpdate(UserSettingsBase):
     # All fields are optional for update, inheriting from UserSettingsBase

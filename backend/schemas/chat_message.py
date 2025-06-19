@@ -3,8 +3,8 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 import uuid
-from backend.schemas.character_card import CharacterCardBase # New import
-from backend.schemas.scenario_card import ScenarioCardBase # New import
+from schemas.character_card import CharacterCardBase # New import
+from schemas.scenario_card import ScenarioCardBase # New import
 
 class ChatMessageBase(BaseModel):
     sender_type: str = Field(..., pattern="^(USER|AI|SYSTEM)$") # Valida os tipos de remetente

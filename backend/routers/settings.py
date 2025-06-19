@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from backend.database import get_db # Adjust import based on your project structure
-from backend.models.user_settings import UserSettings as UserSettingsModel
-from backend.schemas.user_settings import UserSettingsInDB, UserSettingsUpdate # Adjust import
+from db.database import get_db # Adjust import based on your project structure
+from models.user_settings import UserSettings as UserSettingsModel
+from schemas.user_settings import UserSettingsInDB, UserSettingsUpdate # Adjust import
 
 router = APIRouter(
     tags=["User Settings"],
@@ -64,7 +64,33 @@ async def read_user_settings(db: Session = Depends(get_db)):
             top_p=1.0,
             max_response_tokens=2048,
             context_size=164000,
-            active_persona_id=None
+            active_persona_id=None,
+            
+            # Service Enable/Disable Toggles
+            analysis_enabled=True,
+            maintenance_enabled=True,
+            embedding_enabled=True,
+            
+            # Primary LLM Parameters (defaults)
+            primary_llm_temperature=1.0,
+            primary_llm_top_p=1.0,
+            primary_llm_max_tokens=None,
+            primary_llm_reasoning_effort="Medium",
+            primary_llm_custom_prompt="",
+            
+            # Analysis LLM Parameters (defaults)
+            analysis_llm_temperature=1.0,
+            analysis_llm_top_p=1.0,
+            analysis_llm_max_tokens=None,
+            analysis_llm_reasoning_effort="Medium",
+            analysis_llm_custom_prompt="",
+            
+            # Maintenance LLM Parameters (defaults)
+            maintenance_llm_temperature=1.0,
+            maintenance_llm_top_p=1.0,
+            maintenance_llm_max_tokens=None,
+            maintenance_llm_reasoning_effort="Medium",
+            maintenance_llm_custom_prompt=""
         )
 
 

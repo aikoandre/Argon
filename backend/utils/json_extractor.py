@@ -89,7 +89,7 @@ class RobustJSONExtractor:
         """Log successful extraction."""
         try:
             # Import here to avoid circular imports
-            from backend.utils.json_monitoring import json_monitor
+            from utils.json_monitoring import json_monitor
             json_monitor.log_extraction_attempt(
                 text=original_text,
                 result=result,
@@ -104,7 +104,7 @@ class RobustJSONExtractor:
         """Log failed extraction."""
         try:
             # Import here to avoid circular imports
-            from backend.utils.json_monitoring import json_monitor
+            from utils.json_monitoring import json_monitor
             json_monitor.log_extraction_attempt(
                 text=original_text,
                 result=None,

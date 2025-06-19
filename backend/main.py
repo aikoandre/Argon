@@ -36,34 +36,27 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import asyncio
-from backend.background_tasks import embedding_worker
-from backend.routers.lore_entries import router as lore_entries_router, all_lore_router
-from backend.routers.chat import router as chat_router
-from backend.routers.scenarios import router as scenarios_router
-from backend.routers.personas import router as personas_router
-from backend.routers.images import router as images_router
-from backend.routers.characters import router as characters_router
-from backend.routers.master_worlds import router as master_worlds_router
-from backend.routers.settings import router as settings_router
-from backend.routers.llm_providers import router as llm_providers_router
-from backend.routers.maintenance import router as maintenance_router
-from backend.routers.faiss_management import router as faiss_management_router
-from backend.routers.session_notes_api import router as session_notes_router
-from backend import database
+from background_tasks import embedding_worker
+# Temporarily commented out problematic import:
+# from routers.lore_entries import router as lore_entries_router, all_lore_router
+from routers.chat import router as chat_router
+from routers.scenarios import router as scenarios_router
+from routers.personas import router as personas_router
+from routers.images import router as images_router
+from routers.characters import router as characters_router
+from routers.master_worlds import router as master_worlds_router
+from routers.settings import router as settings_router
+from routers.llm_providers import router as llm_providers_router
+from routers.maintenance import router as maintenance_router
+from routers.faiss_management import router as faiss_management_router
+from routers.session_notes_api import router as session_notes_router
+from routers.prompt_presets import router as prompt_presets_router # Import prompt presets router
+from database import get_db # Import get_db
 from sqlalchemy.orm import Session # Import Session
-from backend.database import get_db # Import get_db
 
-# Import all models to register them with the SQLAlchemy engine
-from backend.models.user_persona import UserPersona
-from backend.models.master_world import MasterWorld
-from backend.models.character_card import CharacterCard
-from backend.models.scenario_card import ScenarioCard
-from backend.models.chat_message import ChatMessage
-from backend.models.chat_session import ChatSession
-from backend.models.lore_entry import LoreEntry
-from backend.models.session_relationship import SessionRelationship # Import the new model
-from backend.models.user_settings import UserSettings
-from backend.models.maintenance_queue import MaintenanceQueue
+# Import only models that are directly used in main.py
+from models.user_persona import UserPersona
+# Other models are imported through routers and services, which registers them with SQLAlchemy
 from fastapi.responses import StreamingResponse
 
 app = FastAPI(title="Advanced Roleplay Engine API")
@@ -174,7 +167,7 @@ async def startup_event():
 
     # Create database tables if they don't exist
     print("Creating database tables if they don't exist...")
-    from backend.db.database import engine, Base
+    from db.database import engine, Base
     Base.metadata.create_all(bind=engine)
     print("Database tables created successfully.")
 
@@ -194,7 +187,7 @@ async def startup_event():
     
     # 4. Start the maintenance worker for the Unified LLM Services Architecture
     print("Starting maintenance worker...")
-    from backend.services.maintenance_worker import get_maintenance_worker
+    from services.maintenance_worker import get_maintenance_worker
     maintenance_worker = get_maintenance_worker()
     loop.create_task(maintenance_worker.start())
     print("Maintenance worker started.")
@@ -250,8 +243,9 @@ async def test_serve_image():
     return FileResponse(image_path)
 
 # Include other routers
-app.include_router(lore_entries_router)
-app.include_router(all_lore_router)
+# Temporarily commented out:
+# app.include_router(lore_entries_router)
+# app.include_router(all_lore_router)
 app.include_router(chat_router, prefix="/api/chat")
 app.include_router(scenarios_router)
 app.include_router(personas_router)
@@ -263,6 +257,7 @@ app.include_router(llm_providers_router)
 app.include_router(maintenance_router, prefix="/api")
 app.include_router(faiss_management_router, prefix="/api")
 app.include_router(session_notes_router, prefix="/api")
+app.include_router(prompt_presets_router, prefix="/api")
 
 def create_default_user_persona(db: Session):
     """

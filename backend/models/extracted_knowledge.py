@@ -5,7 +5,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
 
-from ..database import Base
+from db.database import Base
 
 class ExtractedKnowledge(Base):
     __tablename__ = "extracted_knowledge"

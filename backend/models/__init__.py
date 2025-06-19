@@ -10,3 +10,5 @@ from .lore_entry import LoreEntry
 from .session_relationship import SessionRelationship
 from .session_note import SessionNote
 from .maintenance_queue import MaintenanceQueue
+from .prompt_preset import PromptPreset, PromptModule, UserPromptConfiguration
+from .user_prompt_instructions import UserPromptInstructions

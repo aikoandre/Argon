@@ -3,13 +3,13 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import json
-from ..file_storage import save_uploaded_file, delete_image_file
+from file_storage import save_uploaded_file, delete_image_file
 
 # Importe o modelo SQLAlchemy e os schemas Pydantic
-from ..models.character_card import CharacterCard
-from ..schemas.character_card import CharacterCardCreate, CharacterCardUpdate, CharacterCardInDB
+from models.character_card import CharacterCard
+from schemas.character_card import CharacterCardCreate, CharacterCardUpdate, CharacterCardInDB
 
-from ..database import get_db
+from database import get_db
 
 router = APIRouter(
     prefix="/api/characters",

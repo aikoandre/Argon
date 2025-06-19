@@ -10,10 +10,10 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
-from backend.models.session_note import SessionNote
-from backend.models.lore_entry import LoreEntry
-from backend.models.chat_session import ChatSession
-from backend.schemas.session_note import (
+from models.session_note import SessionNote
+from models.lore_entry import LoreEntry
+from models.chat_session import ChatSession
+from schemas.session_note import (
     SessionNoteCreate, 
     SessionNoteUpdate, 
     SessionNoteInDB,

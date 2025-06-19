@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from backend.models.chat_session import ChatSession
-from backend.models.chat_message import ChatMessage
-from backend.models.full_analysis_result import FullAnalysisResult
-from backend.models.session_cache_fact import SessionCacheFact
-from backend.models.session_relationship import SessionRelationship
-from backend.models.session_lore_modification import SessionLoreModification
-from backend.models.active_session_event import ActiveSessionEvent
-from backend.models.temp_message_variant import TempMessageVariant
-from backend.database import get_db
+from models.chat_session import ChatSession
+from models.chat_message import ChatMessage
+from models.full_analysis_result import FullAnalysisResult
+from models.session_cache_fact import SessionCacheFact
+from models.session_relationship import SessionRelationship
+from models.session_lore_modification import SessionLoreModification
+from models.active_session_event import ActiveSessionEvent
+from models.temp_message_variant import TempMessageVariant
+from db.database import get_db
 
 router = APIRouter(tags=["Delete"], prefix="/delete")
 
@@ -48,12 +48,12 @@ def delete_messages_after(message_id: str, db: Session = Depends(get_db)):
             db.add(SessionLoreModification(chat_session_id=session_id, **mod))
     # Restore ActiveSessionEvents
     if 'active_session_events' in analysis_data:
-        db.query(ActiveSessionEvent).filter(ActiveSessionEvent.chat_session_id == session_id).delete(synchronize_session=False)
+        db.query(ActiveSessionEvent).filter(ActiveSessionEvent.session_id == session_id).delete(synchronize_session=False)
         for event in analysis_data['active_session_events']:
             db.add(ActiveSessionEvent(chat_session_id=session_id, **event))
     db.commit()
     # --- Remove dynamic memories from FAISS that are no longer relevant ---
-    from backend.services.faiss_service import get_faiss_index
+    from services.faiss_service import get_faiss_index
     faiss_index = get_faiss_index()
     if 'dynamic_memories_to_remove' in analysis_data:
         for item_id in analysis_data['dynamic_memories_to_remove']:
@@ -105,7 +105,7 @@ def delete_specific_message(message_id: str, db: Session = Depends(get_db)):
     
     # Clean up FAISS vectors for variants
     if variant_faiss_ids:
-        from backend.services.faiss_service import get_faiss_index
+        from services.faiss_service import get_faiss_index
         faiss_index = get_faiss_index()
         try:
             faiss_index.remove_ids(variant_faiss_ids)

@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from backend.models.chat_session import ChatSession
-from backend.models.chat_message import ChatMessage
-from backend.models.full_analysis_result import FullAnalysisResult
-from backend.database import get_db
+from models.chat_session import ChatSession
+from models.chat_message import ChatMessage
+from models.full_analysis_result import FullAnalysisResult
+from db.database import get_db
 
 router = APIRouter(tags=["Branching"], prefix="/branch")
 

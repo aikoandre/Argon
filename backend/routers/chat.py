@@ -14,16 +14,18 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined, 
 from sqlalchemy.orm import joinedload
 from fastapi.responses import StreamingResponse
 
-from backend.services.faiss_service import get_faiss_index
+from services.faiss_service import get_faiss_index
 # MistralClient removed - now using LiteLLM service for embeddings
-from backend.services.rerank_service import get_auxiliary_rerank_service, get_principal_rerank_service
-from backend.schemas.event import FixedEventData
+from services.rerank_service import get_auxiliary_rerank_service, get_principal_rerank_service
+from schemas.event import FixedEventData
 from backend.background_tasks import run_full_interaction_analysis
-from backend.services.synchronous_memory_service import SynchronousMemoryService
-from backend.services.composite_document_service import CompositeDocumentService
+from services.synchronous_memory_service import SynchronousMemoryService
+from services.composite_document_service import CompositeDocumentService
 
-from backend.services.query_transformation_service import QueryTransformationService
-from backend.services.litellm_service import litellm_service # Import LiteLLM service
+from services.query_transformation_service import QueryTransformationService
+from services.user_configuration_service import user_configuration_service
+from services.adaptive_prompt_service import AdaptivePromptService
+from services.litellm_service import litellm_service # Import LiteLLM service
 
 logger = logging.getLogger(__name__)
 
@@ -39,32 +41,34 @@ def safe_json_dumps(obj, **kwargs):
     return SafeJSONEncoder(**kwargs).encode(obj)
 
 # Jinja2 environment for all templates
+import os
+template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
 jinja_env = Environment(
-    loader=FileSystemLoader("backend/templates"),
+    loader=FileSystemLoader(template_dir),
     autoescape=select_autoescape(["html", "xml", "jinja2"]),
     undefined=Undefined  # Temporarily changed for debugging NameError
 )
 
-# Import SQLAlchemy models
-from backend.models.chat_session import ChatSession
-from backend.models.chat_message import ChatMessage
-from backend.models.user_settings import UserSettings
+# Import SQLAlchemy models 
+from models.chat_session import ChatSession
+from models.chat_message import ChatMessage
+from models.user_settings import UserSettings
 # Removed SessionCacheFact and SessionLoreModification - replaced by SessionNote system
-from backend.services.event_manager_service import EventManagerService
-from backend.models.session_relationship import SessionRelationship
-from backend.models.user_persona import UserPersona
-from backend.models.character_card import CharacterCard
-from backend.models.scenario_card import ScenarioCard
-from backend.models.master_world import MasterWorld
-from backend.models.active_session_event import ActiveSessionEvent
-from backend.models.lore_entry import LoreEntry as LoreEntryModel
+from services.event_manager_service import EventManagerService
+from models.session_relationship import SessionRelationship
+from models.user_persona import UserPersona
+from models.character_card import CharacterCard
+from models.scenario_card import ScenarioCard
+from models.master_world import MasterWorld
+from models.active_session_event import ActiveSessionEvent
+from models.lore_entry import LoreEntry as LoreEntryModel
 
 
 # Import Pydantic schemas
-from backend.schemas.chat_session import ChatSessionCreate, ChatSessionInDB, ChatSessionUpdate, ChatSessionListed
-from backend.schemas.chat_message import ChatMessageCreate, ChatMessageInDB, ChatTurnResponse, AIPersonaCardInfo, UserPersonaInfo
+from schemas.chat_session import ChatSessionCreate, ChatSessionInDB, ChatSessionUpdate, ChatSessionListed
+from schemas.chat_message import ChatMessageCreate, ChatMessageInDB, ChatTurnResponse, AIPersonaCardInfo, UserPersonaInfo
 
-from backend.database import get_db
+from db.database import get_db
 from backend.db.crud import create_chat_session as crud_create_chat_session
 
 # Global service instances
@@ -126,8 +130,7 @@ def create_or_get_chat_session(
     else:
         card = db.query(ScenarioCard).filter(ScenarioCard.id == str(card_id)).first()
     
-    if not card:
-        raise HTTPException(
+    if not card:        raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"{card_type.capitalize()} with id {card_id} not found"
         )
@@ -394,40 +397,15 @@ async def chat_message(
     Generate a full LLM response for a chat message, incorporating RAG, planning, and analysis.
     Returns the full AI message as a JSON response (not streamed).
     """
-    # --- LLM CLIENT/MODEL/KEY/CONTEXT SETUP (must be before any LLM call) ---
-    db_user_settings_obj = db.query(UserSettings).filter(UserSettings.id == USER_SETTINGS_ID).first()
-    if not db_user_settings_obj:
-        raise HTTPException(status_code=500, detail="User settings not configured. Please configure settings first.")
-    db_user_settings = {
-        # Legacy configuration
-        "llm_provider": db_user_settings_obj.llm_provider,
-        "primary_llm_api_key": db_user_settings_obj.primary_llm_api_key,
-        "analysis_llm_api_key": db_user_settings_obj.analysis_llm_api_key,
-        "selected_llm_model": db_user_settings_obj.selected_llm_model,
-        "mistral_api_key": db_user_settings_obj.mistral_api_key,
-        "max_messages_for_context": db_user_settings_obj.max_messages_for_context,
-        "analysis_llm_model": getattr(db_user_settings_obj, "analysis_llm_model", None),
-        
-        # New LiteLLM configuration
-        "primary_llm_provider": getattr(db_user_settings_obj, "primary_llm_provider", None),
-        "primary_llm_model": getattr(db_user_settings_obj, "primary_llm_model", None),
-        "primary_llm_api_key_new": getattr(db_user_settings_obj, "primary_llm_api_key_new", None),
-        "analysis_llm_provider": getattr(db_user_settings_obj, "analysis_llm_provider", None),
-        "analysis_llm_model_new": getattr(db_user_settings_obj, "analysis_llm_model_new", None),
-        "analysis_llm_api_key_new": getattr(db_user_settings_obj, "analysis_llm_api_key_new", None),
-        "maintenance_llm_provider": getattr(db_user_settings_obj, "maintenance_llm_provider", None),
-        "maintenance_llm_model": getattr(db_user_settings_obj, "maintenance_llm_model", None),
-        "maintenance_llm_api_key": getattr(db_user_settings_obj, "maintenance_llm_api_key", None),
-        "embedding_llm_provider": getattr(db_user_settings_obj, "embedding_llm_provider", None),
-        "embedding_llm_model": getattr(db_user_settings_obj, "embedding_llm_model", None),
-        "embedding_llm_api_key": getattr(db_user_settings_obj, "embedding_llm_api_key", None),
-        
-        # Other settings
-        "top_p": getattr(db_user_settings_obj, "top_p", 1.0),
-        "max_response_tokens": getattr(db_user_settings_obj, "max_response_tokens", 512),
-    }
-    # LiteLLM service will handle provider routing internally
-    # Validate that primary LLM settings are configured
+    # --- Enhanced User Settings with Prompt Configuration Integration ---
+    try:
+        # Get merged settings that include prompt preset parameters
+        db_user_settings = await user_configuration_service.get_merged_user_settings(db, USER_SETTINGS_ID)
+    except Exception as e:
+        logger.error(f"Failed to load user configuration: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load user configuration. Please check settings.")
+    
+    # Validate critical LLM settings
     if not db_user_settings.get("primary_llm_api_key") and not db_user_settings.get("primary_llm_api_key_new"):
         raise HTTPException(status_code=500, detail="Primary LLM API key is missing. Please configure it in settings.")
     
@@ -639,25 +617,31 @@ User ({{user_persona_details.name}}): {{user_input}}
         logger.error(f"Error during RAG process: {e}")
         retrieved_lore_entries_context = "\n\nNote: An error occurred while retrieving relevant lore entries."
     
-    # --- TEMPLATE RENDERING AND MESSAGE CONSTRUCTION ---
+    # --- ENHANCED PROMPT ASSEMBLY WITH MODULAR PRESET SYSTEM ---
     # Prepare context for the main generation template
-    from backend.services.event_manager_service import EventManagerService
-    from backend.models.user_prompt_instructions import UserPromptInstructions
-    from backend.services.message_preprocessing_service import MessagePreprocessingService
-    
-    # Get user prompt instructions
-    user_prompt_instructions = db.query(UserPromptInstructions).first()
+    from services.event_manager_service import EventManagerService
+    from models.user_prompt_instructions import UserPromptInstructions
+    from services.message_preprocessing_service import MessagePreprocessingService
+      # Get user prompt instructions
+    USER_INSTRUCTIONS_ID = 1  # Single global instructions row
+    user_prompt_instructions = db.query(UserPromptInstructions).filter(
+        UserPromptInstructions.id == USER_INSTRUCTIONS_ID
+    ).first()
     if not user_prompt_instructions:
-        # Create default empty instructions
-        class DefaultInstructions:
-            primary_instructions = None
-            analysis_instructions = None 
-            extraction_instructions = None
-        user_prompt_instructions = DefaultInstructions()
+        # Create default empty instructions in database
+        user_prompt_instructions = UserPromptInstructions(
+            id=USER_INSTRUCTIONS_ID,
+            primary_instructions="",
+            extraction_instructions="",
+            analysis_instructions=""
+        )
+        db.add(user_prompt_instructions)
+        db.commit()
+        db.refresh(user_prompt_instructions)
     
     # Get active events for this session
     active_events = db.query(ActiveSessionEvent).filter(
-        ActiveSessionEvent.chat_session_id == chat_id
+        ActiveSessionEvent.session_id == chat_id
     ).all()
     
     # Process user message for placeholder replacement and OOC detection
@@ -694,11 +678,42 @@ User ({{user_persona_details.name}}): {{user_input}}
     
     main_llm_context = replace_jinja_undefined(main_llm_context)
     
-    # Load and render the generation template
+    # --- NEW: Use AdaptivePromptService for modular prompt assembly ---
     try:
-        main_llm_prompt_template = jinja_env.get_template('main_generation_enhanced.jinja2')
-        final_full_prompt = main_llm_prompt_template.render(main_llm_context)
-        logger.info(f"[Template] Successfully rendered template for chat_id: {chat_id}")
+        # Get user prompt configuration
+        user_prompt_config = await user_configuration_service.get_or_create_user_configuration(db, USER_SETTINGS_ID)
+        
+        # Initialize adaptive prompt service
+        adaptive_prompt_service = AdaptivePromptService()
+        
+        # Assemble prompt with modular preset system
+        final_full_prompt = await adaptive_prompt_service.assemble_prompt_for_service(
+            service_type='generation',
+            base_context=main_llm_context,
+            user_config=user_prompt_config,
+            db=db,
+            rag_results=reranked_lore_entries
+        )
+        
+        logger.info(f"[AdaptivePrompt] Successfully assembled modular prompt for chat_id: {chat_id}")
+    except Exception as adaptive_error:
+        logger.warning(f"[AdaptivePrompt] Error using modular prompt service: {adaptive_error}")
+        logger.info("[AdaptivePrompt] Falling back to legacy template rendering")
+        
+        # Fallback to legacy template rendering
+        try:
+            main_llm_prompt_template = jinja_env.get_template('main_generation_enhanced.jinja2')
+            final_full_prompt = main_llm_prompt_template.render(main_llm_context)
+            logger.info(f"[Template] Successfully rendered fallback template for chat_id: {chat_id}")
+        except Exception as template_error:
+            logger.error(f"[Template] Error rendering fallback template: {template_error}")
+            # Ultimate fallback to simple prompt
+            final_full_prompt = f"""You are {ai_persona_card_info.name}.
+Personality: {ai_persona_card_info.description}
+Instructions: {ai_persona_card_info.instructions}
+
+User ({user_persona_name}): {preprocessed_message.content}
+{ai_persona_card_info.name}:"""
     except Exception as template_error:
         logger.error(f"[Template] Error rendering template: {template_error}")
         # Fallback to simple prompt
@@ -726,18 +741,17 @@ Respond helpfully to their OOC request without staying in character."""
             {"role": "user", "content": preprocessed_message.content}
         ]
     
-    # --- MAIN LLM CALL (non-streaming) ---
+    # --- ENHANCED LLM CALL WITH PROMPT PRESET PARAMETERS ---
     try:
-        logger.info(f"[LLM] Starting LLM call for chat_id: {chat_id}")
+        logger.info(f"[LLM] Starting enhanced LLM call with prompt preset parameters for chat_id: {chat_id}")
         
-        # Use LiteLLM service for primary LLM generation
+        # Use LiteLLM service with merged settings (includes prompt preset parameters)
         response = await litellm_service.get_service_completion(
             service_type="primary",
             messages=final_llm_messages,
-            user_settings=db_user_settings,
-            temperature=0.7,
-            max_tokens=db_user_settings["max_response_tokens"],
-            top_p=db_user_settings["top_p"]
+            user_settings=db_user_settings
+            # Note: All parameters now come from merged user settings
+            # No hardcoded temperature, max_tokens, or top_p values
         )
         
         # Extract content from LiteLLM response
@@ -745,7 +759,7 @@ Respond helpfully to their OOC request without staying in character."""
             ai_response_content = response["choices"][0]["message"]["content"]
         else:
             ai_response_content = str(response)
-        logger.info(f"[LLM] Successfully generated response for chat_id: {chat_id}")
+        logger.info(f"[LLM] Successfully generated response with preset parameters for chat_id: {chat_id}")
     except ImportError as ie:
         logger.error(f"[LLM] Missing LiteLLM service dependency: {ie}")
         ai_response_content = "I'm sorry, but the language model service is not available. Please check the system configuration."
@@ -753,7 +767,7 @@ Respond helpfully to their OOC request without staying in character."""
         logger.error(f"[LLM] LiteLLM service method missing: {ae}")
         ai_response_content = "I'm sorry, but there was a configuration issue with the language model service."
     except Exception as e:
-        logger.error(f"[LLM] Main LLM call failed: {e}")
+        logger.error(f"[LLM] Enhanced LLM call failed: {e}")
         ai_response_content = "I'm sorry, but I encountered an error while generating my response."
 
     # Ensure persona name/image always set (fallback to card/scenario or hardcoded default)
@@ -798,6 +812,22 @@ Respond helpfully to their OOC request without staying in character."""
             master_world_id = str(db_chat_session.master_world_id)
         elif ai_persona_card and hasattr(ai_persona_card, 'master_world_id') and ai_persona_card.master_world_id:
             master_world_id = str(ai_persona_card.master_world_id)
+        
+        # Fallback: get or create a default master world if none is set
+        if not master_world_id:
+            from models.master_world import MasterWorld
+            default_master_world = db.query(MasterWorld).first()
+            if not default_master_world:
+                # Create a default master world
+                import uuid
+                default_master_world = MasterWorld(
+                    id=str(uuid.uuid4()),
+                    name="Default World",
+                    description="Default world for lore entries without a specific world assignment."
+                )
+                db.add(default_master_world)
+                db.flush()
+            master_world_id = str(default_master_world.id)
         
         # Process memory updates synchronously (with fallback to continue on failure)
         memory_result = await memory_service.process_turn_memory_updates(

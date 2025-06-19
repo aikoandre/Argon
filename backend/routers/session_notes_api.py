@@ -9,9 +9,9 @@ from fastapi import APIRouter, Depends, HTTPException, status, Path, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from backend.database import get_db
-from backend.services.session_note_service import SessionNoteService
-from backend.schemas.session_note import (
+from db.database import get_db
+from services.session_note_service import SessionNoteService
+from schemas.session_note import (
     SessionNoteCreate,
     SessionNoteUpdate,
     SessionNoteResponse,

@@ -10,8 +10,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from .litellm_service import litellm_service
-from ..models.lore_entry import LoreEntry
-from ..utils.reasoning_utils import is_reasoning_capable_model
+from models.lore_entry import LoreEntry
+from utils.reasoning_utils import is_reasoning_capable_model
 
 logger = logging.getLogger(__name__)
 

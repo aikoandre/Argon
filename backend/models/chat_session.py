@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from backend.database import Base
+from db.database import Base
 
 class ChatSession(Base):
     __tablename__ = "chat_sessions"

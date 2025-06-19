@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { deleteCharacterCard, updateCharacterCard, createCharacterCard, getAllCharacterCards, createOrGetCardChat, type CharacterCardData } from "../services/api";
 import { useLayout } from '../contexts/LayoutContext';
+import { useActiveCard } from '../contexts/ActiveCardContext';
 import CharacterEditPanel from '../components/Editing/CharacterEditPanel';
 import { LeftPanelImage } from '../components/Layout';
 import { useInstantAutoSave } from '../hooks/useInstantAutoSave';
@@ -17,6 +18,7 @@ const CharactersPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const { setLeftPanelContent, setRightPanelContent, setLeftPanelVisible, setRightPanelVisible } = useLayout();
+  const { setActiveCard } = useActiveCard();
 
   // Load characters on component mount
   useEffect(() => {
@@ -92,6 +94,16 @@ const CharactersPage: React.FC = () => {
   // Handle editing character (like other pages)
   const handleEditCharacter = (character: CharacterCardData) => {
     setEditingCharacter(character);
+    
+    // Set active card for left panel image
+    setActiveCard({
+      type: 'character',
+      id: character.id,
+      name: character.name,
+      image: character.image_url || undefined,
+      description: character.description || undefined
+    });
+    
     updateLayoutContent(character);
   };
 

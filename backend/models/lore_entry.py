@@ -3,7 +3,7 @@ from sqlalchemy import Column, String, Text, JSON, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy.sql.sqltypes import TIMESTAMP
-from ..database import Base
+from db.database import Base
 
 class LoreEntry(Base):
     __tablename__ = "lore_entries"

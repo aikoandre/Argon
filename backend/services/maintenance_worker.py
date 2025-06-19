@@ -11,12 +11,12 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 from sqlalchemy.orm import Session
 
-from backend.db.database import get_db
-from backend.models.maintenance_queue import MaintenanceQueue
-from backend.schemas.maintenance_queue import TaskType, TaskStatus
-from backend.services.unified_llm_service import get_llm_service
-from backend.models.lore_entry import LoreEntry
-from backend.models.master_world import MasterWorld
+from db.database import get_db
+from models.maintenance_queue import MaintenanceQueue
+from schemas.maintenance_queue import TaskType, TaskStatus
+from services.unified_llm_service import get_llm_service
+from models.lore_entry import LoreEntry
+from models.master_world import MasterWorld
 
 logger = logging.getLogger(__name__)
 

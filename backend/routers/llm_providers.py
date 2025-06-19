@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 import httpx
 from typing import List, Optional, Dict, Any
-from backend.services.litellm_service import litellm_service, SUPPORTED_PROVIDERS
+from services.litellm_service import litellm_service, SUPPORTED_PROVIDERS
 
 router = APIRouter(
     prefix="/api/llm",

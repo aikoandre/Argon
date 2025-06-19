@@ -3,9 +3,9 @@ from fastapi import APIRouter, Depends, HTTPException, status, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from ..models.master_world import MasterWorld
-from ..schemas.master_world import MasterWorldCreate, MasterWorldUpdate, MasterWorldInDB
-from ..database import get_db
+from models.master_world import MasterWorld
+from schemas.master_world import MasterWorldCreate, MasterWorldUpdate, MasterWorldInDB
+from database import get_db
 
 router = APIRouter(
     prefix="/api/master_worlds",

@@ -5,12 +5,12 @@ from typing import List, Optional
 import json
 
 # Importe o modelo SQLAlchemy e os schemas Pydantic
-from ..models.scenario_card import ScenarioCard
-from ..schemas.scenario_card import ScenarioCardCreate, ScenarioCardUpdate, ScenarioCardInDB
-from ..file_storage import save_uploaded_file, delete_image_file
+from models.scenario_card import ScenarioCard
+from schemas.scenario_card import ScenarioCardCreate, ScenarioCardUpdate, ScenarioCardInDB
+from file_storage import save_uploaded_file, delete_image_file
 # Poderia importar WorldCard para validar referências, mas pode ficar complexo por enquanto
 
-from ..database import get_db
+from database import get_db
 
 router = APIRouter(
     prefix="/api/scenarios",

@@ -79,6 +79,21 @@ module.exports = {
             width: '0',
           },
         },
+        '.scrollbar-modern': {
+          'scrollbar-width': 'auto',
+          'scrollbar-color': '#495057 #212529',
+          '&::-webkit-scrollbar': {
+            width: '8px'
+          },
+          '&::-webkit-scrollbar-track': {
+            background: '#212529'
+          },
+          '&::-webkit-scrollbar-thumb': {
+            backgroundColor: '#495057',
+            borderRadius: '10px',
+            border: '2px solid #212529'
+          }
+        }
       }
       addUtilities(newUtilities);
     }

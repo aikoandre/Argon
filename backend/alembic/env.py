@@ -28,10 +28,10 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 
-from backend.database import Base as AppBase
+from db.database import Base as AppBase
 
 # Import all models to ensure they're registered with SQLAlchemy
-from backend.models import user_settings, user_persona, character_card, master_world, lore_entry, scenario_card, chat_session, chat_message
+from models import user_settings, user_persona, character_card, master_world, lore_entry, scenario_card, chat_session, chat_message
 
 target_metadata = AppBase.metadata
 

@@ -11,7 +11,7 @@ from sqlalchemy import and_
 import numpy as np
 from pydantic import BaseModel
 
-from ..models.lore_entry import LoreEntry
+from models.lore_entry import LoreEntry
 from .litellm_service import litellm_service
 
 logger = logging.getLogger(__name__)

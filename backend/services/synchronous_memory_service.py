@@ -20,9 +20,9 @@ from .session_note_rewriter import SessionNoteRewriter
 from .entity_creation_service import EntityCreationService
 from .faiss_service import get_faiss_index
 from .litellm_service import litellm_service
-from ..models.lore_entry import LoreEntry
-from ..models.session_note import SessionNote
-from ..schemas.session_note import SessionNoteCreate, SessionNoteUpdate
+from models.lore_entry import LoreEntry
+from models.session_note import SessionNote
+from schemas.session_note import SessionNoteCreate, SessionNoteUpdate
 
 logger = logging.getLogger(__name__)
 

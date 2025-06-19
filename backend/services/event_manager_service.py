@@ -1,12 +1,12 @@
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from backend.models.lore_entry import LoreEntry
-from backend.models.chat_session import ChatSession
-from backend.models.session_relationship import SessionRelationship
-from backend.models.active_session_event import ActiveSessionEvent
+from models.lore_entry import LoreEntry
+from models.chat_session import ChatSession
+from models.session_relationship import SessionRelationship
+from models.active_session_event import ActiveSessionEvent
 # Removed SessionCacheFact and SessionLoreModification - replaced by SessionNote system
-from backend.schemas.event import TriggerCondition, Phase, FixedEventData, EventOutcome
-from backend.schemas.active_session_event import ActiveSessionEventCreate, ActiveSessionEventUpdate
+from schemas.event import TriggerCondition, Phase, FixedEventData, EventOutcome
+from schemas.active_session_event import ActiveSessionEventCreate, ActiveSessionEventUpdate
 import logging
 import uuid
 

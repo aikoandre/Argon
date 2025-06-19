@@ -89,10 +89,9 @@ const ChatsListPage: React.FC = () => {
             const isCharacter = session.card_type === 'character';
             const CardImageComponent = CardImage;
             
-            return (
-              <div
+            return (              <div
                 key={session.id}
-                className="bg-app-surface p-4 rounded-lg shadow-md cursor-pointer transform transition-transform duration-300 hover:scale-105 flex items-center gap-4"
+                className="bg-app-bg p-4 rounded-lg shadow-md cursor-pointer flex items-center gap-4"
                 onClick={() => navigate(`/chat/${session.id}`)}
               >
                 <div className="flex-shrink-0 w-16 h-24">
@@ -107,7 +106,7 @@ const ChatsListPage: React.FC = () => {
                     <h2 className="text-xl font-semibold text-app-text">
                       {session.title || `Chat ${session.id.substring(0, 8)}`}
                     </h2>
-                    <span className="text-xs px-2 py-1 rounded-full bg-app-text-2 text-app-surface">
+                    <span className="text-xs px-2 py-1 rounded-full bg-app-text text-app-surface">
                       {isCharacter ? 'Character' : 'Scenario'}
                     </span>
                   </div>
@@ -118,7 +117,7 @@ const ChatsListPage: React.FC = () => {
                 <div className="flex-shrink-0 flex items-center gap-2">
                   {/* Rename Button */}
                   <button
-                    className="p-2 rounded-full hover:bg-app-surface-2 text-gray-400 hover:text-white transition-colors"
+                    className="p-2 rounded-lg hover:bg-app-surface text-gray-400 hover:text-white transition-colors"
                     onClick={(e) => {
                       e.stopPropagation(); // Prevent card click
                       // Implement rename logic here
@@ -133,7 +132,7 @@ const ChatsListPage: React.FC = () => {
                   </button>
                   {/* Delete Button */}
                   <button
-                    className="p-2 rounded-full hover:bg-red-700 text-gray-400 hover:text-white transition-colors"
+                    className="p-2 rounded-lg hover:bg-app-surface text-gray-400 hover:text-white transition-colors"
                     onClick={(e) => {
                       e.stopPropagation(); // Prevent card click
                       if (window.confirm(`Are you sure you want to delete "${session.title || `Chat ${session.id.substring(0, 8)}`}"?`)) {

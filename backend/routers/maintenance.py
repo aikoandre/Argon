@@ -6,16 +6,16 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
 
-from backend.db.database import get_db
-from backend.models.maintenance_queue import MaintenanceQueue
-from backend.schemas.maintenance_queue import (
+from db.database import get_db
+from models.maintenance_queue import MaintenanceQueue
+from schemas.maintenance_queue import (
     MaintenanceQueueCreate,
     MaintenanceQueueUpdate,
     MaintenanceQueueResponse,
     TaskType,
     TaskStatus
 )
-from backend.services.maintenance_worker import get_maintenance_worker
+from services.maintenance_worker import get_maintenance_worker
 
 router = APIRouter(prefix="/maintenance", tags=["maintenance"])
 

@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import Column, String, Text, DateTime, JSON, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from ..database import Base
+from db.database import Base
 
 class ScenarioCard(Base):
     __tablename__ = "scenario_cards"

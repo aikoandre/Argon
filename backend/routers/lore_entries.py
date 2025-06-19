@@ -5,17 +5,16 @@ from sqlalchemy import or_, and_, cast, String # Import or_, and_, cast, String 
 from typing import List, Dict
 import json # Import json for parsing the data string
 import os # Import os for path manipulation
-from backend.services.faiss_service import get_faiss_index # New import for FAISS
-from backend.services.litellm_service import litellm_service # LiteLLM service for embeddings
+from services.faiss_service import get_faiss_index # New import for FAISS
+from services.litellm_service import litellm_service # LiteLLM service for embeddings
 
 logger = logging.getLogger(__name__)
 
 # Adjust these imports based on your actual project structure
-from backend.database import get_db
-from backend.models.user_settings import UserSettings as UserSettingsModel # Ensure this is imported
-from backend.models.lore_entry import LoreEntry as LoreEntryModel
-from backend.schemas.lore_entry import LoreEntryCreate, LoreEntryUpdate, LoreEntryInDB
-from backend.models.user_settings import UserSettings as UserSettingsModel
+from db.database import get_db
+from models.user_settings import UserSettings as UserSettingsModel # Ensure this is imported
+from models.lore_entry import LoreEntry as LoreEntryModel
+from schemas.lore_entry import LoreEntryCreate, LoreEntryUpdate, LoreEntryInDB
 
 router = APIRouter(
     prefix="/api/master_worlds/{master_world_id}/lore_entries", # Corrected to match frontend

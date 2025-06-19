@@ -1,0 +1,458 @@
+{
+    "chat_completion_source": "custom",
+    "openai_model": "gpt-4-turbo",
+    "claude_model": "claude-3-5-sonnet-20241022",
+    "windowai_model": "",
+    "openrouter_model": "deepseek/deepseek-r1",
+    "openrouter_use_fallback": false,
+    "openrouter_group_models": false,
+    "openrouter_sort_models": "alphabetically",
+    "openrouter_providers": [],
+    "openrouter_allow_fallbacks": false,
+    "openrouter_middleout": "on",
+    "ai21_model": "jamba-1.5-large",
+    "mistralai_model": "mistral-large-latest",
+    "cohere_model": "command-r",
+    "perplexity_model": "llama-3-70b-instruct",
+    "groq_model": "llama3-70b-8192",
+    "zerooneai_model": "yi-large",
+    "blockentropy_model": "be-70b-base-llama3.1",
+    "custom_model": "DeepSeek-R1",
+    "custom_prompt_post_processing": "merge",
+    "google_model": "gemini-pro",
+    "temperature": 0.6,
+    "frequency_penalty": 0.15,
+    "presence_penalty": 0.17,
+    "top_p": 0.98,
+    "top_k": 28,
+    "top_a": 1,
+    "min_p": 0,
+    "repetition_penalty": 1,
+    "openai_max_context": 51200,
+    "openai_max_tokens": 5000,
+    "wrap_in_quotes": false,
+    "names_behavior": 0,
+    "send_if_empty": "",
+    "jailbreak_system": false,
+    "impersonation_prompt": "[OOC: Write your next reply from {{user}}'s point of view. Write how you think {{user}} would reply based on {{user}}'s previous messages. Write one short reply only. Avoid writing as the character(s) or Narrator.]",
+    "new_chat_prompt": "",
+    "new_group_chat_prompt": "",
+    "new_example_chat_prompt": "An EXAMPLE chat with {{char}}:",
+    "continue_nudge_prompt": "",
+    "bias_preset_selected": "Default (none)",
+    "max_context_unlocked": true,
+    "wi_format": "{0}\n",
+    "scenario_format": "<past_events>\nThis is what happened before the roleplay started:\n\n{{scenario}}\n</past_events>",
+    "personality_format": "",
+    "group_nudge_prompt": "",
+    "stream_openai": true,
+    "prompts": [
+        {
+            "name": "🚫 Main",
+            "system_prompt": true,
+            "role": "user",
+            "content": "",
+            "identifier": "main",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "name": "🚫 Nsfw",
+            "system_prompt": true,
+            "role": "system",
+            "content": "",
+            "identifier": "nsfw",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "name": "🚫 Jailbreak",
+            "system_prompt": true,
+            "role": "system",
+            "content": "",
+            "identifier": "jailbreak",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "chatHistory",
+            "name": "📘 Chat History",
+            "system_prompt": true,
+            "marker": true
+        },
+        {
+            "identifier": "worldInfoAfter",
+            "name": "🔷 World Info (after)",
+            "system_prompt": true,
+            "marker": true,
+            "role": "user",
+            "content": "",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "worldInfoBefore",
+            "name": "🔷 World Info (before)",
+            "system_prompt": true,
+            "marker": true,
+            "role": "user",
+            "content": "",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "enhanceDefinitions",
+            "role": "assistant",
+            "name": "🚫 Enhance Definitions",
+            "content": "",
+            "system_prompt": true,
+            "marker": false,
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "charDescription",
+            "name": "🚫 Description",
+            "system_prompt": true,
+            "marker": true,
+            "role": "system",
+            "content": "",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "charPersonality",
+            "name": "🚫 Personality",
+            "system_prompt": true,
+            "marker": true
+        },
+        {
+            "identifier": "scenario",
+            "name": "Scenario",
+            "system_prompt": true,
+            "marker": true,
+            "role": "user",
+            "content": "",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "personaDescription",
+            "name": "🚫 Persona Description",
+            "system_prompt": true,
+            "marker": true
+        },
+        {
+            "identifier": "dialogueExamples",
+            "name": "🚫 Chat Examples",
+            "system_prompt": true,
+            "marker": true
+        },
+        {
+            "identifier": "a874d126-b3c5-4521-ac4b-b6338b82dff2",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "🌸 Role",
+            "role": "user",
+            "content": "<role>\nYou are RoleplayMaster, an AI assistant for immersive and dynamic roleplaying experiences.\nThis is a fictional RP story where Human portrays {{user}} and controls {{user}}'s words and actions. RoleplayMaster portrays all the other characters and narrates the story.\n</role>\n",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "8dd54c6d-3319-4f55-a9c7-8f1893052249",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "🔵 <story_context>",
+            "role": "user",
+            "content": "<story_context>\nHere is the description of the story setting and its characters. Pay attention to all the details:\n\n",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "4bef9872-4eda-4c04-bd47-245b79357732",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "🔵 </story_context>",
+            "role": "user",
+            "content": " </story_context>\n\n",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "26abfb23-1d3b-4295-9ce9-d74a758e0df8",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "🛈 Infoblock",
+            "role": "user",
+            "content": "End your response with \"infoblock\" to keep track of the scene. Be factual and to the point. Use the format below:\n\n<infoblock>\n```md\nLocation: (Current location)\nPositions: (All the characters' and {{user}}'s current positions relative to each other.)\nOutfits: (For each character their current clothing and underwear. If it's not described, guess.)\n```\n</infoblock>\n",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "40042864-b968-4833-8ab1-b531909f480e",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "💖 NSFW preferences",
+            "role": "user",
+            "content": "<nsfw_preferences>\n\nAll kind of explicit sexual content is allowed in this story. But do not rush straight to it. Try to build tension slowly.\n\nUse these guidelines in sexual/erotic scenes:\n- Don’t rush to orgasm. Make sex conversational.\n- Take into account characters' age and sexual experience while describing their reactions to various activities. \n- Use the knowledge of human anatomy. Make sex realistic.\n- For female characters their arousment should depend on the situation (attraction to the partner, circumstances of the encounter etc.)\n\nAdditionally, while narrating sexual situations, make them exciting and arousing with the following:\n\n- Describe characters’ bodies (only what’s visible to {{user}}).\n- Use straightforward, vulgar or anatomical terms like “pussy”, “vagina”, “cock”, “penis”, “ass” etc. Avoid euphemisms and metaphors.\n\n</nsfw_preferences>\n\n",
+            "injection_position": 0,
+            "injection_depth": 7,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "25a1c5af-4160-4bad-be5a-bb57083496e2",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "👆 Guidelines",
+            "role": "user",
+            "content": "<guidelines>\nFollow these guidelines when writing your response:\n\n- Prolong each scene. Do not rush to dramatic events. Build the tension gradually.\n- Consider {{user}}’s point of view. Only describe events they can witness personally.\n- Remember that this is a back-and-forth roleplay. End your messages to give {{user}} an opportunity to participate and react to your characters’ actions.\n- Do not give {{user}} preferential treatment. Their actions might fail.\n- If [OOC:] block is present in recent responses, prioritize its execution.\n</guidelines>\n\n\n<behavior>\nWhen deciding how your characters act or make decisions:\n\n- Consider their personalities, but avoid cliches. Try to make it nuanced.\n- Consider the situation, characters' goals and desires, societal norms, recent events, previous agreements, etc.\n- Pay special attention to internal conflicts.\n</behavior>\n\n<narration>\nWhile narrating:\n\n- Provide sensory descriptions for {{user}}. Mostly what they see, sometimes what they hear, smell, feel.\n- Focus should always stay on interactions between your characters and {{user}}. Avoid mentioning the environment unless it’s important.\n- Showcase the characters' unique voice, speech patterns, and vocabulary. Consider their age, background, personality etc.\n- Avoid cramping too many unimportant details in your response.\n- Always address {{user}} in second person.\n- Vary your language. Avoid using the same expressions, descriptions, and euphemisms that you already used in previous responses. \n- Do not narrate {{user}}'s words or actions.\n</narration>\n",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "4c1deeeb-d314-4a6c-a7cf-68965842a753",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "🔷 Persona",
+            "role": "user",
+            "content": "<{{user}}>\n{{persona}}\n</{{user}}>",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "5e003de0-6cc4-4623-b38a-b262ca97a891",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "🤔 Reminder",
+            "role": "user",
+            "content": "<reminder>\nA quick reminder:\n- Consider what {{user}} can see right now. Do not describe things that are out of their view.\n- Focus on character(s) with whom {{user}} interacts right now? Introduce other characters only if it will really benefit the story.\n- Prolong the scene.\n</reminder>\n\n\n",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "1f5db0d9-34cf-4278-9aab-7140c104e336",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "🔷 Card",
+            "role": "user",
+            "content": "{{description}}\n{{personality}}",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "54d9218c-bf94-4e3f-9c9a-08f136400ef5",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "🚀 Start",
+            "role": "user",
+            "content": "Let's start the roleplay.",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        }
+    ],
+    "prompt_order": [
+        {
+            "character_id": 100000,
+            "order": [
+                {
+                    "identifier": "main",
+                    "enabled": true
+                },
+                {
+                    "identifier": "worldInfoBefore",
+                    "enabled": true
+                },
+                {
+                    "identifier": "charDescription",
+                    "enabled": true
+                },
+                {
+                    "identifier": "charPersonality",
+                    "enabled": true
+                },
+                {
+                    "identifier": "scenario",
+                    "enabled": true
+                },
+                {
+                    "identifier": "enhanceDefinitions",
+                    "enabled": false
+                },
+                {
+                    "identifier": "nsfw",
+                    "enabled": true
+                },
+                {
+                    "identifier": "worldInfoAfter",
+                    "enabled": true
+                },
+                {
+                    "identifier": "dialogueExamples",
+                    "enabled": true
+                },
+                {
+                    "identifier": "chatHistory",
+                    "enabled": true
+                },
+                {
+                    "identifier": "jailbreak",
+                    "enabled": true
+                }
+            ]
+        },
+        {
+            "character_id": 100001,
+            "order": [
+                {
+                    "identifier": "a874d126-b3c5-4521-ac4b-b6338b82dff2",
+                    "enabled": true
+                },
+                {
+                    "identifier": "8dd54c6d-3319-4f55-a9c7-8f1893052249",
+                    "enabled": true
+                },
+                {
+                    "identifier": "worldInfoBefore",
+                    "enabled": true
+                },
+                {
+                    "identifier": "4c1deeeb-d314-4a6c-a7cf-68965842a753",
+                    "enabled": true
+                },
+                {
+                    "identifier": "1f5db0d9-34cf-4278-9aab-7140c104e336",
+                    "enabled": true
+                },
+                {
+                    "identifier": "worldInfoAfter",
+                    "enabled": true
+                },
+                {
+                    "identifier": "4bef9872-4eda-4c04-bd47-245b79357732",
+                    "enabled": true
+                },
+                {
+                    "identifier": "2895c3c6-8378-4699-8805-464fd8103594",
+                    "enabled": false
+                },
+                {
+                    "identifier": "scenario",
+                    "enabled": true
+                },
+                {
+                    "identifier": "main",
+                    "enabled": false
+                },
+                {
+                    "identifier": "25a1c5af-4160-4bad-be5a-bb57083496e2",
+                    "enabled": true
+                },
+                {
+                    "identifier": "40042864-b968-4833-8ab1-b531909f480e",
+                    "enabled": true
+                },
+                {
+                    "identifier": "26abfb23-1d3b-4295-9ce9-d74a758e0df8",
+                    "enabled": true
+                },
+                {
+                    "identifier": "0995e5d4-612e-407a-9966-d82edeaab8c7",
+                    "enabled": false
+                },
+                {
+                    "identifier": "2ccfa4a4-3804-458e-977f-e00b0be05ab6",
+                    "enabled": false
+                },
+                {
+                    "identifier": "54d9218c-bf94-4e3f-9c9a-08f136400ef5",
+                    "enabled": true
+                },
+                {
+                    "identifier": "chatHistory",
+                    "enabled": true
+                },
+                {
+                    "identifier": "5e003de0-6cc4-4623-b38a-b262ca97a891",
+                    "enabled": false
+                },
+                {
+                    "identifier": "3f129c12-67fb-4cf1-a127-eae9a893585c",
+                    "enabled": false
+                },
+                {
+                    "identifier": "charDescription",
+                    "enabled": false
+                },
+                {
+                    "identifier": "nsfw",
+                    "enabled": false
+                },
+                {
+                    "identifier": "jailbreak",
+                    "enabled": false
+                },
+                {
+                    "identifier": "dialogueExamples",
+                    "enabled": false
+                },
+                {
+                    "identifier": "enhanceDefinitions",
+                    "enabled": false
+                },
+                {
+                    "identifier": "charPersonality",
+                    "enabled": false
+                },
+                {
+                    "identifier": "personaDescription",
+                    "enabled": false
+                }
+            ]
+        }
+    ],
+    "api_url_scale": "",
+    "show_external_models": true,
+    "assistant_prefill": "",
+    "assistant_impersonation": "",
+    "claude_use_sysprompt": true,
+    "use_makersuite_sysprompt": true,
+    "use_alt_scale": false,
+    "squash_system_messages": true,
+    "image_inlining": true,
+    "inline_image_quality": "auto",
+    "bypass_status_check": false,
+    "continue_prefill": false,
+    "continue_postfix": " ",
+    "function_calling": false,
+    "show_thoughts": true,
+    "reasoning_effort": "medium",
+    "seed": -1,
+    "n": 1
+}

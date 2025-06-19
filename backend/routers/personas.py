@@ -8,11 +8,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Importe o modelo SQLAlchemy e os schemas Pydantic
-from ..models.user_persona import UserPersona
-from ..schemas.user_persona import UserPersonaCreate, UserPersonaUpdate, UserPersonaInDB
-from ..models.master_world import MasterWorld
+from models.user_persona import UserPersona
+from schemas.user_persona import UserPersonaCreate, UserPersonaUpdate, UserPersonaInDB
+from models.master_world import MasterWorld
 
-from ..database import get_db
+from database import get_db
 
 router = APIRouter(
     prefix="/api/personas",
@@ -37,7 +37,7 @@ async def create_user_persona(
             raise HTTPException(status_code=400, detail="Master World not found")
 
     if image:
-        from ..file_storage import save_uploaded_file
+        from file_storage import save_uploaded_file
         image_url = await save_uploaded_file(
             image,
             entity_type="persona",
@@ -99,7 +99,7 @@ async def update_user_persona(
             raise HTTPException(status_code=400, detail="Master World not found")
 
     if image:
-        from ..file_storage import save_uploaded_file, delete_image_file
+        from file_storage import save_uploaded_file, delete_image_file
         if db_persona.image_url:
             delete_image_file(db_persona.image_url)
         # Use the name from update_data_model if provided, otherwise fallback to db_persona.name
@@ -110,7 +110,7 @@ async def update_user_persona(
             entity_name=image_name_for_file
         )
     elif remove_image:
-        from ..file_storage import delete_image_file
+        from file_storage import delete_image_file
         if db_persona.image_url:
             delete_image_file(db_persona.image_url)
         update_data["image_url"] = None
@@ -135,7 +135,7 @@ def delete_user_persona(persona_id: str, db: Session = Depends(get_db)):
 
     # Delete the associated image file if it exists
     if getattr(db_persona, 'image_url', None):
-        from ..file_storage import delete_image_file
+        from file_storage import delete_image_file
         delete_image_file(db_persona.image_url)
 
     db.delete(db_persona)

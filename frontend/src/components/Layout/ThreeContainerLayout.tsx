@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { useLayout } from '../../contexts/LayoutContext';
 import { useChatInput } from '../../contexts/ChatInputContext';
 import LeftPanel from './LeftPanel.tsx';
+import EnhancedLeftPanel from './EnhancedLeftPanel.tsx';
 import CenterPanel from './CenterPanel.tsx';
 import RightPanel from './RightPanel.tsx';
 import { ChatInput } from '../ChatInput';
@@ -30,9 +31,9 @@ const ThreeContainerLayout: React.FC<ThreeContainerLayoutProps> = ({
   // Header height for spacing calculations
   const headerHeight = '56px'; // Based on h-[56px] from App.tsx
   
-  // Consistent panel widths - Fixed to ensure perfect uniformity
-  const mobilePanelWidth = 'w-80'; // 320px fixed
-  const desktopPanelWidth = 'w-80'; // 320px fixed on all screen sizes
+  // Consistent panel widths - Increased by 10% total from 320px to 353px
+  const mobilePanelWidth = 'w-[353px]'; // 353px fixed (320px + 10% total)
+  const desktopPanelWidth = 'w-[353px]'; // 353px fixed on all screen sizes
 
   return (
     <div className="relative flex flex-col w-full min-h-screen bg-app-bg overflow-hidden">
@@ -45,7 +46,7 @@ const ThreeContainerLayout: React.FC<ThreeContainerLayoutProps> = ({
             <CenterPanel header={header} noPadding={isChatPage}>{children}</CenterPanel>
           </div>
 
-          {/* Left Panel Overlay - Animated from left */}
+          {/* Left Panel Overlay - Always show EnhancedLeftPanel */}
           <AnimatePresence>
             {leftVisible && (
               <motion.div
@@ -61,7 +62,11 @@ const ThreeContainerLayout: React.FC<ThreeContainerLayoutProps> = ({
                 className={`absolute top-0 left-0 ${mobilePanelWidth} h-full z-20`}
                 style={{ marginTop: headerHeight }}
               >
-                <LeftPanel>{layoutState.leftPanelContent}</LeftPanel>
+                <LeftPanel>
+                  <div className="h-full overflow-y-auto scrollbar-modern">
+                    <EnhancedLeftPanel />
+                  </div>
+                </LeftPanel>
               </motion.div>
             )}
           </AnimatePresence>
@@ -109,17 +114,21 @@ const ThreeContainerLayout: React.FC<ThreeContainerLayoutProps> = ({
 
         {/* Desktop/Large Screen Layout - Side by side */}
         <div className="hidden lg:flex w-full">
-          {/* Left Panel - Fixed width */}
+          {/* Left Panel - Conditional visibility */}
           <AnimatePresence>
             {leftVisible && (
               <motion.div
                 initial={{ width: 0, opacity: 0 }}
-                animate={{ width: 320, opacity: 1 }} // Fixed 320px width
+                animate={{ width: 353, opacity: 1 }} // Fixed 353px width
                 exit={{ width: 0, opacity: 0 }}
                 transition={{ duration: 0.3, ease: 'easeInOut' }}
                 className={`${desktopPanelWidth} flex-shrink-0 m-px`}
               >
-                <LeftPanel>{layoutState.leftPanelContent}</LeftPanel>
+                <LeftPanel>
+                  <div className="h-full overflow-y-auto scrollbar-modern">
+                    <EnhancedLeftPanel />
+                  </div>
+                </LeftPanel>
               </motion.div>
             )}
           </AnimatePresence>
@@ -134,7 +143,7 @@ const ThreeContainerLayout: React.FC<ThreeContainerLayoutProps> = ({
             {rightVisible && (
               <motion.div
                 initial={{ width: 0, opacity: 0 }}
-                animate={{ width: 320, opacity: 1 }} // Fixed 320px width
+                animate={{ width: 353, opacity: 1 }} // Fixed 353px width (320px + 10% total)
                 exit={{ width: 0, opacity: 0 }}
                 transition={{ duration: 0.3, ease: 'easeInOut' }}
                 className={`${desktopPanelWidth} flex-shrink-0 m-px`}
@@ -151,7 +160,7 @@ const ThreeContainerLayout: React.FC<ThreeContainerLayoutProps> = ({
         <div className="hidden lg:block">
           {/* Desktop: Align with center panel width */}
           <div className="flex w-full">
-            {leftVisible && <div className="w-80 flex-shrink-0" />}
+            {leftVisible && <div className="w-[353px] flex-shrink-0" />}
             <div className="flex-1 min-w-0">
               <ChatInput 
                 onSendMessage={sendMessage}
@@ -161,7 +170,7 @@ const ThreeContainerLayout: React.FC<ThreeContainerLayoutProps> = ({
                 isProcessingMemory={isProcessingMemory}
               />
             </div>
-            {rightVisible && <div className="w-80 flex-shrink-0" />}
+            {rightVisible && <div className="w-[353px] flex-shrink-0" />}
           </div>
         </div>
         <div className="block lg:hidden">

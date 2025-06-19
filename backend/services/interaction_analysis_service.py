@@ -4,9 +4,9 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
 import os
 import json
 
-from backend.services.litellm_service import litellm_service
-from backend.schemas.ai_analysis_result import InteractionAnalysisResult
-from backend.utils.reasoning_utils import is_reasoning_capable_model
+from services.litellm_service import litellm_service
+from schemas.ai_analysis_result import InteractionAnalysisResult
+from utils.reasoning_utils import is_reasoning_capable_model
 
 # Set up logger
 logger = logging.getLogger(__name__)

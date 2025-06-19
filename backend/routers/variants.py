@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Body, Path
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from backend.models.temp_message_variant import TempMessageVariant
-from backend.models.temp_variant_analysis import TempVariantAnalysis
-from backend.models.temp_variant_memory import TempVariantMemory
-from backend.models.chat_message import ChatMessage
-from backend.models.full_analysis_result import FullAnalysisResult
-from backend.database import get_db
+from models.temp_message_variant import TempMessageVariant
+from models.temp_variant_analysis import TempVariantAnalysis
+from models.temp_variant_memory import TempVariantMemory
+from models.chat_message import ChatMessage
+from models.full_analysis_result import FullAnalysisResult
+from db.database import get_db
 
 router = APIRouter(tags=["Variants"], prefix="/variants")
 
@@ -119,24 +119,24 @@ async def generate_variant_for_message(message_id: str, db: Session = Depends(ge
     next_variant_index = len(existing_variants)
     
     # Import the chat message generation logic and models
-    from backend.routers.chat import (
+    from routers.chat import (
         USER_SETTINGS_ID, QueryTransformationService,
         jinja_env, replace_jinja_undefined,
         get_text_to_embed_from_lore_entry,
         is_reasoning_capable_model,
         AIPersonaCardInfo, MessagePreprocessingService
     )
-    from backend.services.litellm_service import litellm_service
+    from services.litellm_service import litellm_service
     
     # Import models directly from their respective modules
-    from backend.models.user_settings import UserSettings
-    from backend.models.character_card import CharacterCard
-    from backend.models.scenario_card import ScenarioCard
-    from backend.models.user_persona import UserPersona
-    from backend.models.lore_entry import LoreEntry as LoreEntryModel
-    from backend.models.session_lore_modification import SessionLoreModification
-    from backend.models.session_cache_fact import SessionCacheFact
-    from backend.models.user_prompt_instructions import UserPromptInstructions
+    from models.user_settings import UserSettings
+    from models.character_card import CharacterCard
+    from models.scenario_card import ScenarioCard
+    from models.user_persona import UserPersona
+    from models.lore_entry import LoreEntry as LoreEntryModel
+    from models.session_lore_modification import SessionLoreModification
+    from models.session_cache_fact import SessionCacheFact
+    from models.user_prompt_instructions import UserPromptInstructions
     
     # Get user settings and session details
     user_settings = db.query(UserSettings).filter(UserSettings.id == USER_SETTINGS_ID).first()
@@ -144,7 +144,7 @@ async def generate_variant_for_message(message_id: str, db: Session = Depends(ge
         raise HTTPException(status_code=500, detail="User settings not found.")
     
     # Get session details
-    from backend.models.chat_session import ChatSession
+    from models.chat_session import ChatSession
     session = db.query(ChatSession).filter(ChatSession.id == original_message.chat_session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Chat session not found.")
@@ -435,7 +435,7 @@ async def regenerate_ai_response(message_id: str, db: Session = Depends(get_db))
     Regenerate AI response by triggering the same chat generation flow as sending a message.
     This will create a new AI message in the conversation with a new response.
     """
-    from backend.routers.chat import chat_message, UserMessageInput
+    from routers.chat import chat_message, UserMessageInput
 
     original_message = db.query(ChatMessage).filter(ChatMessage.id == message_id).first()
     if not original_message:

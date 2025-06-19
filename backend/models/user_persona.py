@@ -5,7 +5,7 @@ from sqlalchemy.dialects.postgresql import UUID # Se usar PostgreSQL no futuro
 from sqlalchemy.orm import relationship
 # Para SQLite, UUID pode ser armazenado como String
 from sqlalchemy.sql import func
-from ..database import Base
+from db.database import Base
 
 class UserPersona(Base):
     __tablename__ = "user_personas"

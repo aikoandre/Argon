@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { IconActionBar } from '../Layout';
 import { FullscreenModal } from '../Common';
-import PlaceholderHelp from '../PlaceholderHelp';
 import type { ScenarioCardData, MasterWorldData } from '../../services/api';
 
 interface ScenarioEditPanelProps {
@@ -261,7 +260,6 @@ const ScenarioEditPanel: React.FC<ScenarioEditPanelProps> = React.memo(({
       />
       <div className="flex justify-between items-center p-2 border-b border-app-border bg-app-surface">
         <h3 className="text-sm font-semibold">Edit Scenario</h3>
-        <PlaceholderHelp />
       </div>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-4 flex-1 overflow-y-auto scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border">
         <label className="font-semibold text-sm">Name

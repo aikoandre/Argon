@@ -5,16 +5,16 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 import os
 import logging
 
-from backend.services.litellm_service import litellm_service
-from backend.services.chat_flow_monitor import get_monitor
-from backend.utils.json_extractor import extract_json, validate_json_structure
-from backend.utils.json_monitoring import validate_and_log_llm_response
+from services.litellm_service import litellm_service
+from services.chat_flow_monitor import get_monitor
+from utils.json_extractor import extract_json, validate_json_structure
+from utils.json_monitoring import validate_and_log_llm_response
 
 logger = logging.getLogger(__name__)
  
 class QueryTransformationService:
-    def __init__(self, litellm_service=None):
-        self.litellm_service = litellm_service or litellm_service
+    def __init__(self, litellm_service_instance=None):
+        self.litellm_service = litellm_service_instance or litellm_service
         template_dir = os.path.join(os.path.dirname(__file__), '../templates')
         self.env = Environment(
             loader=FileSystemLoader(template_dir),

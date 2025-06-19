@@ -4,7 +4,7 @@ from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Uniq
 from sqlalchemy import JSON # Use generic JSON for broader compatibility
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from ..database import Base
+from db.database import Base
 
 class SessionRelationship(Base):
     __tablename__ = "session_relationships"

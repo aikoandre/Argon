@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from backend.services.litellm_service import litellm_service
+from services.litellm_service import litellm_service
 
 class EmbeddingService:
     def __init__(self):

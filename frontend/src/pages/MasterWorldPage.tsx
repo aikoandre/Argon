@@ -367,7 +367,7 @@ const MasterWorldPageContext: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col h-full max-h-[calc(100vh-120px)] overflow-hidden">
       {/* Header and controls */}
       <div className="mb-4 flex-shrink-0">
         <div className="flex justify-between items-center">
@@ -445,7 +445,7 @@ const MasterWorldPageContext: React.FC = () => {
       )}
 
       {/* Scrollable section titles and cards */}
-      <div className="overflow-y-auto flex-1 min-h-0 max-h-[calc(100vh-310px)] space-y-8 pb-4 scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border hover:scrollbar-thumb-app-text">
+      <div className="overflow-y-auto flex-1 min-h-0 space-y-8 pb-4 scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border hover:scrollbar-thumb-app-text">
         {!selectedMasterWorld ? (
           <div className="flex flex-col items-center justify-center h-full text-center py-20">
             <span className="material-icons-outlined text-6xl text-gray-500 mb-4">public</span>

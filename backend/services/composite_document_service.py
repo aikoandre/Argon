@@ -12,10 +12,10 @@ import numpy as np
 from collections import OrderedDict
 import time
 
-from backend.models.lore_entry import LoreEntry
-from backend.models.session_note import SessionNote
-from backend.services.litellm_service import litellm_service
-from backend.services.faiss_service import get_faiss_index
+from models.lore_entry import LoreEntry
+from models.session_note import SessionNote
+from services.litellm_service import litellm_service
+from services.faiss_service import get_faiss_index
 
 logger = logging.getLogger(__name__)
 
@@ -109,18 +109,19 @@ class CompositeDocumentService:
             embedding_api_key = user_settings.get('embedding_llm_api_key')
             
             # Generate embedding
-            response = await self.litellm_service.generate_embedding(
-                text=text,
+            embeddings = await self.litellm_service.get_embedding(
                 provider=embedding_provider,
                 model=embedding_model,
+                texts=[text],  # Pass as list since method expects Union[str, List[str]]
                 api_key=embedding_api_key
             )
             
-            if response.success and response.embedding:
+            if embeddings and len(embeddings) > 0:
+                embedding_vector = embeddings[0]  # Get first embedding
                 logger.debug(f"Generated composite embedding for {composite_doc.lore_entry.name}")
-                return np.array(response.embedding)
+                return np.array(embedding_vector)
             else:
-                logger.error(f"Embedding generation failed: {response.error_message}")
+                logger.error(f"Embedding generation failed: no embeddings returned")
                 return None
                 
         except Exception as e:

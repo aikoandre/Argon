@@ -15,12 +15,14 @@ import { LeftPanelImage } from '../components/Layout';
 import { createPNGWithEmbeddedData } from '../utils/pngExport';
 import { scenarioToFormData } from '../utils/formDataHelpers';
 import { useLayout } from '../contexts/LayoutContext';
+import { useActiveCard } from '../contexts/ActiveCardContext';
 import { useInstantAutoSave } from '../hooks/useInstantAutoSave';
 import ScenarioEditPanel from '../components/Editing/ScenarioEditPanel';
 
 const ScenariosPageContext: React.FC = () => {
   const navigate = useNavigate();
   const { setLeftPanelContent, setRightPanelContent, setLeftPanelVisible, setRightPanelVisible } = useLayout();
+  const { setActiveCard } = useActiveCard();
   
   const [scenarios, setScenarios] = useState<ScenarioCardData[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -83,6 +85,16 @@ const ScenariosPageContext: React.FC = () => {
   // Handle editing scenario
   const handleEditScenario = (scenario: ScenarioCardData) => {
     setEditingScenario(scenario);
+    
+    // Set active card for left panel image
+    setActiveCard({
+      type: 'scenario',
+      id: scenario.id,
+      name: scenario.name,
+      image: scenario.image_url || undefined,
+      description: scenario.description || undefined
+    });
+    
     updateLayoutContent(scenario);
   };
 

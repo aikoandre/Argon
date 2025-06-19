@@ -1,9 +1,9 @@
 # backend/routers/prompt_instructions.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from backend.database import get_db
-from backend.models.user_prompt_instructions import UserPromptInstructions
-from backend.schemas.user_prompt_instructions import (
+from db.database import get_db
+from models.user_prompt_instructions import UserPromptInstructions
+from schemas.user_prompt_instructions import (
     UserPromptInstructionsInDB, 
     UserPromptInstructionsUpdate
 )

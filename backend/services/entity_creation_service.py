@@ -11,7 +11,7 @@ import json
 import re
 
 from .litellm_service import litellm_service
-from ..utils.reasoning_utils import is_reasoning_capable_model
+from utils.reasoning_utils import is_reasoning_capable_model
 
 logger = logging.getLogger(__name__)
 

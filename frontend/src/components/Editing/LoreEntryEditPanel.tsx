@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { IconActionBar } from '../Layout';
 import { FullscreenModal } from '../Common';
-import PlaceholderHelp from '../PlaceholderHelp';
 import type { LoreEntryData, MasterWorldData } from '../../services/api';
 
 interface SelectOption {
@@ -57,7 +56,6 @@ const LoreEntryEditPanel: React.FC<LoreEntryEditPanelProps> = ({
       />
       <div className="flex justify-between items-center p-2 border-b border-app-border bg-app-surface">
         <h3 className="text-sm font-semibold">Edit Lore Entry</h3>
-        <PlaceholderHelp />
       </div>
       <form className="flex flex-col gap-4 p-4 flex-1 overflow-y-auto scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border">
         <label className="font-semibold text-sm">Name

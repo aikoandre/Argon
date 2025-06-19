@@ -151,10 +151,61 @@ class LiteLLMService:
             )
             
             # Extract embeddings from response
+            embeddings = []
+            
+            # Handle different response formats
             if hasattr(response, 'data'):
-                return [item.embedding for item in response.data]
+                # OpenAI-style response with object attributes
+                for item in response.data:
+                    if hasattr(item, 'embedding'):
+                        embeddings.append(item.embedding)
+                    elif isinstance(item, dict) and 'embedding' in item:
+                        embeddings.append(item['embedding'])
+                    else:
+                        # Log the actual structure for debugging
+                        logger.warning(f"Unexpected embedding item format: {type(item)}, content: {item}")
+                        # Try to extract embedding from any available field
+                        if isinstance(item, dict):
+                            for key in ['embedding', 'vector', 'data']:
+                                if key in item:
+                                    embeddings.append(item[key])
+                                    break
+                        continue
+                return embeddings
+            elif isinstance(response, dict) and 'data' in response:
+                # Dictionary-style response
+                for item in response['data']:
+                    if isinstance(item, dict) and 'embedding' in item:
+                        embeddings.append(item['embedding'])
+                    elif hasattr(item, 'embedding'):
+                        embeddings.append(item.embedding)
+                    else:
+                        # Log the actual structure for debugging
+                        logger.warning(f"Unexpected embedding item format: {type(item)}, content: {item}")
+                        # Try to extract embedding from any available field
+                        if isinstance(item, dict):
+                            for key in ['embedding', 'vector', 'data']:
+                                if key in item:
+                                    embeddings.append(item[key])
+                                    break
+                        continue
+                return embeddings
             else:
-                return [item['embedding'] for item in response['data']]
+                # Log the full response structure for debugging
+                logger.error(f"Unexpected response format: {type(response)}, content: {response}")
+                # Try to handle direct embedding response
+                if isinstance(response, dict):
+                    # Check if this is a direct embedding response
+                    if 'embedding' in response:
+                        return [response['embedding']]
+                    elif 'embeddings' in response:
+                        return response['embeddings']
+                    # Check for other common patterns
+                    for key in ['data', 'result', 'output']:
+                        if key in response and isinstance(response[key], list):
+                            return response[key]
+                
+                raise Exception(f"Unexpected embedding response format: {type(response)}")
             
         except Exception as e:
             logger.error(f"LiteLLM embedding error for {provider}/{model}: {e}")
@@ -220,14 +271,14 @@ class LiteLLMService:
             raise self._format_provider_error(provider, e)
     
     async def get_service_completion(
-        self, 
-        service_type: str, 
-        messages: List[Dict[str, str]], 
+        self,
+        service_type: str,
+        messages: List[Dict[str, str]],
         user_settings: Dict[str, Any],
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Get completion for specific service type (primary, analysis, maintenance, embedding)
+        Get completion for specific service type with parameter configuration and custom prompts
         
         Args:
             service_type: Type of service (primary, analysis, maintenance, embedding)
@@ -238,27 +289,60 @@ class LiteLLMService:
         Returns:
             Completion response
         """
-        # Map service types to settings fields
+        # Check if service is enabled
+        enabled_field = f"{service_type}_enabled"
+        if service_type in ["analysis", "maintenance", "embedding"]:
+            if not user_settings.get(enabled_field, True):
+                raise ValueError(f"{service_type.title()} service is disabled")
+        
+        # Map service types to new settings fields
         service_mapping = {
             "primary": {
-                "provider_field": "llm_provider",
-                "model_field": "selected_llm_model", 
-                "api_key_field": "primary_llm_api_key"
+                "provider_field": "primary_llm_provider",
+                "model_field": "primary_llm_model",
+                "api_key_field": "primary_llm_api_key_new",
+                "temperature_field": "primary_llm_temperature",
+                "top_p_field": "primary_llm_top_p",
+                "max_tokens_field": "primary_llm_max_tokens",
+                "reasoning_effort_field": "primary_llm_reasoning_effort",
+                "custom_prompt_field": "primary_llm_custom_prompt",
+                # Expanded parameters
+                "top_k_field": "primary_llm_top_k",
+                "top_a_field": "primary_llm_top_a",
+                "min_p_field": "primary_llm_min_p",
+                "frequency_penalty_field": "primary_llm_frequency_penalty",
+                "presence_penalty_field": "primary_llm_presence_penalty",
+                "repetition_penalty_field": "primary_llm_repetition_penalty"
             },
             "analysis": {
-                "provider_field": "llm_provider",  # Using same provider for now
-                "model_field": "analysis_llm_model",
-                "api_key_field": "analysis_llm_api_key"
+                "provider_field": "primary_llm_provider",  # Analysis uses Primary LLM provider/key
+                "model_field": "primary_llm_model",
+                "api_key_field": "primary_llm_api_key_new",
+                "temperature_field": "analysis_llm_temperature",
+                "top_p_field": "analysis_llm_top_p",
+                "max_tokens_field": "analysis_llm_max_tokens",
+                "reasoning_effort_field": "analysis_llm_reasoning_effort",
+                "custom_prompt_field": "analysis_llm_custom_prompt"
             },
             "maintenance": {
-                "provider_field": "llm_provider",  # Using same provider for now
-                "model_field": "analysis_llm_model",  # Fallback to analysis model
-                "api_key_field": "analysis_llm_api_key"  # Fallback to analysis key
+                "provider_field": "primary_llm_provider",  # Maintenance uses Primary LLM provider/key
+                "model_field": "primary_llm_model",
+                "api_key_field": "primary_llm_api_key_new",
+                "temperature_field": "maintenance_llm_temperature",
+                "top_p_field": "maintenance_llm_top_p",
+                "max_tokens_field": "maintenance_llm_max_tokens",
+                "reasoning_effort_field": "maintenance_llm_reasoning_effort",
+                "custom_prompt_field": "maintenance_llm_custom_prompt"
             },
             "embedding": {
-                "provider_field": "llm_provider",
-                "model_field": "selected_llm_model",  # Will be updated when embedding settings are added
-                "api_key_field": "mistral_api_key"  # Current embedding provider
+                "provider_field": "embedding_llm_provider",
+                "model_field": "embedding_llm_model",
+                "api_key_field": "embedding_llm_api_key",
+                "temperature_field": None,  # Embeddings don't use temperature
+                "top_p_field": None,
+                "max_tokens_field": None,
+                "reasoning_effort_field": None,
+                "custom_prompt_field": None
             }
         }
         
@@ -268,7 +352,7 @@ class LiteLLMService:
         config = service_mapping[service_type]
         
         # Extract configuration from user settings
-        provider = user_settings.get(config["provider_field"], "openrouter").lower()
+        provider = user_settings.get(config["provider_field"], "openrouter")
         model = user_settings.get(config["model_field"])
         api_key = user_settings.get(config["api_key_field"])
         
@@ -277,13 +361,133 @@ class LiteLLMService:
         
         # For embedding service, use embedding method
         if service_type == "embedding":
-            # This is a special case - embeddings typically need text input, not messages
             if "input_text" in kwargs:
                 return await self.get_embedding(provider, model, kwargs["input_text"], api_key)
             else:
                 raise ValueError("Embedding service requires 'input_text' parameter")
         
-        return await self.get_completion(provider, model, messages, api_key, **kwargs)
+        # Build LLM parameters from user settings
+        llm_params = {}
+        
+        # Add temperature if configured and supported
+        if config["temperature_field"]:
+            temperature = user_settings.get(config["temperature_field"])
+            if temperature is not None:
+                llm_params["temperature"] = temperature
+        
+        # Add top_p if configured and supported
+        if config["top_p_field"]:
+            top_p = user_settings.get(config["top_p_field"])
+            if top_p is not None:
+                llm_params["top_p"] = top_p
+        
+        # Add max_tokens if configured and supported
+        if config["max_tokens_field"]:
+            max_tokens = user_settings.get(config["max_tokens_field"])
+            if max_tokens is not None and max_tokens > 0:
+                llm_params["max_tokens"] = max_tokens
+        
+        # Add expanded parameter support for Primary LLM service
+        if service_type == "primary":
+            # Advanced sampling parameters
+            top_k = user_settings.get("primary_llm_top_k")
+            if top_k is not None:
+                llm_params["top_k"] = top_k
+            
+            top_a = user_settings.get("primary_llm_top_a")
+            if top_a is not None:
+                llm_params["top_a"] = top_a
+            
+            min_p = user_settings.get("primary_llm_min_p")
+            if min_p is not None:
+                llm_params["min_p"] = min_p
+            
+            # Penalty controls
+            frequency_penalty = user_settings.get("primary_llm_frequency_penalty")
+            if frequency_penalty is not None:
+                llm_params["frequency_penalty"] = frequency_penalty
+            
+            presence_penalty = user_settings.get("primary_llm_presence_penalty")
+            if presence_penalty is not None:
+                llm_params["presence_penalty"] = presence_penalty
+            
+            repetition_penalty = user_settings.get("primary_llm_repetition_penalty")
+            if repetition_penalty is not None and repetition_penalty != 1.0:
+                llm_params["repetition_penalty"] = repetition_penalty
+        
+        # Check for UserPromptConfiguration parameters (higher priority)
+        user_prompt_config = kwargs.get("user_prompt_config")
+        if user_prompt_config and service_type == "primary":
+            # Override with user prompt configuration if available
+            if user_prompt_config.temperature is not None:
+                llm_params["temperature"] = user_prompt_config.temperature
+            if user_prompt_config.top_p is not None:
+                llm_params["top_p"] = user_prompt_config.top_p
+            if user_prompt_config.max_tokens is not None:
+                llm_params["max_tokens"] = user_prompt_config.max_tokens
+            if user_prompt_config.top_k is not None:
+                llm_params["top_k"] = user_prompt_config.top_k
+            if user_prompt_config.top_a is not None:
+                llm_params["top_a"] = user_prompt_config.top_a
+            if user_prompt_config.min_p is not None:
+                llm_params["min_p"] = user_prompt_config.min_p
+            if user_prompt_config.frequency_penalty is not None:
+                llm_params["frequency_penalty"] = user_prompt_config.frequency_penalty
+            if user_prompt_config.presence_penalty is not None:
+                llm_params["presence_penalty"] = user_prompt_config.presence_penalty
+            if user_prompt_config.repetition_penalty is not None:
+                llm_params["repetition_penalty"] = user_prompt_config.repetition_penalty
+        
+        # Add reasoning_effort if configured and supported
+        if config["reasoning_effort_field"]:
+            reasoning_effort = user_settings.get(config["reasoning_effort_field"])
+            if reasoning_effort and reasoning_effort != "Medium":
+                # Map reasoning effort to provider-specific parameter
+                effort_mapping = {
+                    "Low": "low",
+                    "Medium": "medium",
+                    "High": "high"
+                }
+                llm_params["reasoning_effort"] = effort_mapping.get(reasoning_effort, "medium")
+        
+        # Handle custom prompt (additional instructions)
+        if config["custom_prompt_field"]:
+            custom_prompt = user_settings.get(config["custom_prompt_field"])
+            if custom_prompt and custom_prompt.strip():
+                # Add custom prompt as additional instructions to the last message
+                messages = self._apply_custom_prompt(messages, custom_prompt)
+        
+        # Merge with any additional kwargs
+        llm_params.update(kwargs)
+        
+        return await self.get_completion(provider, model, messages, api_key, **llm_params)
+    
+    def _apply_custom_prompt(self, messages: List[Dict[str, str]], custom_prompt: str) -> List[Dict[str, str]]:
+        """
+        Apply custom prompt as additional instructions to messages
+        
+        Args:
+            messages: Original message list
+            custom_prompt: Custom prompt to append
+        
+        Returns:
+            Modified message list with custom prompt instructions
+        """
+        if not messages or not custom_prompt.strip():
+            return messages
+        
+        # Create a copy of messages to avoid modifying the original
+        modified_messages = messages.copy()
+        
+        # Find the last user or system message to append instructions
+        for i in range(len(modified_messages) - 1, -1, -1):
+            if modified_messages[i]["role"] in ["user", "system"]:
+                # Append custom prompt as additional instructions
+                original_content = modified_messages[i]["content"]
+                modified_messages[i]["content"] = f"{original_content}\n\nAdditional Instructions: {custom_prompt}"
+                break
+        
+        return modified_messages
     
     async def validate_api_key(self, provider: str, api_key: str) -> bool:
         """

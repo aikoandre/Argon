@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional
 from pydantic import BaseModel
 
-from backend.database import get_db
-from backend.services.faiss_service import get_faiss_index
+from db.database import get_db
+from services.faiss_service import get_faiss_index
 
 logger = logging.getLogger(__name__)
 

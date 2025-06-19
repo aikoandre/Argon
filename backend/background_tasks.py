@@ -4,11 +4,17 @@ import logging
 from typing import Dict, Any, Optional
 import os # Import os for environment variables
 
-from backend.database import get_db
-from backend.models.chat_session import ChatSession
-from backend.models.user_persona import UserPersona
-from backend.models.character_card import CharacterCard
-from backend.models.scenario_card import ScenarioCard
+from db.database import get_db
+from models.chat_session import ChatSession
+from models.user_persona import UserPersona
+from models.character_card import CharacterCard
+from models.scenario_card import ScenarioCard
+
+from db.database import get_db
+from models.chat_session import ChatSession
+from models.user_persona import UserPersona
+from models.character_card import CharacterCard
+from models.scenario_card import ScenarioCard
 from sqlalchemy.orm import joinedload
 
 # Configure logging
@@ -21,12 +27,12 @@ async def embedding_worker():
     This worker continuously checks the embedding_queue for new embedding requests
     and processes them using the Mistral client.
     """
-    from backend.services.mistral_client import embedding_queue  # Keep only the queue
+    from services.mistral_client import embedding_queue  # Keep only the queue
     # MistralClient removed - now using LiteLLM service for embeddings
-    from backend.database import get_db
-    from backend.models.lore_entry import LoreEntry as LoreEntryModel
-    from backend.models.extracted_knowledge import ExtractedKnowledge as ExtractedKnowledgeModel
-    from backend.services.faiss_service import get_faiss_index
+    from db.database import get_db
+    from models.lore_entry import LoreEntry as LoreEntryModel
+    from models.extracted_knowledge import ExtractedKnowledge as ExtractedKnowledgeModel
+    from services.faiss_service import get_faiss_index
     
     logger.info("Starting embedding worker...")
     
