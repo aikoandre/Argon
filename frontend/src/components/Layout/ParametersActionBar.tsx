@@ -8,6 +8,7 @@ interface ParametersActionBarProps {
   onSave?: () => void;
   onRename?: () => void;
   onDelete?: () => void;
+  onCreate?: () => void;
   disabled?: boolean;
 }
 
@@ -15,11 +16,12 @@ interface ActionButton {
   key: string;
   icon: string;
   label: string;
-  onClick: 'onImport' | 'onExport' | 'onSave' | 'onRename' | 'onDelete';
+  onClick: 'onImport' | 'onExport' | 'onSave' | 'onRename' | 'onDelete' | 'onCreate';
   className?: string;
 }
 
-const actionButtons: ActionButton[] = [  { 
+const actionButtons: ActionButton[] = [
+  { 
     key: 'import', 
     icon: 'file_upload', 
     label: 'Import Preset', 
@@ -44,6 +46,12 @@ const actionButtons: ActionButton[] = [  {
     onClick: 'onRename',
   },
   { 
+    key: 'create', 
+    icon: 'add', 
+    label: 'Create New Preset', 
+    onClick: 'onCreate',
+  },
+  { 
     key: 'delete', 
     icon: 'delete', 
     label: 'Delete Preset', 
@@ -62,12 +70,14 @@ const ParametersActionBar: React.FC<ParametersActionBarProps> = ({
         <span className="material-icons-outlined text-xl pl-3">{icon}</span>
         {title}
       </h3>
-      
-      {/* Action buttons */}
-      <div className="flex items-center gap-4 pr-2">
+        {/* Action buttons */}
+      <div className="flex items-center gap-2.5 pr-2">
         {actionButtons.map(({ key, icon, label, onClick, className }) => {
-          const clickHandler = handlers[onClick] as (() => void) | undefined;          
-          if (!clickHandler) return null;
+          const clickHandler = handlers[onClick] as (() => void) | undefined;
+          
+          // Always show Create button, even if handler is not provided
+          const shouldRender = key === 'create' || clickHandler;
+          if (!shouldRender) return null;
           
           return (
             <button
@@ -75,7 +85,7 @@ const ParametersActionBar: React.FC<ParametersActionBarProps> = ({
               onClick={clickHandler}
               className={className}
               title={label}
-              disabled={disabled}
+              disabled={disabled || (key === 'create' && !clickHandler)}
               type="button"
             >
               <span className="material-icons-outlined text-xl text-app-text-secondary group-hover:text-app-text">

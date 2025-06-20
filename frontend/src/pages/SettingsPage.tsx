@@ -9,8 +9,6 @@ import {
   type LLMModelData,
 } from "../services/api";
 import type { UserSettingsUpdateData } from "../types/settings";
-import ParameterSection from "../components/Settings/ParameterSection";
-import { getVisibleParameters } from "../utils/providerCapabilities";
 
 interface SelectOption {
   value: string;
@@ -42,29 +40,7 @@ const SettingsPage: React.FC = () => {
     embedding_enabled: true,
     embedding_llm_provider: "",
     embedding_llm_model: "",
-    embedding_llm_api_key: "",
-    
-    // Primary LLM parameters (defaults)
-    primary_llm_temperature: 1.0,
-    primary_llm_top_p: 1.0,
-    primary_llm_max_tokens: undefined,
-    primary_llm_reasoning_effort: "Medium",
-    primary_llm_custom_prompt: "",
-    
-    // Analysis LLM parameters (defaults)
-    analysis_llm_temperature: 1.0,
-    analysis_llm_top_p: 1.0,
-    analysis_llm_max_tokens: undefined,
-    analysis_llm_reasoning_effort: "Medium",
-    analysis_llm_custom_prompt: "",
-    
-    // Maintenance LLM parameters (defaults)
-    maintenance_llm_temperature: 1.0,
-    maintenance_llm_top_p: 1.0,
-    maintenance_llm_max_tokens: undefined,
-    maintenance_llm_reasoning_effort: "Medium",
-    maintenance_llm_custom_prompt: "",
-  });
+    embedding_llm_api_key: "",  });
   const [activeTab, setActiveTab] = useState<string>("primary");
   const [showApiKey, setShowApiKey] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -132,14 +108,11 @@ const SettingsPage: React.FC = () => {
         
         if (settingsData) {
           setSettings({
-            // Legacy fields (keep for backward compatibility)
             selected_llm_model: settingsData.selected_llm_model || "",
             primary_llm_api_key: settingsData.primary_llm_api_key || "",
             analysis_llm_api_key: settingsData.analysis_llm_api_key || "",
             mistral_api_key: settingsData.mistral_api_key || "",
             analysis_llm_model: settingsData.analysis_llm_model || "",
-            
-            // Simplified LLM configuration - only Primary LLM settings needed
             primary_llm_provider: settingsData.primary_llm_provider || "",
             primary_llm_model: settingsData.primary_llm_model || "",
             primary_llm_api_key_new: settingsData.primary_llm_api_key_new || "",
@@ -153,27 +126,6 @@ const SettingsPage: React.FC = () => {
             embedding_llm_provider: settingsData.embedding_llm_provider || "",
             embedding_llm_model: settingsData.embedding_llm_model || "",
             embedding_llm_api_key: settingsData.embedding_llm_api_key || "",
-            
-            // Primary LLM parameters (defaults if not set)
-            primary_llm_temperature: settingsData.primary_llm_temperature ?? 1.0,
-            primary_llm_top_p: settingsData.primary_llm_top_p ?? 1.0,
-            primary_llm_max_tokens: settingsData.primary_llm_max_tokens || undefined,
-            primary_llm_reasoning_effort: settingsData.primary_llm_reasoning_effort || "Medium",
-            primary_llm_custom_prompt: settingsData.primary_llm_custom_prompt || "",
-            
-            // Analysis LLM parameters (defaults if not set)
-            analysis_llm_temperature: settingsData.analysis_llm_temperature ?? 1.0,
-            analysis_llm_top_p: settingsData.analysis_llm_top_p ?? 1.0,
-            analysis_llm_max_tokens: settingsData.analysis_llm_max_tokens || undefined,
-            analysis_llm_reasoning_effort: settingsData.analysis_llm_reasoning_effort || "Medium",
-            analysis_llm_custom_prompt: settingsData.analysis_llm_custom_prompt || "",
-            
-            // Maintenance LLM parameters (defaults if not set)
-            maintenance_llm_temperature: settingsData.maintenance_llm_temperature ?? 1.0,
-            maintenance_llm_top_p: settingsData.maintenance_llm_top_p ?? 1.0,
-            maintenance_llm_max_tokens: settingsData.maintenance_llm_max_tokens || undefined,
-            maintenance_llm_reasoning_effort: settingsData.maintenance_llm_reasoning_effort || "Medium",
-            maintenance_llm_custom_prompt: settingsData.maintenance_llm_custom_prompt || "",
           });
         } else {
           setSettings({
@@ -198,27 +150,6 @@ const SettingsPage: React.FC = () => {
             embedding_llm_provider: "",
             embedding_llm_model: "",
             embedding_llm_api_key: "",
-            
-            // Primary LLM parameters (defaults)
-            primary_llm_temperature: 1.0,
-            primary_llm_top_p: 1.0,
-            primary_llm_max_tokens: undefined,
-            primary_llm_reasoning_effort: "Medium",
-            primary_llm_custom_prompt: "",
-            
-            // Analysis LLM parameters (defaults)
-            analysis_llm_temperature: 1.0,
-            analysis_llm_top_p: 1.0,
-            analysis_llm_max_tokens: undefined,
-            analysis_llm_reasoning_effort: "Medium",
-            analysis_llm_custom_prompt: "",
-            
-            // Maintenance LLM parameters (defaults)
-            maintenance_llm_temperature: 1.0,
-            maintenance_llm_top_p: 1.0,
-            maintenance_llm_max_tokens: undefined,
-            maintenance_llm_reasoning_effort: "Medium",
-            maintenance_llm_custom_prompt: "",
           });
         }
         setAvailableModels(modelsDataFromApi);
@@ -292,9 +223,7 @@ const SettingsPage: React.FC = () => {
     setSuccessMessage(null);
     setError(null);
     autoSaveSettings(newSettings);
-  };
-
-  // Simple toggle handlers for optional services (all use Primary LLM when enabled)
+  };  // Simple feature toggles for Analysis and Maintenance
   const handleAnalysisEnabledChange = (enabled: boolean) => {
     const newSettings = {
       ...settings,
@@ -363,42 +292,6 @@ const SettingsPage: React.FC = () => {
     autoSaveSettings(newSettings);
   };
 
-  // Primary LLM parameter handlers
-  const handlePrimaryParameterChange = (field: keyof UserSettingsUpdateData, value: any) => {
-    const newSettings = {
-      ...settings,
-      [field]: value,
-    };
-    setSettings(newSettings);
-    setSuccessMessage(null);
-    setError(null);
-    autoSaveSettings(newSettings);
-  };
-
-  // Analysis LLM parameter handlers
-  const handleAnalysisParameterChange = (field: keyof UserSettingsUpdateData, value: any) => {
-    const newSettings = {
-      ...settings,
-      [field]: value,
-    };
-    setSettings(newSettings);
-    setSuccessMessage(null);
-    setError(null);
-    autoSaveSettings(newSettings);
-  };
-
-  // Maintenance LLM parameter handlers
-  const handleMaintenanceParameterChange = (field: keyof UserSettingsUpdateData, value: any) => {
-    const newSettings = {
-      ...settings,
-      [field]: value,
-    };
-    setSettings(newSettings);
-    setSuccessMessage(null);
-    setError(null);
-    autoSaveSettings(newSettings);
-  };
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -420,6 +313,7 @@ const SettingsPage: React.FC = () => {
       <p className="text-center text-gray-400 p-10">Loading settings...</p>
     );
   }
+  
   return (
     <div className="text-white h-full max-h-[calc(90vh-65px)] overflow-hidden flex flex-col">
       <h1 className="text-4xl font-bold text-white mb-8 flex-shrink-0">
@@ -434,46 +328,24 @@ const SettingsPage: React.FC = () => {
         <p className="bg-green-700 text-white p-3 rounded-md mb-4 text-center flex-shrink-0">
           {successMessage}
         </p>
-      )}
-      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border hover:scrollbar-thumb-app-text">
+      )}      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border hover:scrollbar-thumb-app-text">
         <form onSubmit={handleSubmit} className="space-y-6 w-full max-w-lg mx-auto pb-4">
-        <div className="flex justify-between border-b border-gray-700 mb-6">
+          {/* Tab Navigation */}
+        <div className="flex justify-center border-b border-gray-700 mb-6">
           <button
             type="button"
-            className={`py-2 px-4 text-sm font-medium ${
+            className={`py-2 px-6 text-sm font-medium mx-4 ${
               activeTab === "primary"
                 ? "border-b-2 border-app-text-2 text-app-text-2"
                 : "text-gray-400 hover:text-white"
             }`}
             onClick={() => setActiveTab("primary")}
           >
-            Primary
+            Primary LLM
           </button>
           <button
             type="button"
-            className={`py-2 px-4 text-sm font-medium ${
-              activeTab === "analysis"
-                ? "border-b-2 border-app-text-2 text-app-text-2"
-                : "text-gray-400 hover:text-white"
-            }`}
-            onClick={() => setActiveTab("analysis")}
-          >
-            Analysis
-          </button>
-          <button
-            type="button"
-            className={`py-2 px-4 text-sm font-medium ${
-              activeTab === "maintenance"
-                ? "border-b-2 border-app-text-2 text-app-text-2"
-                : "text-gray-400 hover:text-white"
-            }`}
-            onClick={() => setActiveTab("maintenance")}
-          >
-            Maintenance
-          </button>
-          <button
-            type="button"
-            className={`py-2 px-4 text-sm font-medium ${
+            className={`py-2 px-6 text-sm font-medium mx-4 ${
               activeTab === "embedding"
                 ? "border-b-2 border-app-text-2 text-app-text-2"
                 : "text-gray-400 hover:text-white"
@@ -482,8 +354,7 @@ const SettingsPage: React.FC = () => {
           >
             Embedding
           </button>
-        </div>
-        
+        </div>{/* Primary LLM Tab */}
         {activeTab === "primary" && (
           <div className="space-y-6">
             <div>
@@ -650,102 +521,51 @@ const SettingsPage: React.FC = () => {
                 </button>
               </div>
             </div>
-            
-            <ParameterSection
-              temperature={settings.primary_llm_temperature}
-              topP={settings.primary_llm_top_p}
-              maxTokens={settings.primary_llm_max_tokens}
-              reasoningEffort={settings.primary_llm_reasoning_effort || "Medium"}
-              customPrompt={settings.primary_llm_custom_prompt || ""}
-              onTemperatureChange={(value) => handlePrimaryParameterChange('primary_llm_temperature', value)}
-              onTopPChange={(value) => handlePrimaryParameterChange('primary_llm_top_p', value)}
-              onMaxTokensChange={(value) => handlePrimaryParameterChange('primary_llm_max_tokens', value || undefined)}
-              onReasoningEffortChange={(value) => handlePrimaryParameterChange('primary_llm_reasoning_effort', value)}
-              onCustomPromptChange={(value) => handlePrimaryParameterChange('primary_llm_custom_prompt', value)}
-              {...getVisibleParameters(settings.primary_llm_provider)}
-              isLoading={isLoading}
-            />
+
+            {/* Feature Toggles */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-app-text-2 border-b border-gray-600 pb-2">
+                LLM Features
+              </h3>
+              
+              <div className="p-4 bg-app-bg border border-gray-600 rounded-lg">
+                <label className="flex items-center mb-3">
+                  <input
+                    type="checkbox"
+                    checked={settings.analysis_enabled || false}
+                    onChange={(e) => handleAnalysisEnabledChange(e.target.checked)}
+                    className="mr-3"
+                  />
+                  <div>
+                    <span className="text-app-text font-medium">Enable Analysis Features</span>
+                    <p className="text-sm text-app-text-secondary mt-1">
+                      Uses Primary LLM for message analysis and relationship tracking.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              <div className="p-4 bg-app-bg border border-gray-600 rounded-lg">
+                <label className="flex items-center mb-3">
+                  <input
+                    type="checkbox"
+                    checked={settings.maintenance_enabled || false}
+                    onChange={(e) => handleMaintenanceEnabledChange(e.target.checked)}
+                    className="mr-3"
+                  />
+                  <div>
+                    <span className="text-app-text font-medium">Enable Maintenance Features</span>
+                    <p className="text-sm text-app-text-secondary mt-1">
+                      Uses Primary LLM for background cleanup and optimization tasks.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
           </div>
         )}
 
-        {activeTab === "analysis" && (
-          <div className="space-y-6">
-            <div className="p-4 bg-app-bg border border-gray-600 rounded-lg">
-              <label className="flex items-center">
-                <input 
-                  type="checkbox" 
-                  checked={settings.analysis_enabled || false}
-                  onChange={(e) => handleAnalysisEnabledChange(e.target.checked)}
-                  className="mr-3"
-                />
-                <div>
-                  <span className="text-app-text font-medium">Enable Query Analysis</span>
-                  <p className="text-sm text-app-text-secondary mt-1">
-                    Uses Primary LLM to optimize queries. Auto-retry: 2 attempts, then skip if failed.
-                  </p>
-                </div>
-              </label>
-            </div>
-            
-            {settings.analysis_enabled && (
-              <ParameterSection
-                temperature={settings.analysis_llm_temperature}
-                topP={settings.analysis_llm_top_p}
-                maxTokens={settings.analysis_llm_max_tokens}
-                reasoningEffort={settings.analysis_llm_reasoning_effort || "Medium"}
-                customPrompt={settings.analysis_llm_custom_prompt || ""}
-                onTemperatureChange={(value) => handleAnalysisParameterChange('analysis_llm_temperature', value)}
-                onTopPChange={(value) => handleAnalysisParameterChange('analysis_llm_top_p', value)}
-                onMaxTokensChange={(value) => handleAnalysisParameterChange('analysis_llm_max_tokens', value || undefined)}
-                onReasoningEffortChange={(value) => handleAnalysisParameterChange('analysis_llm_reasoning_effort', value)}
-                onCustomPromptChange={(value) => handleAnalysisParameterChange('analysis_llm_custom_prompt', value)}
-                {...getVisibleParameters(settings.primary_llm_provider)}
-                showMaxTokens={false}
-                isLoading={isLoading}
-              />
-            )}
-          </div>
-        )}
-
-        {activeTab === "maintenance" && (
-          <div className="space-y-6">
-            <div className="p-4 bg-app-bg border border-app-border rounded-lg">
-              <label className="flex items-center">
-                <input 
-                  type="checkbox" 
-                  checked={settings.maintenance_enabled || false}
-                  onChange={(e) => handleMaintenanceEnabledChange(e.target.checked)}
-                  className="mr-3"
-                />
-                <div>
-                  <span className="text-app-text font-medium">Enable Memory Maintenance</span>
-                  <p className="text-sm text-app-text-secondary mt-1">
-                    Uses Primary LLM for memory updates. Auto-retry: 2 attempts, then skip if failed.
-                  </p>
-                </div>
-              </label>
-            </div>
-            
-            {settings.maintenance_enabled && (
-              <ParameterSection
-                temperature={settings.maintenance_llm_temperature}
-                topP={settings.maintenance_llm_top_p}
-                maxTokens={settings.maintenance_llm_max_tokens}
-                reasoningEffort={settings.maintenance_llm_reasoning_effort || "Medium"}
-                customPrompt={settings.maintenance_llm_custom_prompt || ""}
-                onTemperatureChange={(value) => handleMaintenanceParameterChange('maintenance_llm_temperature', value)}
-                onTopPChange={(value) => handleMaintenanceParameterChange('maintenance_llm_top_p', value)}
-                onMaxTokensChange={(value) => handleMaintenanceParameterChange('maintenance_llm_max_tokens', value || undefined)}
-                onReasoningEffortChange={(value) => handleMaintenanceParameterChange('maintenance_llm_reasoning_effort', value)}
-                onCustomPromptChange={(value) => handleMaintenanceParameterChange('maintenance_llm_custom_prompt', value)}
-                {...getVisibleParameters(settings.primary_llm_provider)}
-                showMaxTokens={false}
-                isLoading={isLoading}
-              />
-            )}
-          </div>
-        )}
-        
+        {/* Embedding Tab */}
         {activeTab === "embedding" && (
           <div className="space-y-6">
             <div className="p-4 bg-app-bg border border-gray-600 rounded-lg">
@@ -929,7 +749,9 @@ const SettingsPage: React.FC = () => {
               </>
             )}
           </div>
-        )}        <button
+        )}
+        
+        <button
           type="submit"
           disabled={isSubmitting || isLoading}
           className="w-full mt-2 px-4 py-2.5 text-sm text-app-surface bg-app-text-2 hover:bg-app-text-3 rounded-md font-medium disabled:bg-gray-700 disabled:opacity-70 transition-colors"

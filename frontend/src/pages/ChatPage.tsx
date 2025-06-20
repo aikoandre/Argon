@@ -76,6 +76,45 @@ const ArrowForwardIcon = ({ className, onClick, disabled }: {
   />
 );
 
+const EditIcon = ({ className, onClick, disabled }: { 
+  className?: string; 
+  onClick: () => void; 
+  disabled?: boolean 
+}) => (
+  <MaterialIcon 
+    icon="edit" 
+    className={className} 
+    onClick={onClick} 
+    disabled={disabled} 
+  />
+);
+
+const SaveIcon = ({ className, onClick, disabled }: { 
+  className?: string; 
+  onClick: () => void; 
+  disabled?: boolean 
+}) => (
+  <MaterialIcon 
+    icon="save" 
+    className={className} 
+    onClick={onClick} 
+    disabled={disabled} 
+  />
+);
+
+const CancelIcon = ({ className, onClick, disabled }: { 
+  className?: string; 
+  onClick: () => void; 
+  disabled?: boolean 
+}) => (
+  <MaterialIcon 
+    icon="close" 
+    className={className} 
+    onClick={onClick} 
+    disabled={disabled} 
+  />
+);
+
 // Helper function to get proper image URL for persona images
 const getImageUrl = (imageUrl: string | null) => {
   if (!imageUrl) return null;
@@ -118,9 +157,10 @@ const ChatPage = () => {
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const [isSending, setIsSendingLocal] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activePersonaId, setActivePersonaId] = useState<string | null>(null);
-  const [activePersonaName, setActivePersonaName] = useState<string>("User");
+  const [activePersonaId, setActivePersonaId] = useState<string | null>(null);  const [activePersonaName, setActivePersonaName] = useState<string>("User");
   const [activePersonaImageUrl, setActivePersonaImageUrl] = useState<string | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState<string>("");
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -732,6 +772,38 @@ const ChatPage = () => {
       return msg;
     }));
   };
+  // Message editing handlers
+  const handleEditMessage = (messageId: string, content: string) => {
+    setEditingMessageId(messageId);
+    setEditingContent(content);
+  };
+
+  const handleSaveEdit = (messageId: string) => {
+    setMessages(prevMessages => prevMessages.map(msg => {
+      if (msg.id === messageId) {
+        return {
+          ...msg,
+          content: editingContent,
+          timestamp: new Date().toISOString(), // Update timestamp to reflect the edit
+        };
+      }
+      return msg;
+    }));
+    setEditingMessageId(null);
+    setEditingContent("");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditingContent("");
+  };
+
+  // Calculate textarea rows based on content
+  const calculateTextareaRows = (content: string) => {
+    const lines = content.split('\n').length;
+    const estimatedLinesFromLength = Math.ceil(content.length / 80); // Estimate based on ~80 chars per line
+    return Math.max(3, Math.max(lines, estimatedLinesFromLength));
+  };
 
   // Function to format timestamp
   const formatTime = (timestamp: string) => {
@@ -743,6 +815,27 @@ const ChatPage = () => {
     } catch (error) {
       return "";
     }
+  };
+
+  // Helper function to get proper image URL for persona images
+  const getImageUrl = (imageUrl: string | null) => {
+    if (!imageUrl) return null;
+    if (imageUrl.startsWith('data:')) return imageUrl;
+
+    // Normalize the URL by removing common incorrect prefixes and ensuring a clean path
+    let cleanedPath = imageUrl
+      .replace(/^(https?:\/\/[^/]+)?\/?/, '') // Remove http(s)://domain:port/
+      .replace(/(api\/images\/serve\/|static\/images\/|static\/)/g, '') // Remove all instances of specific incorrect prefixes
+      .split('?')[0]; // Remove query parameters
+
+    // Decode URI components (e.g., %2F to /)
+    cleanedPath = decodeURIComponent(cleanedPath);
+
+    // Ensure no leading/trailing slashes from the cleaning process
+    cleanedPath = cleanedPath.replace(/^\/|\/$/g, '');
+
+    // Construct the final static URL with the correct base
+    return `/static/images/${cleanedPath}`;
   };
 
   // Modern loading state component
@@ -898,10 +991,41 @@ const ChatPage = () => {
                                 </span>
                                 <span className="text-xs text-gray-400">
                                   {formatTime(msg.timestamp)}
-                                </span>
-                              </div>
-                              {/* Message content with custom formatting, no markdown */}
-                              <div className="break-words mt-0 overflow-hidden max-w-full">{(() => {
+                                </span>                              </div>
+                              {/* Message content with edit functionality */}                              {editingMessageId === msg.id ? (
+                                // Edit mode
+                                <div className="mt-2">                                  <textarea 
+                                    value={editingContent}
+                                    onChange={(e) => setEditingContent(e.target.value)}
+                                    className="w-full bg-app-surface text-app-text border border-app-border rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-app-primary"
+                                    placeholder="Edit message..."
+                                    autoFocus
+                                    rows={calculateTextareaRows(editingContent)}
+                                    style={{ 
+                                      minHeight: '80px',
+                                      height: 'auto'
+                                    }}
+                                  />
+                                  <div className="flex items-center space-x-2 mt-2">
+                                    <button
+                                      onClick={() => handleSaveEdit(msg.id)}
+                                      className="flex items-center space-x-1 px-3 py-1 bg-app-primary text-white rounded-md hover:bg-opacity-80 transition-colors"
+                                    >
+                                      <SaveIcon className="!text-sm" onClick={() => {}} />
+                                      <span className="text-sm">Save</span>
+                                    </button>
+                                    <button
+                                      onClick={handleCancelEdit}
+                                      className="flex items-center space-x-1 px-3 py-1 bg-app-surface text-app-text border border-app-border rounded-md hover:bg-opacity-80 transition-colors"
+                                    >
+                                      <CancelIcon className="!text-sm" onClick={() => {}} />
+                                      <span className="text-sm">Cancel</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                // Display mode
+                                <div className="break-words mt-0 overflow-hidden max-w-full">{(() => {
                                   // Apply placeholder replacement for display
                                   const charName = getCharacterName(sessionDetails);
                                   const userName = msg.sender_type === "USER" 
@@ -958,10 +1082,9 @@ const ChatPage = () => {
                                     const prev = arr[idx - 1] || '';
                                     if (prev.startsWith('```') && prev.endsWith('```')) return null;
                                     if (prev.match(/^!\[[^\]]*\]\([^)]+\)$/)) return null;
-                                    return <br key={idx} />;
-                                  } else {
+                                    return <br key={idx} />;                                  } else {
                                     // Inline text, apply custom formatting for quoted and italic text
-                                    let formatted = part
+                                    const formatted = part
                                       .replace(/"([^"]+)"/g, '<span class="text-app-primary">$1</span>')
                                       .replace(/\*([^*]+)\*/g, '<em>$1</em>');
                                     // Remove top margin for the first inline text
@@ -969,49 +1092,61 @@ const ChatPage = () => {
                                   }
                                 });
                                 })()}
-                              </div>
-                            </div>
-                          </div>
-                          {msg.sender_type === "AI" &&
-                            msg.ai_responses &&
-                            msg.ai_responses.length > 0 &&
-                            (msg.is_beginning_message ? (
-                              // For beginning messages: show arrows only if more than one beginning message exists
-                              allBeginningMessages.length > 1 && (
-                                <div className="absolute top-2 right-2 flex items-center space-x-1 text-gray-400 text-sm">
-                                  <ArrowBackIcon
-                                    className="!text-lg"
-                                    onClick={() => handleNavigateBeginningMessage("prev")}
-                                    disabled={currentBeginningMessageIndex === 0}
-                                  />
-                                  <span>{`${currentBeginningMessageIndex + 1}/${allBeginningMessages.length}`}</span>
-                                  <ArrowForwardIcon
-                                    className="!text-lg"
-                                    onClick={() => handleNavigateBeginningMessage('next')}
-                                    disabled={currentBeginningMessageIndex === allBeginningMessages.length - 1}
-                                  />
                                 </div>
+                              )}
+                            </div>
+                          </div>                          {/* Edit button and navigation controls - positioned in top right */}
+                          <div className="absolute top-2 right-2 flex items-center space-x-1">
+                            {editingMessageId !== msg.id && (
+                              <EditIcon 
+                                className="!text-lg text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-pointer hover:text-app-text" 
+                                onClick={() => handleEditMessage(msg.id, msg.content)}
+                              />
+                            )}
+                            
+                            {/* AI message navigation controls */}
+                            {msg.sender_type === "AI" &&
+                              msg.ai_responses &&
+                              msg.ai_responses.length > 0 &&
+                              editingMessageId !== msg.id &&
+                              (msg.is_beginning_message ? (
+                                // For beginning messages: show arrows only if more than one beginning message exists
+                                allBeginningMessages.length > 1 && (
+                                  <>
+                                    <ArrowBackIcon
+                                      className="!text-lg text-gray-400"
+                                      onClick={() => handleNavigateBeginningMessage("prev")}
+                                      disabled={currentBeginningMessageIndex === 0}
+                                    />
+                                    <span className="text-gray-400 text-sm">{`${currentBeginningMessageIndex + 1}/${allBeginningMessages.length}`}</span>
+                                    <ArrowForwardIcon
+                                      className="!text-lg text-gray-400"
+                                      onClick={() => handleNavigateBeginningMessage('next')}
+                                      disabled={currentBeginningMessageIndex === allBeginningMessages.length - 1}
+                                    />
+                                  </>
+                                )
+                              ) : (
+                                // For regular AI messages: show arrows if more than one response, allow regeneration
+                                <>
+                                  {msg.current_response_index !== 0 && (
+                                    <ArrowBackIcon className="!text-lg text-gray-400" onClick={() => handleNavigateResponse(msg.id, 'prev')} />
+                                  )}
+                                  <span className="text-gray-400 text-sm">{`${(msg.current_response_index || 0) + 1}/${msg.ai_responses!.length}`}</span>
+                                  <ArrowForwardIcon
+                                    className="!text-lg text-gray-400"
+                                    onClick={() => {
+                                      if ((msg.current_response_index || 0) === msg.ai_responses!.length - 1) {
+                                        handleRegenerate(msg.id);
+                                      } else {
+                                        handleNavigateResponse(msg.id, 'next');
+                                      }
+                                    }}
+                                  />
+                                </>
                               )
-                            ) : (
-                              // For regular AI messages: show arrows if more than one response, allow regeneration
-                              <div className="absolute top-2 right-2 flex items-center space-x-1 text-gray-400 text-sm">
-                                {msg.current_response_index !== 0 && (
-                                  <ArrowBackIcon className="!text-lg" onClick={() => handleNavigateResponse(msg.id, 'prev')} />
-                                )}
-                                <span>{`${(msg.current_response_index || 0) + 1}/${msg.ai_responses!.length}`}</span>
-                                <ArrowForwardIcon
-                                  className="!text-lg"
-                                  onClick={() => {
-                                    if ((msg.current_response_index || 0) === msg.ai_responses!.length - 1) {
-                                      handleRegenerate(msg.id);
-                                    } else {
-                                      handleNavigateResponse(msg.id, 'next');
-                                    }
-                                  }}
-                                />
-                              </div>
-                            )
-                          )}
+                            )}
+                          </div>
                         </div>
                       </motion.div>
                     );
