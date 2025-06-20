@@ -1,6 +1,7 @@
 // frontend/src/components/Layout/EnhancedLeftPanel.tsx
 import React, { useState, useEffect } from 'react';
 import ServicePromptSection from '../PromptConfiguration/ServicePromptSection';
+import ParametersActionBar from './ParametersActionBar';
 import { getUserSettings } from '../../services/api';
 import { useActiveCard } from '../../contexts/ActiveCardContext';
 import { 
@@ -15,19 +16,98 @@ import {
   createModule,
   deleteModule,
   getContextRecommendations,
-  createDefaultNemoPreset,
+  createDefaultCherryBoxPreset,
   type PromptPreset as APIPromptPreset,
   type UserPromptConfiguration as APIUserPromptConfiguration,
   type PromptModule
 } from '../../services/promptPresetApi';
 
+// Helper component for active card images with proper error handling
+interface ActiveCardImageProps {
+  imageUrl?: string;
+  cardType: 'character' | 'scenario' | 'persona';
+  cardName?: string;
+}
+
+const ActiveCardImage: React.FC<ActiveCardImageProps> = ({ imageUrl, cardType, cardName }) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+
+  // Reset error state when imageUrl changes
+  useEffect(() => {
+    setImageError(false);
+    setImageLoading(true);
+  }, [imageUrl]);
+
+  const getIconForType = (type: string) => {
+    switch (type) {
+      case 'character': return 'person';
+      case 'scenario': return 'map';
+      case 'persona': return 'account_circle';
+      default: return 'image';
+    }
+  };
+
+  // Handle case where no image URL is provided
+  if (!imageUrl || imageUrl.trim() === '') {
+    return (
+      <div className="w-full aspect-[3/4.5] bg-app-border/50 rounded-md flex flex-col items-center justify-center">
+        <span className="material-icons-outlined text-4xl text-app-text-secondary opacity-50">
+          {getIconForType(cardType)}
+        </span>
+        <p className="text-xs text-app-text-secondary opacity-50 mt-2 text-center">
+          No image
+        </p>
+      </div>
+    );
+  }
+
+  // Handle case where image failed to load
+  if (imageError) {
+    return (
+      <div className="w-full aspect-[3/4.5] bg-app-border/50 rounded-md flex flex-col items-center justify-center">
+        <span className="material-icons-outlined text-4xl text-app-text-secondary opacity-50">
+          broken_image
+        </span>
+        <p className="text-xs text-app-text-secondary opacity-50 mt-2 text-center">
+          Failed to load
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative aspect-[3/4.5]">
+      {imageLoading && (
+        <div className="absolute inset-0 bg-app-border/50 rounded-md flex items-center justify-center">
+          <span className="material-icons-outlined text-2xl text-app-text-secondary opacity-50 animate-pulse">
+            image
+          </span>
+        </div>
+      )}
+      <img
+        src={imageUrl}
+        alt={cardName || `${cardType} image`}
+        className={`w-full h-full object-cover rounded-md transition-opacity duration-200 ${
+          imageLoading ? 'opacity-0' : 'opacity-100'
+        }`}
+        onLoad={() => setImageLoading(false)}
+        onError={() => {
+          setImageError(true);
+          setImageLoading(false);
+        }}
+      />
+    </div>
+  );
+};
+
 interface RuntimeParameters {
   temperature: number;
   topP: number;
-  topK?: number;
-  topA?: number;
-  minP?: number;
-  maxTokens?: number;
+  topK: number;
+  topA: number;
+  minP: number;
+  maxTokens: number;
   frequencyPenalty: number;
   presencePenalty: number;
   repetitionPenalty: number;
@@ -41,27 +121,26 @@ interface EnhancedLeftPanelProps {
 
 const EnhancedLeftPanel: React.FC<EnhancedLeftPanelProps> = () => {
   const { activeCard } = useActiveCard();  const [parameters, setParameters] = useState<RuntimeParameters>({
-    temperature: 0.3,
-    topP: 0.95,
-    topK: 40,
-    topA: 1,
-    minP: 0,
-    maxTokens: 8164,
-    frequencyPenalty: 0,
-    presencePenalty: 0,
-    repetitionPenalty: 1,
-    reasoningEffort: 'Max',
-    contextSize: 50
+    temperature: 0.6,
+    topP: 0.98,
+    topK: 28,
+    topA: 1.0,
+    minP: 0.0,
+    maxTokens: 5000,
+    frequencyPenalty: 0.15,
+    presencePenalty: 0.17,
+    repetitionPenalty: 1.0,
+    reasoningEffort: 'Medium',
+    contextSize: 20
   });const [selectedPreset, setSelectedPreset] = useState<string>('');
   const [availablePresets, setAvailablePresets] = useState<APIPromptPreset[]>([]);
   const [userConfiguration, setUserConfiguration] = useState<APIUserPromptConfiguration | null>(null);
   const [promptModules, setPromptModules] = useState<PromptModule[]>([]);
-    // Service-specific states for 4-drawer UI
+  // Service-specific states for 3-drawer UI (removed Embedding)
   const [expandedServices, setExpandedServices] = useState<Record<string, boolean>>({
     Generation: true,   // Start with Generation expanded
     Analysis: false,
-    Maintenance: false,
-    Embedding: false
+    Maintenance: false
   });
 
   const [showCreateModuleModal, setShowCreateModuleModal] = useState(false);
@@ -94,25 +173,22 @@ const EnhancedLeftPanel: React.FC<EnhancedLeftPanelProps> = () => {
           presets = [];
         }
         
-        if (presets.length === 0) {
-          console.log('📋 No presets found, creating default...');
+        if (presets.length === 0) {          console.log('📋 No presets found, creating default...');
           try {
-            await createDefaultNemoPreset();
+            await createDefaultCherryBoxPreset();
             presets = await getAllPresets();
             console.log('📋 Presets after creating default:', presets);
           } catch (error) {
             console.error('❌ Failed to create default preset:', error);
             presets = []; // Ensure presets is empty on failure
           }
-        }
-
-        // Filter to show only NemoEngine Argon Edition
-        const filteredPresets = presets.filter(p => p.name === 'NemoEngine Argon Edition');
-        console.log('🔍 Filtered presets (Argon Edition only):', filteredPresets);
+        }        // Filter to show only CherryBox Argon Edition
+        const filteredPresets = presets.filter(p => p.name === 'CherryBox Argon Edition');
+        console.log('🔍 Filtered presets (CherryBox Edition only):', filteredPresets);
         
-        // If no Argon Edition found, show all presets temporarily
+        // If no CherryBox Edition found, show all presets temporarily
         if (filteredPresets.length === 0) {
-          console.log('⚠️ No Argon Edition preset found, showing all presets');
+          console.log('⚠️ No CherryBox Edition preset found, showing all presets');
           setAvailablePresets(presets);
         } else {
           setAvailablePresets(filteredPresets);
@@ -147,21 +223,20 @@ const EnhancedLeftPanel: React.FC<EnhancedLeftPanelProps> = () => {
         } else {
           setSelectedPreset('');
           setPromptModules([]);
-        }
-          // Load parameters from user configuration
+        }        // Load parameters from user configuration
         setParameters(prev => ({
           ...prev,
-          contextSize: userConfig.context_size || 50,
-          maxTokens: userConfig.max_tokens || 8164,
-          temperature: userConfig.temperature || 0.3,
-          topP: userConfig.top_p || 0.95,
-          reasoningEffort: userConfig.reasoning_effort || 'Max',
-          topK: userConfig.top_k || 40,
-          topA: userConfig.top_a || 1,
-          minP: userConfig.min_p || 0,
-          frequencyPenalty: userConfig.frequency_penalty || 0,
-          presencePenalty: userConfig.presence_penalty || 0,
-          repetitionPenalty: userConfig.repetition_penalty || 1,
+          contextSize: userConfig.context_size || 20,
+          maxTokens: userConfig.max_tokens || 5000,
+          temperature: userConfig.temperature || 0.6,
+          topP: userConfig.top_p || 0.98,
+          reasoningEffort: userConfig.reasoning_effort || 'Medium',
+          topK: userConfig.top_k || 28,
+          topA: userConfig.top_a || 1.0,
+          minP: userConfig.min_p || 0.0,
+          frequencyPenalty: userConfig.frequency_penalty || 0.15,
+          presencePenalty: userConfig.presence_penalty || 0.17,
+          repetitionPenalty: userConfig.repetition_penalty || 1.0,
         }));
 
         // Get context recommendations for current model if available
@@ -176,17 +251,22 @@ const EnhancedLeftPanel: React.FC<EnhancedLeftPanelProps> = () => {
         }
       } catch (error) {
         console.error('Failed to load prompt system settings:', error);
-        
-        // Fallback: Load basic user settings
+          // Fallback: Load basic user settings
         try {
           const settings = await getUserSettings();
           if (settings) {
             setParameters(prev => ({
               ...prev,
               contextSize: settings.max_messages_for_context || 20,
-              maxTokens: settings.max_response_tokens || undefined,
-              temperature: settings.primary_llm_temperature || 1.0,
-              topP: settings.primary_llm_top_p || 1.0,
+              maxTokens: settings.max_response_tokens || 5000,
+              temperature: settings.primary_llm_temperature || 0.6,
+              topP: settings.primary_llm_top_p || 0.98,
+              topK: 28,
+              topA: 1.0,
+              minP: 0.0,
+              frequencyPenalty: 0.15,
+              presencePenalty: 0.17,
+              repetitionPenalty: 1.0,
             }));
           }
         } catch (fallbackError) {
@@ -583,13 +663,12 @@ const EnhancedLeftPanel: React.FC<EnhancedLeftPanelProps> = () => {
         // Try to find default preset first, otherwise use the first available
         const nextPreset = updatedPresets.find(p => p.is_default) || updatedPresets[0];
         await handlePresetChange(nextPreset.id);
-      } else {
-        // No presets left, clear selection
+      } else {        // No presets left, clear selection
         setSelectedPreset('');
         setPromptModules([]);
         // Optionally create a new default preset
         try {
-          const newDefaultPreset = await createDefaultNemoPreset();
+          const newDefaultPreset = await createDefaultCherryBoxPreset();
           const refreshedPresets = await getAllPresets();
           setAvailablePresets(refreshedPresets);
           await handlePresetChange(newDefaultPreset.id);
@@ -633,72 +712,26 @@ const EnhancedLeftPanel: React.FC<EnhancedLeftPanelProps> = () => {
     setExpandedServices(prev => ({
       ...prev,
       [serviceName]: !prev[serviceName]
-    }));  };
-
-  return (
-    <div className="h-full flex flex-col bg-app-bg overflow-y-auto">
-      {/* Section 1: Runtime Parameters */}
-      <div className="border-b border-app-border p-4 flex-shrink-0">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold text-app-text flex items-center gap-2">
-            <span className="material-icons-outlined text-xl">tune</span>
-            Parameters
-          </h3>            {/* Action buttons */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={handleImportPreset}
-              className="p-1.5 bg-app-surface hover:bg-app-border rounded-md transition-colors group"
-              title="Import Preset"
-            >
-              <span className="material-icons-outlined text-sm text-app-text-secondary group-hover:text-app-text">
-                file_upload
-              </span>
-            </button>
-            <button
-              onClick={handleExportPreset}
-              className="p-1.5 bg-app-surface hover:bg-app-border rounded-md transition-colors group"
-              title="Export Preset"
-            >
-              <span className="material-icons-outlined text-sm text-app-text-secondary group-hover:text-app-text">
-                file_download
-              </span>
-            </button>            <button
-              onClick={handleSavePreset}
-              className="p-1.5 bg-app-surface hover:bg-app-border rounded-md transition-colors group"
-              title="Save Current Parameters & Prompts"
-            >
-              <span className="material-icons-outlined text-sm text-app-text-secondary group-hover:text-app-text">
-                save
-              </span>
-            </button>
-            <button
-              onClick={handleRenamePreset}
-              className="p-1.5 bg-app-surface hover:bg-app-border rounded-md transition-colors group"
-              title="Rename Preset"
-            >
-              <span className="material-icons-outlined text-sm text-app-text-secondary group-hover:text-app-text">
-                edit
-              </span>
-            </button>
-            <button
-              onClick={handleDeletePreset}
-              className="p-1.5 bg-red-600/20 hover:bg-red-600/40 rounded-md transition-colors group"
-              title="Delete Preset"
-            >
-              <span className="material-icons-outlined text-sm text-red-400 group-hover:text-red-300">
-                delete
-              </span>
-            </button>
-          </div>
-        </div>        {/* Preset Selector */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-app-text-2 mb-1">
+    }));  };  return (
+    <div className="h-full flex flex-col bg-app-surface overflow-y-auto scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border">      {/* Section 1: Runtime Parameters */}
+      <div className="border-b border-app-border flex-shrink-0 bg-app-surface">
+        <ParametersActionBar
+          onImport={handleImportPreset}
+          onExport={handleExportPreset}
+          onSave={handleSavePreset}
+          onRename={handleRenamePreset}          onDelete={handleDeletePreset}
+        />
+        
+        <div className="p-4">
+          {/* Preset Selector */}
+          <div className="mb-4">
+          <label className="block text-base font-medium text-app-text-2 mb-1">
             Active Preset
           </label>
           <select
             value={selectedPreset}
             onChange={(e) => handlePresetChange(e.target.value)}
-            className="w-full bg-app-surface border border-app-border rounded-md text-white focus:ring-blue-500 focus:border-blue-500 p-1"
+            className="w-full bg-app-bg border border-app-border rounded text-white focus:ring-app-primary focus:border-app-primary p-1"
           >
             {availablePresets.length === 0 && (
               <option value="">Loading presets...</option>
@@ -710,12 +743,50 @@ const EnhancedLeftPanel: React.FC<EnhancedLeftPanelProps> = () => {
           </select>
         </div>
         
-        <div className="space-y-3">
-          {/* Core Parameters */}
+        <div className="space-y-3">          {/* Core Parameters */}
           <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-app-text border-b border-app-border/50 pb-1">Core Parameters</h4>
+            <h4 className="text-base font-semibold text-app-text border-b border-app-border pb-1">Core Parameters</h4>
             
-            {/* Temperature */}
+            {/* Max Tokens */}
+            <div>
+              <label className="block text-sm font-medium text-app-text-2 mb-1">
+                Max Tokens: {parameters.maxTokens || 5000}
+              </label>
+              <input
+                type="number"
+                value={parameters.maxTokens || 5000}
+                onChange={(e) => handleParameterChange('maxTokens', e.target.value ? parseInt(e.target.value, 10) : 5000)}
+                placeholder="5000"
+                min="1"
+                max="100000"
+                className="w-full p-2 bg-app-bg border border-app-border rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
+              />
+              <p className="text-xs text-app-text-secondary mt-1">
+                Maximum response length (tokens)
+              </p>
+            </div>
+
+            {/* Context Size */}
+            <div>
+              <label className="block text-sm font-medium text-app-text-2 mb-1">
+                Context Size: {parameters.contextSize} messages
+              </label>              <input
+                type="range"
+                min="5"
+                max={contextRecommendations?.max_possible || 100}
+                step="5"
+                value={parameters.contextSize}
+                onChange={(e) => handleParameterChange('contextSize', parseInt(e.target.value))}
+                className="w-full h-2 bg-app-bg rounded-lg appearance-none cursor-pointer accent-app-primary"
+              />
+              <div className="flex justify-between text-xs text-app-text-secondary mt-1">
+                <span>5</span>
+                <span>100</span>
+              </div>
+              <div className="text-xs text-app-text-secondary mt-2 space-y-1">
+                <p><strong>Context Memory:</strong> How many recent chat messages the AI can see and remember.</p>
+              </div>
+            </div>            {/* Temperature */}
             <div>
               <label className="block text-sm font-medium text-app-text-2 mb-1">
                 Temperature: {parameters.temperature}
@@ -727,15 +798,13 @@ const EnhancedLeftPanel: React.FC<EnhancedLeftPanelProps> = () => {
                 step="0.1"
                 value={parameters.temperature}
                 onChange={(e) => handleParameterChange('temperature', parseFloat(e.target.value))}
-                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                className="w-full h-2 bg-app-bg rounded-lg appearance-none cursor-pointer accent-app-primary"
               />
               <div className="flex justify-between text-xs text-app-text-secondary mt-1">
                 <span>Focused</span>
                 <span>Creative</span>
               </div>
-            </div>
-
-            {/* Top P */}
+            </div>            {/* Top P */}
             <div>
               <label className="block text-sm font-medium text-app-text-2 mb-1">
                 Top P: {parameters.topP}
@@ -747,116 +816,71 @@ const EnhancedLeftPanel: React.FC<EnhancedLeftPanelProps> = () => {
                 step="0.05"
                 value={parameters.topP}
                 onChange={(e) => handleParameterChange('topP', parseFloat(e.target.value))}
-                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                className="w-full h-2 bg-app-bg rounded-lg appearance-none cursor-pointer accent-app-primary"
               />
               <div className="flex justify-between text-xs text-app-text-secondary mt-1">
                 <span>Narrow</span>
                 <span>Diverse</span>
-              </div>
-            </div>
-
-            {/* Reasoning Effort */}
-            <div>
-              <label className="block text-sm font-medium text-app-text-2 mb-1">
-                Reasoning Effort
-              </label>              <select
-                value={parameters.reasoningEffort}
-                onChange={(e) => handleParameterChange('reasoningEffort', e.target.value)}
-                className="w-full p-2 bg-app-surface border border-app-border rounded-md text-white focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-                <option value="Max">Max</option>
-              </select>
-            </div>
+              </div>            </div>
           </div>
 
           {/* Advanced Sampling Parameters */}
           <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-app-text border-b border-app-border/50 pb-1">Advanced Sampling</h4>
-            
-            {/* Top K */}
             <div>
               <label className="block text-sm font-medium text-app-text-2 mb-1">
-                Top K: {parameters.topK || 'Disabled'}
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min="1"
-                  max="100"
-                  step="1"
-                  value={parameters.topK || 40}
-                  disabled={!parameters.topK}
-                  onChange={(e) => handleParameterChange('topK', parseInt(e.target.value))}
-                  className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider disabled:opacity-50"
-                />
-                <input
-                  type="checkbox"
-                  checked={!!parameters.topK}
-                  onChange={(e) => handleParameterChange('topK', e.target.checked ? 40 : undefined)}
-                  className="w-4 h-4"
-                />
+                Top K: {parameters.topK || 40}
+              </label>              <input
+                type="range"
+                min="1"
+                max="100"
+                step="1"
+                value={parameters.topK || 40}
+                onChange={(e) => handleParameterChange('topK', parseInt(e.target.value))}
+                className="w-full h-2 bg-app-bg rounded-lg appearance-none cursor-pointer accent-app-primary"
+              />
+              <div className="flex justify-between text-xs text-app-text-secondary mt-1">
+                <span>Focused</span>
+                <span>Diverse</span>
               </div>
-            </div>
-
-            {/* Min P */}
+            </div>{/* Min P */}
             <div>
               <label className="block text-sm font-medium text-app-text-2 mb-1">
-                Min P: {parameters.minP?.toFixed(3) || 'Disabled'}
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.001"
-                  value={parameters.minP || 0.05}
-                  disabled={!parameters.minP}
-                  onChange={(e) => handleParameterChange('minP', parseFloat(e.target.value))}
-                  className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider disabled:opacity-50"
-                />
-                <input
-                  type="checkbox"
-                  checked={!!parameters.minP}
-                  onChange={(e) => handleParameterChange('minP', e.target.checked ? 0.05 : undefined)}
-                  className="w-4 h-4"
-                />
+                Min P: {(parameters.minP || 0.05).toFixed(3)}
+              </label>              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.001"
+                value={parameters.minP || 0.05}
+                onChange={(e) => handleParameterChange('minP', parseFloat(e.target.value))}
+                className="w-full h-2 bg-app-bg rounded-lg appearance-none cursor-pointer accent-app-primary"
+              />
+              <div className="flex justify-between text-xs text-app-text-secondary mt-1">
+                <span>Off</span>
+                <span>Strict</span>
               </div>
-            </div>
-
-            {/* Top A */}
+            </div>{/* Top A */}
             <div>
               <label className="block text-sm font-medium text-app-text-2 mb-1">
-                Top A: {parameters.topA?.toFixed(3) || 'Disabled'}
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.001"
-                  value={parameters.topA || 0.2}
-                  disabled={!parameters.topA}
-                  onChange={(e) => handleParameterChange('topA', parseFloat(e.target.value))}
-                  className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider disabled:opacity-50"
-                />
-                <input
-                  type="checkbox"
-                  checked={!!parameters.topA}
-                  onChange={(e) => handleParameterChange('topA', e.target.checked ? 0.2 : undefined)}
-                  className="w-4 h-4"
-                />
+                Top A: {(parameters.topA || 0.2).toFixed(3)}
+              </label>              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.001"
+                value={parameters.topA || 0.2}
+                onChange={(e) => handleParameterChange('topA', parseFloat(e.target.value))}
+                className="w-full h-2 bg-app-bg rounded-lg appearance-none cursor-pointer accent-app-primary"
+              />
+              <div className="flex justify-between text-xs text-app-text-secondary mt-1">
+                <span>Off</span>
+                <span>Strict</span>
               </div>
             </div>
           </div>
 
           {/* Penalty Parameters */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-app-text border-b border-app-border/50 pb-1">Penalty Controls</h4>
-            
-            {/* Frequency Penalty */}
+          <div className="space-y-3">             {/* Frequency Penalty */}
             <div>
               <label className="block text-sm font-medium text-app-text-2 mb-1">
                 Frequency Penalty: {parameters.frequencyPenalty.toFixed(2)}
@@ -868,15 +892,13 @@ const EnhancedLeftPanel: React.FC<EnhancedLeftPanelProps> = () => {
                 step="0.01"
                 value={parameters.frequencyPenalty}
                 onChange={(e) => handleParameterChange('frequencyPenalty', parseFloat(e.target.value))}
-                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                className="w-full h-2 bg-app-bg rounded-lg appearance-none cursor-pointer accent-app-primary"
               />
               <div className="flex justify-between text-xs text-app-text-secondary mt-1">
                 <span>Encourage</span>
                 <span>Discourage</span>
               </div>
-            </div>
-
-            {/* Presence Penalty */}
+            </div>            {/* Presence Penalty */}
             <div>
               <label className="block text-sm font-medium text-app-text-2 mb-1">
                 Presence Penalty: {parameters.presencePenalty.toFixed(2)}
@@ -888,15 +910,13 @@ const EnhancedLeftPanel: React.FC<EnhancedLeftPanelProps> = () => {
                 step="0.01"
                 value={parameters.presencePenalty}
                 onChange={(e) => handleParameterChange('presencePenalty', parseFloat(e.target.value))}
-                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                className="w-full h-2 bg-app-bg rounded-lg appearance-none cursor-pointer accent-app-primary"
               />
               <div className="flex justify-between text-xs text-app-text-secondary mt-1">
                 <span>Repetition OK</span>
                 <span>Avoid Topics</span>
               </div>
-            </div>
-
-            {/* Repetition Penalty */}
+            </div>            {/* Repetition Penalty */}
             <div>
               <label className="block text-sm font-medium text-app-text-2 mb-1">
                 Repetition Penalty: {parameters.repetitionPenalty.toFixed(2)}
@@ -908,81 +928,34 @@ const EnhancedLeftPanel: React.FC<EnhancedLeftPanelProps> = () => {
                 step="0.01"
                 value={parameters.repetitionPenalty}
                 onChange={(e) => handleParameterChange('repetitionPenalty', parseFloat(e.target.value))}
-                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                className="w-full h-2 bg-app-bg rounded-lg appearance-none cursor-pointer accent-app-primary"
               />
               <div className="flex justify-between text-xs text-app-text-secondary mt-1">
-                <span>Allow Repeat</span>
-                <span>Force Variety</span>
-              </div>
-            </div>
-          </div>          {/* Context & Token Controls */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-app-text border-b border-app-border/50 pb-1">Context & Token Limits</h4>            {/* Context Size */}
-            <div>
-              <label className="block text-sm font-medium text-app-text-2 mb-1">
-                Context Size: {parameters.contextSize} messages
-                {contextRecommendations && (
-                  <span className="text-xs text-app-text-secondary ml-2">
-                    (Recommended: {contextRecommendations.recommended}, Max: {contextRecommendations.max_possible})
-                  </span>
-                )}
-              </label>
-              <input
-                type="range"
-                min="5"
-                max={contextRecommendations?.max_possible || 100}
-                step="5"
-                value={parameters.contextSize}
-                onChange={(e) => handleParameterChange('contextSize', parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
-              />
-              <div className="flex justify-between text-xs text-app-text-secondary mt-1">
-                <span>5 (Short)</span>
-                {contextRecommendations && (
-                  <span>{contextRecommendations.recommended} (Recommended)</span>
-                )}
-                <span>50 (Default)</span>
-                <span>50 (Long)</span>
-                <span>{contextRecommendations?.max_possible || 100} (Max)</span>
-              </div>
-              <div className="text-xs text-app-text-secondary mt-2 space-y-1">
-                <p><strong>Context Memory:</strong> How many recent chat messages the AI can see and remember.</p>
-                <p><strong>50 messages</strong> ≈ Last 25 exchanges (recommended for most conversations)</p>
-                <p><strong>Higher values</strong> = More context but slower responses and higher cost</p>
-                {contextRecommendations?.provider_info && (
-                  <p><strong>Model Info:</strong> {contextRecommendations.provider_info}</p>
-                )}
+                <span>Allow Repeat</span>                <span>Force Variety</span>
               </div>
             </div>
 
-            {/* Token Limit */}
+            {/* Reasoning Effort */}
             <div>
               <label className="block text-sm font-medium text-app-text-2 mb-1">
-                Max Tokens: {parameters.maxTokens || 'Auto'}
+                Reasoning Effort
               </label>
-              <div className="flex items-center gap-2">
-                <textarea
-                  value={parameters.maxTokens || ''}
-                  disabled={!parameters.maxTokens}
-                  onChange={(e) => handleParameterChange('maxTokens', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                  placeholder="Auto"
-                  className="flex-1 p-2 bg-app-surface border border-app-border rounded-md text-white focus:ring-blue-500 focus:border-blue-500 resize-none disabled:opacity-50"
-                  rows={1}
-                />
-                <input
-                  type="checkbox"
-                  checked={!!parameters.maxTokens}
-                  onChange={(e) => handleParameterChange('maxTokens', e.target.checked ? 8000 : undefined)}
-                  className="w-4 h-4"
-                />
-              </div>
-              <p className="text-xs text-app-text-secondary mt-1">
-                Maximum response length. Uncheck for model default.
-              </p>
+              <select
+                value={parameters.reasoningEffort}
+                onChange={(e) => handleParameterChange('reasoningEffort', e.target.value)}
+                className="w-full p-2 bg-app-bg border border-app-border rounded text-white focus:ring-app-primary focus:border-app-primary"
+              >
+                <option value="Min">Min</option>
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+                <option value="Max">Max</option>
+              </select>
             </div>
           </div>
         </div>
-      </div>      {/* Section 2: Service-Specific Prompt Modules (4-Drawer Architecture) */}
+      </div>
+      </div>      {/* Section 2: Service-Specific Prompt Modules (3-Service Architecture) */}
       <div className="flex-1 border-b border-app-border">
         <div className="p-4">          <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-semibold text-app-text flex items-center gap-2">
@@ -1031,8 +1004,7 @@ const EnhancedLeftPanel: React.FC<EnhancedLeftPanelProps> = () => {
               onModuleDelete={handleDeleteModule}
               isExpanded={expandedServices.Analysis}
               onToggleExpanded={() => handleServiceToggle('Analysis')}
-            />
-            
+            />            
             {/* Maintenance Service */}
             <ServicePromptSection
               serviceName="Maintenance"
@@ -1043,18 +1015,6 @@ const EnhancedLeftPanel: React.FC<EnhancedLeftPanelProps> = () => {
               onModuleDelete={handleDeleteModule}
               isExpanded={expandedServices.Maintenance}
               onToggleExpanded={() => handleServiceToggle('Maintenance')}
-            />
-            
-            {/* Embedding Service */}
-            <ServicePromptSection
-              serviceName="Embedding"
-              serviceIcon="🔍"
-              modules={getModulesByService('embedding')}
-              onModuleToggle={handleModuleToggle}
-              onModuleEdit={handleModuleEdit}
-              onModuleDelete={handleDeleteModule}
-              isExpanded={expandedServices.Embedding}
-              onToggleExpanded={() => handleServiceToggle('Embedding')}
             />
           </div>
         </div>
@@ -1071,31 +1031,18 @@ const EnhancedLeftPanel: React.FC<EnhancedLeftPanelProps> = () => {
                       activeCard.type === 'scenario' ? 'Scenario' : 'Persona'}            </h3>
             
             {/* Card container - non-clickable */}
-            <div className="rounded-md p-3">
+            <div className="rounded p-3">
               <div className="space-y-3">
                 {activeCard.name && (
                   <div>
-                    <h4 className="font-medium text-app-text">{activeCard.name}</h4>
+                    <h4 className="font-bold rounded-lg text-xl text-app-text bg-app-bg text-center p-1">{activeCard.name}</h4>
                   </div>
-                )}
-                  {activeCard.image && (
-                  <div className="relative aspect-[3/4.5]">
-                    <img
-                      src={activeCard.image}
-                      alt={activeCard.name || `${activeCard.type} image`}
-                      className="w-full h-full object-cover rounded-md"
-                    />
-                  </div>
-                )}
-                
-                {!activeCard.image && (
-                  <div className="w-full aspect-[3/4.5] bg-app-border/50 rounded-md flex items-center justify-center">
-                    <span className="material-icons-outlined text-4xl text-app-text-secondary opacity-50">
-                      {activeCard.type === 'character' ? 'person' : 
-                       activeCard.type === 'scenario' ? 'map' : 'account_circle'}
-                    </span>
-                  </div>
-                )}
+                )}                {/* Image section with proper fallback */}
+                <ActiveCardImage 
+                  imageUrl={activeCard.image} 
+                  cardType={activeCard.type}
+                  cardName={activeCard.name}
+                />
               </div>
             </div>
           </div>
@@ -1133,7 +1080,7 @@ const EnhancedLeftPanel: React.FC<EnhancedLeftPanelProps> = () => {
                   Module Name
                 </label>
                 <textarea
-                  className="w-full p-3 rounded bg-app-bg border-2 border-app-border focus:outline-none focus:border-app-text focus:ring-0 resize-none"
+                  className="w-full p-3 rounded bg-app-surface border-2 border-app-border focus:outline-none focus:border-app-text focus:ring-0 resize-none"
                   value={newModuleName}
                   onChange={(e) => setNewModuleName(e.target.value)}
                   placeholder="Enter module name..."
@@ -1146,10 +1093,9 @@ const EnhancedLeftPanel: React.FC<EnhancedLeftPanelProps> = () => {
               <div>
                 <label className="block text-sm font-medium text-app-text-2 mb-2">
                   Applicable Services
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {['Generation', 'Analysis', 'Maintenance', 'Embedding'].map(service => (
-                    <label key={service} className="flex items-center gap-2 p-2 bg-app-bg rounded border border-app-border cursor-pointer hover:bg-app-border/30">
+                </label>                <div className="grid grid-cols-2 gap-2">
+                  {['Generation', 'Analysis', 'Maintenance'].map(service => (
+                    <label key={service} className="flex items-center gap-2 p-2 bg-app-surface rounded border border-app-border cursor-pointer hover:bg-app-border/30">
                       <input
                         type="checkbox"
                         checked={newModuleServices.includes(service.toLowerCase())}
@@ -1172,7 +1118,7 @@ const EnhancedLeftPanel: React.FC<EnhancedLeftPanelProps> = () => {
                   Module Content
                 </label>
                 <textarea
-                  className="w-full flex-1 p-4 rounded bg-app-bg border-2 border-app-border focus:outline-none focus:border-app-text focus:ring-0 resize-none scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border"
+                  className="w-full flex-1 p-4 rounded bg-app-surface border-2 border-app-border focus:outline-none focus:border-app-text focus:ring-0 resize-none scrollbar-thin scrollbar-track-app-surface scrollbar-thumb-app-border"
                   value={newModuleContent}
                   onChange={(e) => setNewModuleContent(e.target.value)}
                   placeholder="Enter module content..."
@@ -1185,7 +1131,7 @@ const EnhancedLeftPanel: React.FC<EnhancedLeftPanelProps> = () => {
                 <button
                   onClick={() => setShowCreateModuleModal(false)}
                   disabled={isCreatingModule}
-                  className="px-4 py-2 bg-app-surface hover:bg-app-bg disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md transition-colors"
+                  className="px-4 py-2 bg-app-border hover:bg-app-surface disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md transition-colors"
                 >
                   Cancel
                 </button>

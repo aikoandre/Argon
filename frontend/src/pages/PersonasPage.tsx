@@ -21,7 +21,7 @@ import PersonaEditPanel from '../components/Editing/PersonaEditPanel';
 
 const PersonasPageContext: React.FC = () => {
   const { setLeftPanelContent, setRightPanelContent, setLeftPanelVisible, setRightPanelVisible } = useLayout();
-  const { setActiveCard } = useActiveCard();
+  const { setActiveCard, clearActiveCard } = useActiveCard();
   
   const [personas, setPersonas] = useState<UserPersonaData[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -253,11 +253,19 @@ const PersonasPageContext: React.FC = () => {
       );
     }
   }, [editingPersona?.id, masterWorlds]); // Only depend on persona ID and master worlds, not the entire persona object
-
   const handleEditFieldChange = useCallback(async (field: string, value: any) => {
     if (editingPersona) {
       const updatedPersona = { ...editingPersona, [field]: value };
       setEditingPersona(updatedPersona);
+      
+      // Update active card context with new field values
+      setActiveCard({
+        type: 'persona',
+        id: updatedPersona.id,
+        name: updatedPersona.name,
+        image: updatedPersona.image_url || undefined,
+        description: updatedPersona.description || undefined
+      });
       
       // Update the personas list immediately for UI consistency
       setPersonas(prev => prev.map(p => p.id === updatedPersona.id ? updatedPersona : p));
@@ -265,15 +273,16 @@ const PersonasPageContext: React.FC = () => {
       // Use debounced save to avoid excessive API calls while typing
       debouncedSave(updatedPersona);
     }
-  }, [editingPersona, debouncedSave]);
+  }, [editingPersona, debouncedSave, setActiveCard]);
 
   const handleDelete = async (personaId: string) => {
     if (!window.confirm('Are you sure you want to delete this persona?')) return;
     
     try {
-      await deleteUserPersona(personaId);
-      if (editingPersona?.id === personaId) {
+      await deleteUserPersona(personaId);      if (editingPersona?.id === personaId) {
         setEditingPersona(null);
+        // Clear active card context
+        clearActiveCard();
         // Only clear panels if we're deleting the currently edited persona
         setLeftPanelContent(null);
         setRightPanelContent(null);
@@ -329,10 +338,19 @@ const PersonasPageContext: React.FC = () => {
         // Update the persona with the new image (only for existing personas)
         if (editingPersona.id && editingPersona.id !== 'new') {
           const updatedPersona = await updateUserPersona(editingPersona.id, formData);
-          
-          // Update local state
+            // Update local state
           setEditingPersona(updatedPersona);
           updateLeftPanelImage(updatedPersona); // Only update the left panel image
+          
+          // Update active card context with new image
+          setActiveCard({
+            type: 'persona',
+            id: updatedPersona.id,
+            name: updatedPersona.name,
+            image: updatedPersona.image_url || undefined,
+            description: updatedPersona.description || undefined
+          });
+          
           // Update the personas list to show the new image
           setPersonas(prev => prev.map(p => p.id === updatedPersona.id ? updatedPersona : p));
         }
@@ -366,20 +384,19 @@ const PersonasPageContext: React.FC = () => {
     // TODO: Handle import logic
     console.log('Import not yet implemented');
   };
-
   const handleCreateNewPersona = async () => {
     try {
       setError(null);
       const newPersonaData = {
         name: 'New Persona',
-        description: 'Enter description...',
+        description: '',
         master_world_id: null
       };
       
       const formData = personaToFormData(newPersonaData);
       const createdPersona = await createUserPersona(formData);
       setPersonas(prev => [...prev, createdPersona]);
-      setEditingPersona(createdPersona);
+      handleEditPersona(createdPersona);
     } catch (err: any) {
       setError('Failed to create new persona.');
       console.error('Full error details:', err);
@@ -411,7 +428,7 @@ const PersonasPageContext: React.FC = () => {
   return (
     <div className="h-full">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-bold font-quintessential text-white">Personas</h1>
+        <h1 className="text-4xl font-bold text-white">Personas</h1>
         <div>
           <button
             onClick={() => importFileInputRef.current?.click()}

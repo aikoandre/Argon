@@ -199,12 +199,55 @@ async def create_default_nemo_preset(db: Session = Depends(get_db)):
         existing_default = db.query(PromptPreset).filter(PromptPreset.is_default == True).first()
         if existing_default:
             return {"message": "Default preset already exists", "preset_id": existing_default.id}
-        
-        # Create default NemoEngine preset
+          # Create default NemoEngine preset
         preset = await sillytavern_import_service.create_default_nemo_engine_preset(db)
         return {"message": "Default NemoEngine preset created successfully", "preset_id": preset.id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create default preset: {str(e)}")
+
+@router.post("/create-default-cherrybox")
+async def create_default_cherrybox_preset(db: Session = Depends(get_db)):
+    """Create or set CherryBox as the default preset, replacing NemoEngine"""
+    try:
+        # Check if CherryBox already exists
+        existing_cherrybox = db.query(PromptPreset).filter(
+            PromptPreset.name == "CherryBox Argon Edition"
+        ).first()
+        
+        if existing_cherrybox:
+            # Set as default and return
+            # Remove default from other presets first
+            other_defaults = db.query(PromptPreset).filter(
+                PromptPreset.is_default == True,
+                PromptPreset.id != existing_cherrybox.id
+            ).all()
+            for preset in other_defaults:
+                preset.is_default = False
+            
+            existing_cherrybox.is_default = True
+            db.commit()
+            
+            return {
+                "message": "CherryBox preset set as default", 
+                "preset_id": existing_cherrybox.id,
+                "module_count": len(existing_cherrybox.modules)
+            }
+        
+        # Remove default from existing presets
+        existing_defaults = db.query(PromptPreset).filter(PromptPreset.is_default == True).all()
+        for preset in existing_defaults:
+            preset.is_default = False
+        
+        # Create new CherryBox preset
+        cherrybox_preset = sillytavern_import_service.create_cherrybox_preset(db)
+        
+        return {
+            "message": "CherryBox preset created and set as default", 
+            "preset_id": cherrybox_preset.id,
+            "module_count": len(cherrybox_preset.modules)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create CherryBox preset: {str(e)}")
 
 @router.post("/user/toggle-module/{preset_id}/{module_id}")
 async def toggle_prompt_module(

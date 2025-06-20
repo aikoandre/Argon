@@ -18,7 +18,7 @@ const CharactersPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const { setLeftPanelContent, setRightPanelContent, setLeftPanelVisible, setRightPanelVisible } = useLayout();
-  const { setActiveCard } = useActiveCard();
+  const { setActiveCard, clearActiveCard } = useActiveCard();
 
   // Load characters on component mount
   useEffect(() => {
@@ -52,12 +52,20 @@ const CharactersPage: React.FC = () => {
     },
     { debounceMs: 300 }
   );
-
   const handleFieldChange = (field: string, value: any) => {
     setEditingCharacter((prev) => {
       if (!prev) return prev;
       const updated = { ...prev, [field]: value };
       updateLayoutContent(updated);
+      
+      // Update active card context with new field values
+      setActiveCard({
+        type: 'character',
+        id: updated.id,
+        name: updated.name,
+        image: updated.image_url || undefined,
+        description: updated.description || undefined
+      });
       
       // Also update the character in the characters array
       setCharacters(prevCharacters => 
@@ -129,10 +137,11 @@ const CharactersPage: React.FC = () => {
       try {
         deleteCharacterCard(characterId);
         // Remove from local state
-        setCharacters(prev => prev.filter(char => char.id !== characterId));
-        // Reset editing state if deleting currently edited character
+        setCharacters(prev => prev.filter(char => char.id !== characterId));        // Reset editing state if deleting currently edited character
         if (editingCharacter?.id === characterId) {
           setEditingCharacter(null);
+          // Clear active card context
+          clearActiveCard();
           // Only clear panels if we're deleting the currently edited character
           setLeftPanelContent(null);
           setRightPanelContent(null);
@@ -184,14 +193,22 @@ const CharactersPage: React.FC = () => {
 
       // Update the character with the new image
       const updatedCharacter = await updateCharacterCard(editingCharacter.id, formData);
-      
-      // Update local state
+        // Update local state
       setEditingCharacter(updatedCharacter);
       setCharacters(prev => 
         prev.map(char => 
           char.id === updatedCharacter.id ? updatedCharacter : char
         )
       );
+      
+      // Update active card context with new image
+      setActiveCard({
+        type: 'character',
+        id: updatedCharacter.id,
+        name: updatedCharacter.name,
+        image: updatedCharacter.image_url || undefined,
+        description: updatedCharacter.description || undefined
+      });
       
       // Update layout with new image
       updateLayoutContent(updatedCharacter);
@@ -228,15 +245,14 @@ const CharactersPage: React.FC = () => {
   return (
     <div className="h-full">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-bold font-quintessential text-white">Characters</h1>
+        <h1 className="text-4xl font-bold text-white">Characters</h1>
         <div>
           <button
             onClick={handleImport}
             className="bg-app-text text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md mr-2"
           >
             Import
-          </button>
-          <button
+          </button>          <button
             onClick={async () => {
               try {
                 // Create a new character with minimal data
@@ -247,8 +263,7 @@ const CharactersPage: React.FC = () => {
                 
                 const newCharacter = await createCharacterCard(formData);
                 setCharacters(prev => [...prev, newCharacter]);
-                setEditingCharacter(newCharacter);
-                updateLayoutContent(newCharacter);
+                handleEditCharacter(newCharacter);
               } catch (error) {
                 console.error('Failed to create new character:', error);
               }

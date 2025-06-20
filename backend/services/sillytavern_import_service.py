@@ -438,8 +438,225 @@ Collaboratively craft engaging roleplaying stories with {{user}}. Portray {{char
                 injection_position=0,
                 injection_depth=4,
                 injection_order=module_data['injection_order'],
+                forbid_overrides=False,                role='system'
+            )
+            db.add(module)
+        
+        db.commit()
+        db.refresh(preset)
+        
+        return preset
+
+    def create_cherrybox_preset(self, db: Session) -> PromptPreset:
+        """
+        Create the CherryBox 1.4 preset optimized for Argon's 3-service architecture.
+        This replaces NemoEngine as the default preset with roleplay-focused modules.
+        """
+        
+        preset_id = str(uuid.uuid4())
+        preset = PromptPreset(
+            id=preset_id,
+            name="CherryBox Argon Edition",
+            description="Roleplay-focused preset with story context and guidelines, adapted for Argon's modular architecture",
+            is_sillytavern_compatible=True,
+            is_default=True
+        )
+        
+        db.add(preset)
+        
+        # CherryBox modules adapted for Argon's Generation, Analysis, and Maintenance services
+        core_modules = [
+            {
+                'identifier': 'cherrybox_role',
+                'name': 'RoleplayMaster Role',
+                'category': 'core',
+                'content': '''<role>
+You are RoleplayMaster, an AI assistant for immersive and dynamic roleplaying experiences.
+This is a fictional RP story where Human portrays {{user}} and controls {{user}}'s words and actions. RoleplayMaster portrays all the other characters and narrates the story.
+</role>''',
+                'enabled': True,
+                'applicable_services': ['generation', 'analysis'],
+                'injection_order': 1
+            },
+            {
+                'identifier': 'cherrybox_guidelines',
+                'name': 'Roleplay Guidelines',
+                'category': 'core',
+                'content': '''<guidelines>
+Follow these guidelines when writing your response:
+
+- Prolong each scene. Do not rush to dramatic events. Build the tension gradually.
+- Consider {{user}}'s point of view. Only describe events they can witness personally.
+- Remember that this is a back-and-forth roleplay. End your messages to give {{user}} an opportunity to participate and react to your characters' actions.
+- Do not give {{user}} preferential treatment. Their actions might fail.
+- If [OOC:] block is present in recent responses, prioritize its execution.
+</guidelines>
+
+<behavior>
+When deciding how your characters act or make decisions:
+
+- Consider their personalities, but avoid cliches. Try to make it nuanced.
+- Consider the situation, characters' goals and desires, societal norms, recent events, previous agreements, etc.
+- Pay special attention to internal conflicts.
+</behavior>
+
+<narration>
+While narrating:
+
+- Provide sensory descriptions for {{user}}. Mostly what they see, sometimes what they hear, smell, feel.
+- Focus should always stay on interactions between your characters and {{user}}. Avoid mentioning the environment unless it's important.
+- Showcase the characters' unique voice, speech patterns, and vocabulary. Consider their age, background, personality etc.
+- Avoid cramping too many unimportant details in your response.
+- Always address {{user}} in second person.
+- Vary your language. Avoid using the same expressions, descriptions, and euphemisms that you already used in previous responses.
+- Do not narrate {{user}}'s words or actions.
+</narration>''',
+                'enabled': True,
+                'applicable_services': ['generation'],
+                'injection_order': 2
+            },
+            {
+                'identifier': 'cherrybox_story_context',
+                'name': 'Story Context Framework',
+                'category': 'core',
+                'content': '''<story_context>
+Here is the description of the story setting and its characters. Pay attention to all the details:
+
+{{char_description}}
+{{scenario}}
+{{personality}}
+</story_context>''',
+                'enabled': True,
+                'applicable_services': ['generation', 'maintenance'],
+                'injection_order': 3
+            }
+        ]
+        
+        # Style modules for writing and behavior
+        style_modules = [
+            {
+                'identifier': 'cherrybox_reminder',
+                'name': 'Scene Reminder',
+                'category': 'style',
+                'content': '''<reminder>
+A quick reminder:
+- Consider what {{user}} can see right now. Do not describe things that are out of their view.
+- Focus on character(s) with whom {{user}} interacts right now? Introduce other characters only if it will really benefit the story.
+- Prolong the scene.
+</reminder>''',
+                'enabled': True,
+                'applicable_services': ['generation'],
+                'injection_order': 10
+            },
+            {
+                'identifier': 'cherrybox_infoblock',
+                'name': 'Infoblock Tracker',
+                'category': 'style',
+                'content': '''End your response with "infoblock" to keep track of the scene. Be factual and to the point. Use the format below:
+
+<infoblock>
+```md
+Location: (Current location)
+Positions: (All the characters' and {{user}}'s current positions relative to each other.)
+Outfits: (For each character their current clothing and underwear. If it's not described, guess.)
+```
+</infoblock>''',
+                'enabled': False,
+                'applicable_services': ['generation'],
+                'injection_order': 11
+            }
+        ]
+        
+        # Stance modules for content handling
+        stance_modules = [
+            {
+                'identifier': 'cherrybox_nsfw',
+                'name': 'NSFW Content Guidelines',
+                'category': 'stance',
+                'content': '''<nsfw_preferences>
+
+All kind of explicit sexual content is allowed in this story. But do not rush straight to it. Try to build tension slowly.
+
+Use these guidelines in sexual/erotic scenes:
+- Don't rush to orgasm. Make sex conversational.
+- Take into account characters' age and sexual experience while describing their reactions to various activities.
+- Use the knowledge of human anatomy. Make sex realistic.
+- For female characters their arousment should depend on the situation (attraction to the partner, circumstances of the encounter etc.)
+
+Additionally, while narrating sexual situations, make them exciting and arousing with the following:
+
+- Describe characters' bodies (only what's visible to {{user}}).
+- Use straightforward, vulgar or anatomical terms like "pussy", "vagina", "cock", "penis", "ass" etc. Avoid euphemisms and metaphors.
+
+</nsfw_preferences>''',
+                'enabled': False,
+                'applicable_services': ['generation'],
+                'injection_order': 20
+            }
+        ]
+        
+        # Utility modules for special features
+        utility_modules = [
+            {
+                'identifier': 'cherrybox_persona',
+                'name': 'User Persona Integration',
+                'category': 'utility',
+                'content': '''<{{user}}>
+{{persona}}
+</{{user}}>''',
+                'enabled': True,
+                'applicable_services': ['generation', 'analysis'],
+                'injection_order': 30
+            },
+            {
+                'identifier': 'cherrybox_memory_maintenance',
+                'name': 'Memory and Consistency Tracking',
+                'category': 'utility',
+                'content': '''<memory_tracking>
+Monitor for:
+- Character development and relationship changes
+- Important story events and their consequences
+- New locations, objects, or world-building elements
+- Emotional states and character motivations
+- Consistency with established character traits and story elements
+
+Update session memory when significant changes occur to characters, relationships, or world state.
+</memory_tracking>''',
+                'enabled': True,
+                'applicable_services': ['analysis', 'maintenance'],
+                'injection_order': 31
+            },
+            {
+                'identifier': 'cherrybox_start_prompt',
+                'name': 'Roleplay Starter',
+                'category': 'utility',
+                'content': 'Let\'s start the roleplay.',
+                'enabled': False,
+                'applicable_services': ['generation'],
+                'injection_order': 99
+            }
+        ]
+        
+        # Create all modules with proper service assignments
+        all_modules = core_modules + style_modules + stance_modules + utility_modules
+        
+        for module_data in all_modules:
+            module = PromptModule(
+                id=str(uuid.uuid4()),
+                preset_id=preset_id,
+                identifier=module_data['identifier'],
+                name=module_data['name'],
+                category=module_data['category'],
+                content=module_data['content'],
+                enabled=module_data['enabled'],
+                injection_position=0,
+                injection_depth=4,
+                injection_order=module_data['injection_order'],
                 forbid_overrides=False,
-                role='system'
+                role='system',
+                applicable_services=json.dumps(module_data['applicable_services']),
+                is_core_module=(module_data['category'] == 'core'),
+                service_priority=module_data['injection_order']
             )
             db.add(module)
         

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { 
   createOrGetCardChat,
   getAllScenarioCards,
+  createScenarioCard,
   deleteScenarioCard,
   getAllMasterWorlds,
   updateScenarioCard,
@@ -22,7 +23,7 @@ import ScenarioEditPanel from '../components/Editing/ScenarioEditPanel';
 const ScenariosPageContext: React.FC = () => {
   const navigate = useNavigate();
   const { setLeftPanelContent, setRightPanelContent, setLeftPanelVisible, setRightPanelVisible } = useLayout();
-  const { setActiveCard } = useActiveCard();
+  const { setActiveCard, clearActiveCard } = useActiveCard();
   
   const [scenarios, setScenarios] = useState<ScenarioCardData[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -129,12 +130,20 @@ const ScenariosPageContext: React.FC = () => {
     // Don't clear panels when scenario is null
     // Let it preserve content from other pages until a new scenario is selected
   };
-
   const handleEditFieldChange = (field: string, value: any) => {
     if (editingScenario) {
       const updatedScenario = { ...editingScenario, [field]: value };
       setEditingScenario(updatedScenario);
       updateLayoutContent(updatedScenario);
+      
+      // Update active card context with new field values
+      setActiveCard({
+        type: 'scenario',
+        id: updatedScenario.id,
+        name: updatedScenario.name,
+        image: updatedScenario.image_url || undefined,
+        description: updatedScenario.description || undefined
+      });
     }
   };
 
@@ -142,9 +151,10 @@ const ScenariosPageContext: React.FC = () => {
     if (!window.confirm('Are you sure you want to delete this scenario?')) return;
     
     try {
-      await deleteScenarioCard(scenarioId);
-      if (editingScenario?.id === scenarioId) {
+      await deleteScenarioCard(scenarioId);      if (editingScenario?.id === scenarioId) {
         setEditingScenario(null);
+        // Clear active card context
+        clearActiveCard();
         // Only clear panels if we're deleting the currently edited scenario
         setLeftPanelContent(null);
         setRightPanelContent(null);
@@ -213,21 +223,32 @@ const ScenariosPageContext: React.FC = () => {
   return (
     <div className="h-full">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-bold font-quintessential text-white">Scenarios</h1>
+        <h1 className="text-4xl font-bold text-white">Scenarios</h1>
         <div>
           <button
             onClick={() => importFileInputRef.current?.click()}
             className="bg-app-text text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md mr-2"
           >
             Import
-          </button>
-          <button
-            onClick={() => handleEditScenario({ 
-              id: 'new', 
-              name: 'New Scenario', 
-              description: 'Enter description...',
-              instructions: 'Enter instructions...'
-            } as ScenarioCardData)}
+          </button>          <button
+            onClick={async () => {
+              try {
+                // Create a new scenario with minimal data
+                const formData = new FormData();
+                formData.append('data', JSON.stringify({
+                  name: 'New Scenario',
+                  description: '',
+                  instructions: ''
+                }));
+                
+                const newScenario = await createScenarioCard(formData);
+                setScenarios(prev => [...prev, newScenario]);
+                handleEditScenario(newScenario);
+              } catch (error) {
+                console.error('Failed to create new scenario:', error);
+                setError('Failed to create new scenario.');
+              }
+            }}
             className="bg-app-text text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
           >
             New +

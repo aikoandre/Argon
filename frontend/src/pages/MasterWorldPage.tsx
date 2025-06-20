@@ -12,6 +12,7 @@ import {
   type MasterWorldData,
 } from '../services/api';
 import { useLayout } from '../contexts/LayoutContext';
+import { useActiveCard } from '../contexts/ActiveCardContext';
 import LoreEntryEditPanel from '../components/Editing/LoreEntryEditPanel';
 
 const iconBaseClass = "material-icons-outlined text-2xl flex-shrink-0";
@@ -50,6 +51,13 @@ const MasterWorldPageContext: React.FC = () => {
   const navigate = useNavigate();
   const { masterWorldId } = useParams<{ masterWorldId: string }>();
   const { setLeftPanelContent, setRightPanelContent, setLeftPanelVisible, setRightPanelVisible } = useLayout();
+  const { clearActiveCard } = useActiveCard();
+  
+  // CRITICAL: Set panels visible immediately to prevent layout shifts during animation
+  React.useLayoutEffect(() => {
+    setLeftPanelVisible(true);
+    setRightPanelVisible(true);
+  }, [setLeftPanelVisible, setRightPanelVisible]);
   
   // Master World states  
   const [masterWorlds, setMasterWorlds] = useState<MasterWorldData[]>([]);
@@ -119,21 +127,12 @@ const MasterWorldPageContext: React.FC = () => {
       setError('Failed to load lore entries or world details.');
       console.error(err);
       setLoreEntries([]);
-      setFactionsOptions([]);
-    } finally {
+      setFactionsOptions([]);    } finally {
       setIsLoading(false);
     }
   }, [selectedMasterWorld, masterWorlds]);
-
   useEffect(() => {
-    fetchMasterWorlds();
-  }, []);
-
-  // Set panels visible when MasterWorldPage loads
-  useEffect(() => {
-    setLeftPanelVisible(true);
-    setRightPanelVisible(true);
-  }, [setLeftPanelVisible, setRightPanelVisible]);
+    fetchMasterWorlds();  }, []); 
 
   // Set initial selected world based on URL
   useEffect(() => {
@@ -176,10 +175,13 @@ const MasterWorldPageContext: React.FC = () => {
   //   },
   //   { debounceMs: 300 }
   // );
-
   // Handle editing lore entry
   const handleEditEntry = (entry: LoreEntryData) => {
     setEditingEntry(entry);
+    
+    // Clear active card since lore entries don't fit the standard card types
+    clearActiveCard();
+    
     updateLayoutContent(entry);
   };
 
@@ -207,35 +209,6 @@ const MasterWorldPageContext: React.FC = () => {
     // Don't clear panels when entry is null
     // Let it preserve content from other pages until a new lore entry is selected
   };
-
-  const handleSaveNewEntry = useCallback(async (entryData: LoreEntryData) => {
-    try {
-      const { id, created_at, updated_at, ...createData } = entryData;
-      const createdEntry = await createLoreEntryForMasterWorld(entryData.master_world_id, createData);
-      
-      // Replace the temporary entry with the real one in the list
-      setLoreEntries(prev => prev.map(entry => 
-        entry.id === 'new' ? createdEntry : entry
-      ));
-      
-      // Update the editing entry with the real ID
-      setEditingEntry(createdEntry);
-      // DON'T call updateLayoutContent here - it causes the component to lose focus
-      // The LoreEntryEditPanel will automatically get the updated loreEntry prop
-      
-      // Don't need to call fetchLoreEntries since we updated the list manually
-    } catch (err) {
-      console.error('Failed to create lore entry:', err);
-      setError('Failed to save new lore entry.');
-      
-      // Remove the temporary entry from the list on error
-      setLoreEntries(prev => prev.filter(entry => entry.id !== 'new'));
-      setEditingEntry(null);
-      setLeftPanelContent(null);
-      setRightPanelContent(null);
-    }
-  }, [setLeftPanelContent, setRightPanelContent]);
-
   const handleEditFieldChange = useCallback((field: string, value: any) => {
     if (editingEntry) {
       const updatedEntry = { ...editingEntry, [field]: value };
@@ -245,27 +218,9 @@ const MasterWorldPageContext: React.FC = () => {
       setLoreEntries(prev => prev.map(entry => 
         entry.id === editingEntry.id ? updatedEntry : entry
       ));
-      
-      // If this is a new entry and we have enough data, save it
-      if (updatedEntry.id === 'new' && updatedEntry.name && updatedEntry.name !== 'New Lore Entry' && updatedEntry.master_world_id) {
-        handleSaveNewEntry(updatedEntry);
-      }
     }
-  }, [editingEntry, handleSaveNewEntry]);
-
+  }, [editingEntry]);
   const handleDelete = async (entryId: string) => {
-    // Handle deleting a new entry that hasn't been saved yet
-    if (entryId === 'new') {
-      if (!window.confirm('Are you sure you want to discard this new lore entry?')) return;
-      
-      // Remove from the list and clear editing state
-      setLoreEntries(prev => prev.filter(entry => entry.id !== 'new'));
-      setEditingEntry(null);
-      setLeftPanelContent(null);
-      setRightPanelContent(null);
-      return;
-    }
-    
     // Find the entry to get its master_world_id
     const entryToDelete = loreEntries.find(entry => entry.id === entryId);
     if (!entryToDelete?.master_world_id) {
@@ -280,9 +235,9 @@ const MasterWorldPageContext: React.FC = () => {
       
       // Remove from the local list
       setLoreEntries(prev => prev.filter(entry => entry.id !== entryId));
-      
-      if (editingEntry?.id === entryId) {
+        if (editingEntry?.id === entryId) {
         setEditingEntry(null);
+        clearActiveCard();
         // Only clear panels if we're deleting the currently edited lore entry
         setLeftPanelContent(null);
         setRightPanelContent(null);
@@ -335,64 +290,57 @@ const MasterWorldPageContext: React.FC = () => {
       console.error(err);
     }
   };
-
-  const handleCreateNewEntry = () => {
+  const handleCreateNewEntry = async () => {
     if (!selectedMasterWorld) {
       setError("Please select a Master World before creating a new lore entry.");
       return;
     }
     
-    const newEntry: LoreEntryData = {
-      id: 'new',
-      name: 'New Lore Entry',
-      entry_type: 'CHARACTER_LORE',
-      description: 'Enter description...',
-      tags: [],
-      aliases: [],
-      faction_id: null,
-      master_world_id: selectedMasterWorld.value,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-    
-    // Add the new entry to the lore entries list so it appears as a card
-    setLoreEntries(prev => [newEntry, ...prev]);
-    
-    // Set it as the editing entry and update panels
-    handleEditEntry(newEntry);
+    try {
+      // Create a new lore entry with minimal data
+      const formData = new FormData();
+      formData.append('data', JSON.stringify({
+        name: 'New Lore Entry',
+        entry_type: 'CHARACTER_LORE',
+        description: '',
+        tags: [],
+        aliases: [],
+        faction_id: null,
+        master_world_id: selectedMasterWorld.value
+      }));
+      
+      const newEntry = await createLoreEntryForMasterWorld(selectedMasterWorld.value, formData);
+      setLoreEntries(prev => [newEntry, ...prev]);
+      handleEditEntry(newEntry);
+    } catch (error) {
+      console.error('Failed to create new lore entry:', error);
+      setError('Failed to create new lore entry.');
+    }
   };
-
-  if (isLoading || isLoadingWorlds) {
-    return <p className="text-center text-gray-400 p-10">Loading lore entries...</p>;
-  }
-
-  return (
-    <div className="flex flex-col h-full max-h-[calc(100vh-120px)] overflow-hidden">
-      {/* Header and controls */}
-      <div className="mb-4 flex-shrink-0">
-        <div className="flex justify-between items-center">
-          <h1 className="text-4xl font-bold text-white font-quintessential">
-            MasterWorld
-          </h1>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowCreateWorldModal(true)}
-              className="bg-app-text text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md flex items-center gap-2"
-            >
-              New <span className="material-icons-outlined">public</span>
-            </button>
-            {selectedMasterWorld && (
-              <button
-                onClick={handleCreateNewEntry}
-                className="bg-app-text text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md"
-              >
-                + New Lore
-              </button>
-            )}
-          </div>
+  if (isLoadingWorlds) {
+    return <p className="text-center text-gray-400 p-10">Loading master worlds...</p>;
+  }  return (
+    <div className="flex flex-col h-full">
+      <div className="flex justify-between items-center mb-8 flex-shrink-0">
+        <h1 className="text-4xl font-bold text-white">
+          MasterWorld
+        </h1>
+        <div className="flex gap-2 min-w-[200px] justify-end">
+          <button
+            onClick={() => setShowCreateWorldModal(true)}
+            className="bg-app-text text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md flex items-center gap-2"
+          >
+            New <span className="material-icons-outlined">public</span>
+          </button>
+          <button
+            onClick={handleCreateNewEntry}
+            disabled={!selectedMasterWorld}
+            className="bg-app-text text-app-surface font-semibold py-2 px-4 rounded-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+          >
+            + New Lore
+          </button>
         </div>
-      </div>
-
+      </div>      
       {/* Master World Dropdown with Delete Button */}
       <div className="mb-4 flex-shrink-0">
         <div className="flex items-center gap-2">
@@ -426,42 +374,51 @@ const MasterWorldPageContext: React.FC = () => {
               }}
             />
           </div>
-          {selectedMasterWorld && (
-            <button
-              onClick={() => handleDeleteWorld(selectedMasterWorld.value)}
-              className="bg-red-600 hover:bg-red-700 text-white px-1 py-0.5 rounded-lg shadow-md transition-colors"
-              title="Delete Master World"
-            >
-              <DeleteIcon className="h-6 w-6" />
-            </button>
-          )}
+          <button
+            onClick={() => selectedMasterWorld && handleDeleteWorld(selectedMasterWorld.value)}
+            disabled={!selectedMasterWorld}
+            className="bg-red-600 hover:bg-red-700 text-white px-1 py-0.5 rounded-lg shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[40px] h-[40px] flex items-center justify-center"
+            title="Delete Master World"
+          >
+            <DeleteIcon className="h-6 w-6" />
+          </button>
         </div>
-      </div>
-
-      {error && (
-        <p className="bg-red-700 text-white p-3 rounded-md mb-2 text-center flex-shrink-0">
-          {error}
-        </p>
-      )}
-
+      </div>      
+      {/* Error message container */}
+      <div className="mb-2 flex-shrink-0">
+        {error && (
+          <p className="bg-red-700 text-white p-3 rounded-md text-center">
+            {error}
+          </p>
+        )}
+      </div>      
       {/* Scrollable section titles and cards */}
-      <div className="overflow-y-auto flex-1 min-h-0 space-y-8 pb-4 scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border hover:scrollbar-thumb-app-text">
-        {!selectedMasterWorld ? (
-          <div className="flex flex-col items-center justify-center h-full text-center py-20">
-            <span className="material-icons-outlined text-6xl text-gray-500 mb-4">public</span>
-            <h3 className="text-2xl font-semibold text-gray-400 mb-2">No Master World Selected</h3>
-            <p className="text-gray-500 max-w-md">
-              Please select a Master World from the dropdown above to view and manage its lore entries.
-            </p>
+      <div className="max-h-96 overflow-y-auto pb-4 scrollbar-thin scrollbar-track-app-bg scrollbar-thumb-app-border hover:scrollbar-thumb-app-text">
+        {/* Always render the sections container to maintain consistent DOM structure */}
+        {(!selectedMasterWorld) ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <div className="space-y-4">
+              <span className="material-icons-outlined text-6xl text-gray-500">public</span>
+              <h3 className="text-2xl font-semibold text-gray-400">No Master World Selected</h3>
+              <p className="text-gray-500 max-w-md">
+                Please select a Master World from the dropdown above to view and manage its lore entries.
+              </p>
+            </div>
+          </div>
+        ) : isLoading ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <div className="space-y-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-app-text mx-auto"></div>
+              <p className="text-gray-400">Loading lore entries...</p>
+            </div>
           </div>
         ) : (
           DISPLAY_ENTRY_TYPES_ORDER.map(entryType => {
             const friendlyTypeName = getFriendlyEntryTypeName(entryType);
             const entriesOfType = loreEntries.filter(entry => entry.entry_type === entryType);
-
             return (
-              <div key={entryType}>
-                <h3 className="text-2xl font-semibold text-app-text mb-2 border-b border-gray-700 pb-2 font-quintessential">
+              <div key={entryType} className="mb-8">
+                <h3 className="text-2xl font-semibold text-app-text mb-2 border-b border-gray-700 pb-2">
                   {friendlyTypeName}
                 </h3>
                 {entriesOfType.length === 0 ? (

@@ -422,7 +422,7 @@ const SettingsPage: React.FC = () => {
   }
   return (
     <div className="text-white h-full max-h-[calc(90vh-65px)] overflow-hidden flex flex-col">
-      <h1 className="text-4xl font-bold text-white font-quintessential mb-8 flex-shrink-0">
+      <h1 className="text-4xl font-bold text-white mb-8 flex-shrink-0">
         Application Settings
       </h1>
       {error && (

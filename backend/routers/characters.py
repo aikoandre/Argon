@@ -28,11 +28,10 @@ async def create_character(
     image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db)
 ):
-    """Create a new character with optional image upload"""
-    """
+    """Create a new character with optional image upload"""    """
     Creates a new character with optional image upload.
     """
-    from ..models.master_world import MasterWorld
+    from models.master_world import MasterWorld
     
     # Validate master world if provided
     if master_world_id:
@@ -112,9 +111,8 @@ async def update_character(
     db: Session = Depends(get_db)
 ):
     """
-    Updates a character including optional image update or removal.
-    """
-    from ..models.master_world import MasterWorld
+    Updates a character including optional image update or removal.    """
+    from models.master_world import MasterWorld
 
     db_character = db.query(CharacterCard).filter(CharacterCard.id == character_id).first()
     if not db_character:

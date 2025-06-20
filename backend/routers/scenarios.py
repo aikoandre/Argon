@@ -28,14 +28,13 @@ async def create_scenario_card(
     Aceita multipart/form-data com um campo 'data' contendo os dados do cenário em JSON
     e um campo opcional 'image' contendo a imagem do cenário.
     """
-    try:
-        # Parse the JSON data from the form
+    try:        # Parse the JSON data from the form
         scenario_data = json.loads(data)
         scenario = ScenarioCardCreate(**scenario_data)
         
-        from ..models.master_world import MasterWorld
-        from ..models.user_persona import UserPersona
-        from ..models.lore_entry import LoreEntry
+        from models.master_world import MasterWorld
+        from models.user_persona import UserPersona
+        from models.lore_entry import LoreEntry
         
         print(f"Attempting to create scenario with data: {scenario.model_dump()}")  # Debug log
         
@@ -112,13 +111,12 @@ async def update_scenario_card(
     - image: arquivo opcional para nova imagem
     - remove_image: flag opcional para remover imagem existente
     """
-    try:
-        # Parse the JSON data from the form
+    try:        # Parse the JSON data from the form
         update_data = json.loads(data)
         scenario_update = ScenarioCardUpdate(**update_data)
         
-        from ..models.master_world import MasterWorld
-        from ..models.lore_entry import LoreEntry
+        from models.master_world import MasterWorld
+        from models.lore_entry import LoreEntry
 
         db_scenario = db.query(ScenarioCard).filter(ScenarioCard.id == scenario_id).first()
         if db_scenario is None:

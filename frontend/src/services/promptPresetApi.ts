@@ -179,3 +179,8 @@ export const createDefaultNemoPreset = async (): Promise<PromptPreset> => {
   const response = await apiClient.post('/prompt-presets/create-default-nemo');
   return response.data;
 };
+
+export const createDefaultCherryBoxPreset = async (): Promise<PromptPreset> => {
+  const response = await apiClient.post('/prompt-presets/create-default-cherrybox');
+  return response.data;
+};

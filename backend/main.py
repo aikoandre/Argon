@@ -37,8 +37,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import asyncio
 from background_tasks import embedding_worker
-# Temporarily commented out problematic import:
-# from routers.lore_entries import router as lore_entries_router, all_lore_router
+from routers.lore_entries import router as lore_entries_router, all_lore_router
 from routers.chat import router as chat_router
 from routers.scenarios import router as scenarios_router
 from routers.personas import router as personas_router
@@ -243,9 +242,8 @@ async def test_serve_image():
     return FileResponse(image_path)
 
 # Include other routers
-# Temporarily commented out:
-# app.include_router(lore_entries_router)
-# app.include_router(all_lore_router)
+app.include_router(lore_entries_router)
+app.include_router(all_lore_router)
 app.include_router(chat_router, prefix="/api/chat")
 app.include_router(scenarios_router)
 app.include_router(personas_router)

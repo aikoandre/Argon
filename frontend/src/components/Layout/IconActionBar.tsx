@@ -18,17 +18,22 @@ const icons = [
 ];
 
 const MaterialIcon = ({ icon, className = "" }: { icon: string; className?: string }) => (
-  <span className={`material-icons-outlined text-2xl ${className}`}>{icon}</span>
+  <span className={`material-icons-outlined text-xl ${className}`}>{icon}</span>
 );
 
 const IconActionBar: React.FC<IconActionBarProps> = (props) => (
-  <div className="p-1 flex flex-row items-center justify-center gap-4 border-b border-app-border bg-app-bg">
+  <div className="p-1.5 flex flex-row items-center justify-between border-b border-app-border bg-app-bg">
+    <h3 className="text-lg font-semibold text-app-text flex items-center gap-2">
+      <span className="material-icons-outlined text-xl pl-3">edit</span>
+      Edit
+    </h3>
+    <div className="flex items-center gap-6 pr-5">
     {icons.map(({ key, icon, label, onClick }) => {
       const clickHandler = props[onClick as keyof IconActionBarProps] as (() => void) | undefined;
       return (
         <button
           key={key}
-          className="px-1 rounded-lg border-2 border-app-bg hover:bg-app-bg/60 focus:outline-none focus:ring-2 focus:ring-app-primary"
+          className="text-app-text-secondary"
           title={label}
           aria-label={label}
           onClick={() => {
@@ -46,6 +51,7 @@ const IconActionBar: React.FC<IconActionBarProps> = (props) => (
         </button>
       );
     })}
+    </div>
   </div>
 );
 
